@@ -4,7 +4,6 @@ devtools::load_all()
 
 # Reminder of the default options
 # val_build(
-#   r_ver = getRversion(),
 #   pkg_names = NULL, 
 #   deps = c("depends", "suggests"), 
 #   out = 'riskassessment',

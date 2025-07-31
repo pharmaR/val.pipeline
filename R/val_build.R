@@ -9,14 +9,17 @@
 #' @importFrom stringr word
 #' 
 val_build <- function(
-    r_ver = getRversion(),
-    pkg_names = NULL, # pkg_names = "aamatch", pkg_names = "zoo"
+    pkg_names = NULL, #
     deps = c("depends", "suggests"), # deps = c("depends"), deps = NULL
     out = 'riskassessment',
     opt_repos = c(val_build_repo = "https://cran.r-project.org")){
   
+  
   # r_ver = '4.5.1' # for debugging
-  # pkg_names = tidy_pop$Package # for debugging
+  # pkg_names = "aamatch", pkg_names = "zoo" # for debugging
+  
+  # Doesn't need to be an arg
+  r_ver = getRversion()
   
   # Grab val date, output messaging
   val_start <- Sys.time()

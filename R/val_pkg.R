@@ -109,13 +109,16 @@ val_pkg <- function(
   # ---- Can Install? ----
   # Make sure we can install cleanly first, else don't with assessment, return meta
   
+  
   clean_install <- TRUE # Add logic here later
+  
+  
   if(!clean_install) {
     # save metadata
     meta_list <- list(
       pkg = pkg,
       ver = ver,
-      r_ver = r_ver,
+      r_ver = getRversion(),
       sys_info = R.version,
       val_date = val_date,
       clean_install = clean_install,
@@ -135,13 +138,15 @@ val_pkg <- function(
   }
   
   # ---- Ref ---- 
+  # Do I need to pull a 'pkg_cran_remote' here as well?
   pkg_src_ref <- riskmetric::pkg_ref(file.path(sourced, pkg), source = "pkg_source")
   cat("\n-->", pkg_v,"referrenced.\n")
   
   # ---- Assess ---- 
+  # Do I need to pull a 'pkg_cran_remote' assessment here as well?
   pkg_src_assessment <- riskmetric::pkg_assess(pkg_src_ref)
-  # pkg_src_assessment$covr_coverage$totalcoverage
-  # covr <- riskmetric::assess_covr_coverage(pkg_src_ref)
+    # pkg_src_assessment$covr_coverage$totalcoverage
+    # covr <- riskmetric::assess_covr_coverage(pkg_src_ref)
   assessed_end <- Sys.time()
   ass_mins <- difftime(assessed_end, start, units = "mins")
   ass_mins_txt <- capture.output(assessed_end - start)
@@ -181,14 +186,14 @@ val_pkg <- function(
   meta_list <- list(
     pkg = pkg,
     ver = ver,
-    r_ver = r_ver,
+    r_ver = getRversion(),
     sys_info = R.version,
     val_date = val_date,
     clean_install = clean_install,
     # metrics = pkg_src_assessment, # saved separately for {riskreports}
     decision = decision,
     final_decision = NULL, # Will be set later
-    depends = depends, # populate this from avail
+    depends = depends, 
     suggests = suggests,
     assessment_runtime = list(txt = ass_mins_txt, mins = ass_mins)
   )
