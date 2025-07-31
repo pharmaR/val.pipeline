@@ -4,7 +4,7 @@
 \alias{val_pkg}
 \title{Package Validation}
 \usage{
-val_pkg(pkg, ver, avail_pkgs, out_dir)
+val_pkg(pkg, ver, avail_pkgs, out_dir, val_date = Sys.Date())
 }
 \description{
 Validation process at the package level. Includes steps...

@@ -5,7 +5,6 @@
 \title{Build Validation}
 \usage{
 val_build(
-  r_ver = getRversion(),
   pkg_names = NULL,
   deps = c("depends", "suggests"),
   out = "riskassessment",

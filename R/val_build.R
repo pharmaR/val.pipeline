@@ -95,7 +95,6 @@ val_build <- function(
   
   # ---- Run through the list of packages ----
   pkg_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
-    
     # i <- 1 # for debugging
     # pkg <- pkgs[i] # for debugging
     # ver <- vers[i] # for debugging
@@ -109,7 +108,8 @@ val_build <- function(
         pkg = pkg,
         ver = ver,
         avail_pkgs = avail_pkgs,
-        out_dir = val_dir)
+        out_dir = val_dir,
+        val_date = val_date)
     } else {
       cat(paste0("\n\n\nAttempted New Package: ", pkg, " v", ver,", but already assessed.\n\n"))
       pkg_meta <- readRDS(pkg_meta_file)
@@ -145,6 +145,11 @@ val_build <- function(
   end <- Sys.time()
   end_txt <- capture.output(end - start)
   cat(end_txt)
+  
+  # Return object 
+  return(list(
+    val_dir = val_dir
+  ))
 }
 
 # val_build(pkg_names = c('aamatch'), deps = NULL)

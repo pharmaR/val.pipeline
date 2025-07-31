@@ -11,7 +11,8 @@ val_pkg <- function(
     pkg,
     ver,
     avail_pkgs,
-    out_dir
+    out_dir,
+    val_date = Sys.Date()
 ) {
   # i <- 1 # for debugging
   # pkg <- pkgs[i] # for debugging
