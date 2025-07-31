@@ -1,3 +1,3 @@
 # val.pipeline (development version)
 
-* Initial CRAN submission.
+* Initial version - contains skeleton workflow

@@ -1,0 +1,21 @@
+Package: val.pipeline
+Title: Validation Pipeline Example
+Version: 0.0.0.9000
+Authors@R: 
+    person("Aaron", "Clark", role = c("aut", "cre"), email = "clark.aaronchris@gmail.com")
+Description: An experimental repository with the goal of bringing together a lot of the R Val Hub's tools under a single workflow to produce the outputs necessary to qualify R packages for a GxP system.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Imports: 
+    dplyr,
+    glue,
+    purrr,
+    riskmetric (>= 0.2.5),
+    stringr
+Remotes:  
+    pharmaR/riskmetric
