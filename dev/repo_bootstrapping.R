@@ -10,9 +10,9 @@ usethis::use_mit_license()
 usethis::use_lifecycle_badge( "Experimental" ) #Experimental, Maturing, Stable, Superseded, Archived, Dormant, Questioning
 usethis::use_news_md( open = TRUE )
 usethis::use_testthat()
-devtools::document()
+devtools::document() # ran 
 
-
+# Install packages
 # CRAN pkgs
 pak::pak("dplyr")
 pak::pak("stringr")
