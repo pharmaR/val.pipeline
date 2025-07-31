@@ -3,7 +3,8 @@
 #' 
 #' 
 #' @importFrom glue glue
-#' @importFrom dplyr filter pull unite
+#' @importFrom tidyr unite
+#' @importFrom dplyr filter pull
 #' @importFrom purrr map2 set_names
 #' @importFrom stringr word
 #' 
@@ -43,7 +44,7 @@ val_build <- function(
     pkgs <- avail_pkgs$Package
   } else {
     
-    base_pkgs <- avail_pkgs |> dplyr::dplyr::filter(Package %in% pkg_names)
+    base_pkgs <- avail_pkgs |> dplyr::filter(Package %in% pkg_names)
     if(length(base_pkgs$Package) != length(pkg_names)) {
       missing_pkgs <- pkg_names[!pkg_names %in% base_pkgs$Package]
       wrn_msg <- paste("Not all pkgs found in repo. Missing pkgs include:",
@@ -54,7 +55,7 @@ val_build <- function(
     # grab depends
     depends <- if("depends" %in% tolower(deps)){
       base_pkgs |>
-        dplyr::unite(pkg_deps, c(Depends, Imports, LinkingTo), sep = ", ", na.rm = TRUE) |>
+        tidyr::unite(pkg_deps, c(Depends, Imports, LinkingTo), sep = ", ", na.rm = TRUE) |>
         dplyr::pull(pkg_deps)
     } else NULL
     

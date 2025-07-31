@@ -16,6 +16,9 @@ Imports:
     glue,
     purrr,
     riskmetric (>= 0.2.5),
-    stringr
+    riskreports (>= 0.0.0.9006),
+    stringr,
+    tidyr
 Remotes:  
-    pharmaR/riskmetric
+    pharmaR/riskmetric,
+    pharmaR/riskreports
