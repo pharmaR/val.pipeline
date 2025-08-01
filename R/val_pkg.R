@@ -174,7 +174,7 @@ val_pkg <- function(
       final_decision = "High Risk",
       depends = if(identical(depends, character(0))) NA_character_ else depends,
       suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
-      assessment_runtime = list(txt = ass_mins_txt, mins = ass_mins)
+      assessment_runtime = list(txt = NA_character_, mins = NA)
     )
     saveRDS(meta_list, file.path(meta_list, glue::glue("{pkg_v}_meta.rds")))
     cat("\n-->", pkg_v,"didn't install cleanly.")

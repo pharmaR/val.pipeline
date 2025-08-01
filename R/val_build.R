@@ -38,12 +38,11 @@ val_build <- function(
   # ---- Set repos option ----
   #
   old <- options()
-  # onStop(function() options(old))
   on.exit(function() options(old))
   if(ref == 'source') {
-    options(repos = opt_repos, pkgType = "source")
+    options(repos = opt_repos, pkgType = "source") # , rlang_interactive = FALSE
   } else {
-    options(repos = opt_repos)
+    options(repos = opt_repos) # , rlang_interactive = FALSE
   }
   
   
