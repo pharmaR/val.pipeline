@@ -23,6 +23,7 @@ pak::pak("tidyr")
 # GitHub pkgs
 pak::pak("pharmaR/riskmetric")
 pak::pak("pharmaR/riskreports")
+pak::pak("Sanofi-Public/risk.assessr")
 
 # Add to Description
 usethis::use_package("dplyr")
@@ -32,6 +33,7 @@ usethis::use_package("glue")
 usethis::use_package("tidyr")
 usethis::use_dev_package("riskmetric") #, min_version = "0.2.5") 
 usethis::use_dev_package("riskreports")
+usethis::use_dev_package("risk.assessr")
 
 # renv
 pak::pak("renv")

@@ -10,10 +10,18 @@
 #' 
 val_build <- function(
     pkg_names = NULL, #
+    ref = "source", 
+    metric_pkg = "riskmetric",
     deps = c("depends", "suggests"), # deps = c("depends"), deps = NULL
+    val_date = Sys.Date(),
     out = 'riskassessment',
-    opt_repos = c(val_build_repo = "https://cran.r-project.org")){
+    opt_repos = c(val_build_repo = "https://cran.r-project.org")
+    ){
   
+  # assess args
+  if(!ref %in% c('risk.assessr', 'riskmetric')) stop("'metric_pkg' arg must be either 'riskmetric' or 'risk.assessr' but '", metric_pkg, "' was given.")
+  if(!ref %in% c('source', 'remote')) stop("'ref' arg must be either 'source' or 'remote' but '", ref, "' was given.")
+  stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
   
   # r_ver = '4.5.1' # for debugging
   # pkg_names = "aamatch", pkg_names = "zoo" # for debugging
@@ -24,7 +32,7 @@ val_build <- function(
   # Grab val date, output messaging
   val_start <- Sys.time()
   val_start_txt <- format(val_start, '%Y-%m-%d %H:%M:%S', tz = 'US/Eastern', usetz = TRUE)
-  val_date <- as.Date(val_start)
+  val_date <- as.Date(val_date)
   val_date_txt <- gsub("-", "", val_date)
   cat(paste0("\n\n\nNew Validation build: R v", r_ver, " @ ", val_start_txt,"\n\n"))
   
@@ -33,7 +41,12 @@ val_build <- function(
   old <- options()
   # onStop(function() options(old))
   on.exit(function() options(old))
-  options(repos = opt_repos, pkgType = "source")
+  if(ref == 'source') {
+    options(repos = opt_repos, pkgType = "source")
+  } else {
+    options(repos = opt_repos)
+  }
+  
   
   # ---- Grab pkgs & their versions ----
   # great place to add package filtering based on any non-metric based criteria?
@@ -108,6 +121,8 @@ val_build <- function(
         pkg = pkg,
         ver = ver,
         avail_pkgs = avail_pkgs,
+        ref = ref,
+        metric_pkg = metric_pkg,
         out_dir = val_dir,
         val_date = val_date)
     } else {

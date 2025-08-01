@@ -15,10 +15,12 @@ Imports:
     dplyr,
     glue,
     purrr,
+    risk.assessr (>= 2.0.0),
     riskmetric (>= 0.2.5),
     riskreports (>= 0.0.0.9006),
     stringr,
     tidyr
 Remotes:  
     pharmaR/riskmetric,
-    pharmaR/riskreports
+    pharmaR/riskreports,
+    Sanofi-Public/risk.assessr
