@@ -6,7 +6,10 @@
 \usage{
 val_build(
   pkg_names = NULL,
+  ref = "source",
+  metric_pkg = "riskmetric",
   deps = c("depends", "suggests"),
+  val_date = Sys.Date(),
   out = "riskassessment",
   opt_repos = c(val_build_repo = "https://cran.r-project.org")
 )

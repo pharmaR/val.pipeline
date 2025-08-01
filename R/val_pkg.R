@@ -30,8 +30,9 @@ val_pkg <- function(
   start_txt <- format(start, '%H:%M:%S', tz = 'US/Eastern', usetz = TRUE)
   cat(paste0("\n\n\nNew Package: ", pkg, " v", ver," @ ", start_txt,"\n"))
   
-  
+  #
   # ---- Setup Dirs ----
+  #
   if(ref == "source"){
     tarballs <- file.path(out_dir, 'tarballs')
     sourced <- file.path(out_dir, 'sourced')
@@ -47,10 +48,10 @@ val_pkg <- function(
   if(!dir.exists(reports)) dir.create(reports)
   
   if(ref == "source") {
-    # ---- Download Tarball ----
-    # ref <- riskmetric::pkg_ref(pkg, source = "pkg_cran_remote")
-    # ref$tarball_url
     
+    #
+    # ---- Download Tarball ----
+    #
     tarball_url <- paste0("https://cran.r-project.org/src/contrib/", pkg_v,".tar.gz")
     dwn_ld <- try(utils::download.file(tarball_url,
                                        file.path(tarballs, basename(tarball_url)), 
@@ -63,14 +64,18 @@ val_pkg <- function(
       cat("\n-->", pkg_v,"downloaded.\n")
     }
     
+    #
     # ---- Untar ---- 
+    #
     tar_file <- file.path(tarballs, glue::glue("{pkg_v}.tar.gz"))
     utils::untar(tar_file, exdir = sourced)
     cat("\n-->", pkg_v,"untarred.\n")
     
-    # ---- Grab suggests ----
-    
+    #
+    # ---- Grab Dependencies (using archive)
+    #
     # Not being used...
+    
     # if(file.exists(tar_file)) {
     #   arch <- archive::archive(file.path(tarballs, glue::glue("{pkg_v}.tar.gz"))) |>
     #     dplyr::arrange(tolower(path))
@@ -101,6 +106,9 @@ val_pkg <- function(
     # }
   }
   
+  #
+  # ---- Grab Dependencies ----
+  #
   # Grab deps (Depends, Imports, LinkingTo, Suggests)
   pkg_base <- avail_pkgs |> dplyr::filter(Package %in% pkg)
   
@@ -177,8 +185,11 @@ val_pkg <- function(
     cat("\n-->", pkg_v,"installed cleanly.\n")
   }
   
+  
+  #
+  # ---- Assess ---- 
+  #
   if(metric_pkg == "riskmetric"){
-    # ---- Ref ---- 
     if(ref == "source") {
       pkg_ref <- riskmetric::pkg_ref(file.path(sourced, pkg), source = "pkg_source")
     } else { # ref == "remote"
@@ -187,7 +198,6 @@ val_pkg <- function(
     } 
     cat("\n-->", pkg_v,"referrenced.\n")
     
-    # ---- Assess ---- 
     # Do I need to pull a 'pkg_cran_remote' assessment here as well?
     pkg_assessment <- riskmetric::pkg_assess(pkg_ref)
     # pkg_assessment$covr_coverage$totalcoverage
@@ -221,16 +231,22 @@ val_pkg <- function(
   cat("\n-->", pkg_v,"assessed.\n")
   cat("--> (", ass_mins_txt, ")\n")
   
-  # ---- Eval & Filter ----
-  # Make a risk decision for the package threshold criteria we set
-  decision <- sample(c("Low Risk", "Medium Risk", "High Risk"), 1)
-  
-  # ---- Save ---- 
+  #
+  # ---- Save Assessment---- 
+  #
   assessment_file <- file.path(assessed, glue::glue("{pkg_v}_assessments.rds"))
   saveRDS(pkg_assessment, assessment_file)
   cat("\n-->", pkg_v,"assessments saved.\n")
   
+  #
+  # ---- Decision ----
+  #
+  # Make a risk decision for the package threshold criteria we set
+  decision <- sample(c(rep("Low Risk",6), rep("Medium Risk", 3), "High Risk"), 1)
+  
+  #
   # ---- Build Report ----
+  #
   # file.edit(system.file("report/package/pkg_template.qmd", package = "riskreports"))
   options(riskreports_output_dir = reports)
   pr <- riskreports::package_report(
@@ -249,7 +265,9 @@ val_pkg <- function(
   
   cat("\n-->", pkg_v,"Report built.\n")
   
-  # ---- Save Pkg Metadata ---- 
+  #
+  # ---- Save Pkg Meta Bundle ---- 
+  #
   # Save a list of items beyond the assessment values
   meta_list <- list(
     pkg = pkg,
