@@ -21,7 +21,7 @@ val_pkg <- function(
   # ver <- vers[i] # for debugging
   
   # assess args
-  if(!ref %in% c('risk.assessr', 'riskmetric')) stop("'metric_pkg' arg must be either 'riskmetric' or 'risk.assessr' but '", metric_pkg, "' was given.")
+  if(!metric_pkg %in% c('risk.assessr', 'riskmetric')) stop("'metric_pkg' arg must be either 'riskmetric' or 'risk.assessr' but '", metric_pkg, "' was given.")
   if(!ref %in% c('source', 'remote')) stop("'ref' arg must be either 'source' or 'remote' but '", ref, "' was given.")
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
   
@@ -163,7 +163,7 @@ val_pkg <- function(
       pkg = pkg,
       ver = ver,
       r_ver = getRversion(),
-      sys_info = R.version,
+      sys_info = R.Version(), 
       repos = options("repos"),
       val_date = val_date,
       clean_install = clean_install,
@@ -172,8 +172,8 @@ val_pkg <- function(
       # metrics = pkg_assessment, # saved separately for {riskreports}
       decision = "High Risk",
       final_decision = "High Risk",
-      depends = depends, # populate this from avail
-      suggests = suggests,
+      depends = if(identical(depends, character(0))) NA_character_ else depends,
+      suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
       assessment_runtime = list(txt = ass_mins_txt, mins = ass_mins)
     )
     saveRDS(meta_list, file.path(meta_list, glue::glue("{pkg_v}_meta.rds")))
@@ -273,7 +273,7 @@ val_pkg <- function(
     pkg = pkg,
     ver = ver,
     r_ver = getRversion(),
-    sys_info = R.version,
+    sys_info = R.Version(),
     repos = options("repos"),
     val_date = val_date,
     clean_install = clean_install,
@@ -281,9 +281,9 @@ val_pkg <- function(
     metric_pkg = metric_pkg,
     # metrics = pkg_assessment, # saved separately for {riskreports}
     decision = decision,
-    final_decision = NULL, # Will be set later
-    depends = depends, 
-    suggests = suggests,
+    final_decision = NA_character_, # Will be set later
+    depends = if(identical(depends, character(0))) NA_character_ else depends,
+    suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
     assessment_runtime = list(txt = ass_mins_txt, mins = ass_mins)
   )
   saveRDS(meta_list, file.path(assessed, glue::glue("{pkg_v}_meta.rds")))

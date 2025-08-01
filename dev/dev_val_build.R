@@ -2,13 +2,12 @@
 options("repos")
 devtools::load_all()
 
-# Reminder of the default options
-# val_build(
-#   pkg_names = NULL, 
-#   deps = c("depends", "suggests"), 
-#   out = 'riskassessment',
-#   opt_repos = c(val_build_repo = "https://cran.r-project.org")
-# )
+# Since running this script is such a computationally intensive process, the
+# start of this script would actually begin by filtering packages
+# based on pkg downloads, and then we'd feed that list to pkg_names...
+# Eventually, this 'dev' script will become a new function called val_pipeline()
+
+
 
 # will just build 'zoo'
 z <- val_build(
@@ -21,6 +20,7 @@ z <- val_build(
 )
 
 # if ran after, will build only lattice because there is one dep
+# be warned, this takes forever with ref == 'source'
 l <- val_build('zoo', out = 'dev/riskassessments', deps = "depends")
 
 
@@ -49,7 +49,18 @@ names(ass)
 ass$covr_coverage$totalcoverage
 ass$downloads_1yr |> prettyNum(big.mark = ",")
 
+# val_build(pkg_names = c('aamatch'), deps = NULL) # No coverage
 
-
-# val_build(pkg_names = c('aamatch'), deps = NULL)
-
+#
+# Test out two pkgs, so we can make a useful output to return from val_build
+#
+outtie <- val_build(
+  pkg_names = 'zoo',
+  ref = "remote", 
+  metric_pkg = "riskmetric",
+  deps = c("depends"),
+  val_date = Sys.Date(), # Default
+  rerun = FALSE,
+  out = 'dev/riskassessments'
+)
+outtie$pkgs_df

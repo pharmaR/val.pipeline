@@ -14,19 +14,17 @@ val_build <- function(
     metric_pkg = "riskmetric",
     deps = c("depends", "suggests"), # deps = c("depends"), deps = NULL
     val_date = Sys.Date(),
+    rerun = FALSE,
     out = 'riskassessment',
     opt_repos = c(val_build_repo = "https://cran.r-project.org")
     ){
   
-  # assess args
-  if(!ref %in% c('risk.assessr', 'riskmetric')) stop("'metric_pkg' arg must be either 'riskmetric' or 'risk.assessr' but '", metric_pkg, "' was given.")
+  # Assess args
+  if(!metric_pkg %in% c('risk.assessr', 'riskmetric')) stop("'metric_pkg' arg must be either 'riskmetric' or 'risk.assessr' but '", metric_pkg, "' was given.")
   if(!ref %in% c('source', 'remote')) stop("'ref' arg must be either 'source' or 'remote' but '", ref, "' was given.")
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
   
-  # r_ver = '4.5.1' # for debugging
-  # pkg_names = "aamatch", pkg_names = "zoo" # for debugging
-  
-  # Doesn't need to be an arg
+  # store R Version
   r_ver = getRversion()
   
   # Grab val date, output messaging
@@ -36,8 +34,9 @@ val_build <- function(
   val_date_txt <- gsub("-", "", val_date)
   cat(paste0("\n\n\nNew Validation build: R v", r_ver, " @ ", val_start_txt,"\n\n"))
   
-  
+  #
   # ---- Set repos option ----
+  #
   old <- options()
   # onStop(function() options(old))
   on.exit(function() options(old))
@@ -48,14 +47,10 @@ val_build <- function(
   }
   
   
-  # ---- Grab pkgs & their versions ----
-  # great place to add package filtering based on any non-metric based criteria?
-  
+  #
+  # ---- Determine the list of pkgs to evaluate ----
+  #
   avail_pkgs <- available.packages() |> as.data.frame()
-  # pkg_names <- avail_pkgs[2, ] |> dplyr::pull(Package) # debugging
-  # pkg_names <- NULL # debugging
-  
-  # determine the list of pkgs to evaluate 
   if(is.null(pkg_names)) {
     pkgs <- avail_pkgs$Package
   } else {
@@ -95,7 +90,9 @@ val_build <- function(
   pkgs_length <- length(pkgs)
   cat("\n-->", pkgs_length, "package(s) to process.\n\n")
   
+  #
   # ---- Define dirs for processing ----
+  #
   r_dir <- file.path(out, glue::glue('R_{r_ver}'))
   val_dir <- file.path(r_dir, val_date_txt)
   assessed <- file.path(val_dir, 'assessed') # needed
@@ -106,7 +103,9 @@ val_build <- function(
   if(!dir.exists(val_dir)) dir.create(val_dir)
   if(!dir.exists(assessed)) dir.create(assessed) # needed
   
+  #
   # ---- Run through the list of packages ----
+  #
   pkg_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
     # i <- 1 # for debugging
     # pkg <- pkgs[i] # for debugging
@@ -116,7 +115,7 @@ val_build <- function(
     # skip building the bundle, but we still need to assess it's dependencies
     pkg_v <- paste(pkg, ver, sep = "_")
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
-    if(!file.exists(pkg_meta_file)) {
+    if(!file.exists(pkg_meta_file) | rerun) {
       pkg_meta <- val_pkg(
         pkg = pkg,
         ver = ver,
@@ -133,7 +132,7 @@ val_build <- function(
       
     }
     
-    # ---- Rinse & Repeat on deps & suggests ----
+    # ---- Rinse & Repeat on deps & suggests 
     # old... trying to do some recursive stuff, but it was a bad idea.
     # maybe_new <- c(pkg_meta$dependencies, pkg_meta$suggests)
     # dep_files <- file.path(assessed, glue::glue("{maybe_new}_meta.rds"))
@@ -149,13 +148,43 @@ val_build <- function(
     pkg_meta
   }) |> purrr::set_names(nm = pkgs)
   
-  # pkg_bundles
+  cat("\n--> All packages processed.\n")
   
+  #
+  # ---- Convert to DF ----
+  # names(pkg_bundles)
+  # pkg_bundles$zoo |> dplyr::as_tibble()
+  # pkg_bundles$zoo$suggests
+  # pkg_bundles$lattice$suggests
+  # rm(.x)
+  # dput(pkg_bundles)
+  pkgs_df <- purrr::map( pkg_bundles,
+    ~ {
+      # .x <- pkg_bundles$zoo
+      x <- purrr::list_flatten(.x)
+      # x$depends  <- if(all(is.na(x$depends)))  NA_character_ else paste(x$depends, collapse = ", ")
+      # x$suggests <- if(all(is.na(x$suggests))) NA_character_ else paste(x$suggests, collapse = ", ")
+      x$depends <- list(x$depends)
+      x$suggests <- list(x$suggests)
+      dplyr::as_tibble(x)
+    }) |> 
+    purrr::reduce(dplyr::bind_rows)
+  # pkgs_df$suggests
+  
+  cat("\n--> Collated pkg metadata.\n")
+  
+  
+  #
   # ---- Update final decisions ----
+  #
   # So, after working through all those packages, we need to be able to
   # change 'final' decisions if a package's dependency doesn't pass
   # Reduce package bundles down into a data.frame containing specific info
   
+  
+  
+  
+  cat("\n--> Assigned 'final' decisions.\n")
   
   end <- Sys.time()
   end_txt <- capture.output(end - start)
@@ -163,7 +192,8 @@ val_build <- function(
   
   # Return object 
   return(list(
-    val_dir = val_dir
+    val_dir = val_dir,
+    pkgs_df = pkgs_df
   ))
 }
 

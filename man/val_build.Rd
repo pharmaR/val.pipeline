@@ -10,6 +10,7 @@ val_build(
   metric_pkg = "riskmetric",
   deps = c("depends", "suggests"),
   val_date = Sys.Date(),
+  rerun = FALSE,
   out = "riskassessment",
   opt_repos = c(val_build_repo = "https://cran.r-project.org")
 )
