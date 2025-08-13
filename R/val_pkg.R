@@ -21,7 +21,7 @@ val_pkg <- function(
   # ver <- vers[i] # for debugging
   
   # assess args
-  if(!metric_pkg %in% c('risk.assessr', 'riskmetric')) stop("'metric_pkg' arg must be either 'riskmetric' or 'risk.assessr' but '", metric_pkg, "' was given.")
+  if(!metric_pkg %in% c('risk.assessr', 'riskmetric', 'val.meter')) stop("'metric_pkg' arg must be either 'riskmetric', 'val.meter', or 'risk.assessr' but '", metric_pkg, "' was given.")
   if(!ref %in% c('source', 'remote')) stop("'ref' arg must be either 'source' or 'remote' but '", ref, "' was given.")
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
   
@@ -110,29 +110,43 @@ val_pkg <- function(
   # ---- Grab Dependencies ----
   #
   # Grab deps (Depends, Imports, LinkingTo, Suggests)
-  pkg_base <- avail_pkgs |> dplyr::filter(Package %in% pkg)
+  # pkg_base <- avail_pkgs |> dplyr::filter(Package %in% pkg)
   
   # grab depends
-  depends_base <- pkg_base |>
-    unite(pkg_deps, c(Depends, Imports, LinkingTo), sep = ", ", na.rm = TRUE) |>
-    dplyr::pull(pkg_deps)
-  depends0 <- strsplit(depends_base, split = ", ")[[1]]
-  depends <- avail_pkgs |>
-    dplyr::filter(Package %in% stringr::word(depends0, 1)) |>
-    dplyr::pull(Package)
+  # depends_base <- pkg_base |>
+  #   unite(pkg_deps, c(Depends, Imports, LinkingTo), sep = ", ", na.rm = TRUE) |>
+  #   dplyr::pull(pkg_deps)
+  # depends0 <- strsplit(depends_base, split = ", ")[[1]]
+  # depends <- avail_pkgs |>
+  #   dplyr::filter(Package %in% stringr::word(depends0, 1)) |>
+  #   dplyr::pull(Package)
+  depends <- 
+    tools::package_dependencies(
+      packages = pkg,
+      db = available.packages(),
+      which = "most", #c("Depends", "Imports", "LinkingTo"),
+      recursive = TRUE
+    ) |>
+    unlist(use.names = FALSE) 
   
   # grab suggests
-  suggests_base <- pkg_base |> dplyr::pull(Suggests)
-  suggests0 <- strsplit(suggests_base, split = ", ")[[1]]
-  suggests <- avail_pkgs |>
-    dplyr::filter(Package %in% stringr::word(suggests0, 1)) |>
-    dplyr::pull(Package)
+  # suggests_base <- pkg_base |> dplyr::pull(Suggests)
+  # suggests0 <- strsplit(suggests_base, split = ", ")[[1]]
+  # suggests <- avail_pkgs |>
+  #   dplyr::filter(Package %in% stringr::word(suggests0, 1)) |>
+  #   dplyr::pull(Package)
+  suggests <- 
+    tools::package_dependencies(
+      packages = pkg,
+      db = available.packages(),
+      which = "Suggests",
+      recursive = TRUE
+    ) |>
+    unlist(use.names = FALSE) 
   
   
   # ---- Can Install? ----
   # Make sure we can install cleanly first, else don't with assessment, return meta
-   FALSE
-
   inst_out <- tryCatch({
     if(ref == "source"){
       utils::install.packages(
@@ -223,7 +237,9 @@ val_pkg <- function(
       # pkg_assessment0$tm        
       # pkg_assessment0$check_list 
     }
-  }
+  } else if(metric_pkg == "val.meter") {
+  
+  } # no else since we assert metric_pkg values at top of val_pkg().
   
   assessed_end <- Sys.time()
   ass_mins <- difftime(assessed_end, start, units = "mins")

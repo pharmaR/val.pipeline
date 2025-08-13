@@ -9,9 +9,10 @@ val_build(
   ref = "source",
   metric_pkg = "riskmetric",
   deps = c("depends", "suggests"),
+  deps_recursive = TRUE,
   val_date = Sys.Date(),
-  rerun = FALSE,
   out = "riskassessment",
+  replace = FALSE,
   opt_repos = c(val_build_repo = "https://cran.r-project.org")
 )
 }

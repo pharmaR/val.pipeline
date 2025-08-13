@@ -55,65 +55,51 @@ val_build <- function(
   
   # grab the packages we need
   if(is.null(pkg_names)) {
+    # if no pkgs_names give, assume we are supposed to analyze all pkgs available
     pkgs <- avail_pkgs$Package
+    
   } else {
+    # if pkg_names is provided, then we need to 
+    if(is.null(deps)) {
+      # if no deps given, then just use the pkgs provided
+      full_dep_tree <- pkg_names
+      
+    } else {
+      # If deps are provided, then we need to get the dependencies
+      # and add them to the list of pkgs to assess
+      
+      # params for debugging:
+      # deps = NULL
+      # deps = "depends"
+      # deps = "suggests"
+      # deps = c("depends", "suggests")
+      # deps_recursive = TRUE
+      
+      deps_low <- tolower(deps)
+      which_deps <- dplyr::case_when(
+        all(c("depends", "suggests") %in% deps_low) ~ "most",
+        deps_low == "depends" ~ "strong",
+        deps_low == "suggests" ~ "Suggests",
+        .default = NULL)[1]
+      
+      # check that the which_deps is valid
+      if(!which_deps %in% c("most", "strong", "Suggests")) stop("problem with 'which_deps'")
+      
+      dep_tree <- tools::package_dependencies(
+        packages = pkg_names,
+        db = available.packages(),
+        which = which_deps,
+        recursive = deps_recursive)
+       
+      full_dep_tree <- dep_tree |>
+        unlist(use.names = FALSE) |> 
+        c(names(dep_tree)) |>
+        unique() |>
+        sort()
+    }
     
-    # OLD method, before using tools::package_dependencies()... which gives
-    # us the recursive capability we need.  
-    
-    # base_pkgs <- avail_pkgs |> dplyr::filter(Package %in% pkg_names)
-    # if(length(base_pkgs$Package) != length(pkg_names)) {
-    #   missing_pkgs <- pkg_names[!pkg_names %in% base_pkgs$Package]
-    #   wrn_msg <- paste("Not all pkgs found in repo. Missing pkgs include:",
-    #                    paste(missing_pkgs, collapse = ", "))
-    #   warning(wrn_msg)
-    # }
-    # 
-    # # grab depends
-    # depends <- if("depends" %in% tolower(deps)){
-    #   base_pkgs |>
-    #     tidyr::unite(pkg_deps, c(Depends, Imports, LinkingTo), sep = ", ", na.rm = TRUE) |>
-    #     dplyr::pull(pkg_deps)
-    # } else NULL
-    # 
-    # # grab suggests
-    # suggests <- if("suggests" %in% tolower(deps)){
-    #   base_pkgs |> dplyr::pull(Suggests)
-    # } else NULL
-    # 
-    # # grab all unique pkgs to assess
-    # all_pkgs_v <- strsplit(paste(base_pkgs$Package, depends, suggests, sep = ", "),
-    #                        split = ", ")[[1]]
-    # pkgs <- 
-    #   avail_pkgs |>
-    #   dplyr::filter(Package %in% stringr::word(all_pkgs_v, 1)) |>
-    #   dplyr::pull(Package) 
-    
-    # params for debugging:
-    # deps = NULL
-    # deps = "depends"
-    # deps = "suggests"
-    # deps = c("depends", "suggests")
-    # deps_recursive = TRUE
-    deps_low <- tolower(deps)
-    which_deps <- dplyr::case_when(
-      all(c("depends", "suggests") %in% deps_low) ~ "most",
-      deps_low == "depends" ~ "strong",
-      deps_low == "suggests" ~ "Suggests",
-      .default = NULL)[1] # will cause an error
-    if(!which_deps %in% c("most", "strong", "Suggests")) stop("problem with 'which_deps'")
-    
-    dep_tree <- tools::package_dependencies(
-      packages = pkg_names,
-      db = available.packages(),
-      which = which_deps[1],
-      recursive = deps_recursive)
-     
-    full_dep_tree <- dep_tree|> unlist(use.names = FALSE) |> 
-      c(names(full_dep_tree)) |>
-      unique() |>
-      sort()
-    
+    # select pkgs FROM avail_pkgs so that the pkg names and versions are aligned
+    # i.e. in the correct order
     pkgs <-
       avail_pkgs |>
       dplyr::filter(Package %in% full_dep_tree) |>
@@ -125,12 +111,10 @@ val_build <- function(
   pkgs_length <- length(pkgs)
   cat("\n-->", pkgs_length, "package(s) to process.\n\n")
   
+  # Prompt the user to confirm they want to continue when assessing a lot of pkgs
   if(interactive() & pkgs_length >= 10) {
     message("Wow, looks like there is more than 10 pkgs to assess. That could take a while. Do you want to continue?")
-    
-    # Prompt the user to confirm they want to continue
     continue <- readline(prompt = "Continue: Y/N?")
-    
     if(tolower(continue) == 'n') stop("User chose to stop the validation build.")
   }
   

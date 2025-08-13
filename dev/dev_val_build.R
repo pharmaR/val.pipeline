@@ -66,18 +66,18 @@ devtools::load_all()
 # Expedite internal packages on a faster timeline
 # What did Biogen do? CI/CD
 
-# High level summary of pkgs
-# --> riskscore PR/ workbench job
-
 # filter packages > 20k here
 # Eventually using PACKAGES file
-
-
-# fix reason why not returning results. Likely related to:
-# Error in unclass(e1) - e2 : non-numeric argument to binary operator
+# For now, will use pkg_cran_remote to gain a
+# High level summary of pkgs
+# --> riskscore PR/ workbench job in progress
 
 # Figure out what pkg_assess() prompt is.
 # Doesn't happen during background job
+# --> opened issue on 'riskmetric' repo
+
+# fix reason why not returning results. Likely related to:
+# Error in unclass(e1) - e2 : non-numeric argument to binary operator
 
 #
 # Test out two pkgs, so we can make a useful output to return from val_build
@@ -87,13 +87,13 @@ outtie <- val_build(
   ref = "remote",
   # ref = "source",
   metric_pkg = "riskmetric",
-  # deps = NULL,
+  deps = NULL,
   # deps = "depends",
-  deps = c("depends", "suggests"),
-  # deps_recursive = FALSE,
-  deps_recursive = TRUE,
+  # deps = c("depends", "suggests"),
+  deps_recursive = FALSE,
+  # deps_recursive = TRUE,
   val_date = Sys.Date(),
-  replace = FALSE,
+  replace = TRUE,
   out = 'dev/riskassessments'
 )
 # outtie$pkgs_df
