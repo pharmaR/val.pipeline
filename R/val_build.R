@@ -13,9 +13,10 @@ val_build <- function(
     ref = "source", 
     metric_pkg = "riskmetric",
     deps = c("depends", "suggests"), # deps = c("depends"), deps = NULL
+    deps_recursive = TRUE,
     val_date = Sys.Date(),
-    rerun = FALSE,
     out = 'riskassessment',
+    replace = FALSE,
     opt_repos = c(val_build_repo = "https://cran.r-project.org")
     ){
   
@@ -49,45 +50,89 @@ val_build <- function(
   #
   # ---- Determine the list of pkgs to evaluate ----
   #
+  # Make available.packages into a data.frame
   avail_pkgs <- available.packages() |> as.data.frame()
+  
+  # grab the packages we need
   if(is.null(pkg_names)) {
     pkgs <- avail_pkgs$Package
   } else {
     
-    base_pkgs <- avail_pkgs |> dplyr::filter(Package %in% pkg_names)
-    if(length(base_pkgs$Package) != length(pkg_names)) {
-      missing_pkgs <- pkg_names[!pkg_names %in% base_pkgs$Package]
-      wrn_msg <- paste("Not all pkgs found in repo. Missing pkgs include:",
-                       paste(missing_pkgs, collapse = ", "))
-      warning(wrn_msg)
-    }
+    # OLD method, before using tools::package_dependencies()... which gives
+    # us the recursive capability we need.  
     
-    # grab depends
-    depends <- if("depends" %in% tolower(deps)){
-      base_pkgs |>
-        tidyr::unite(pkg_deps, c(Depends, Imports, LinkingTo), sep = ", ", na.rm = TRUE) |>
-        dplyr::pull(pkg_deps)
-    } else NULL
+    # base_pkgs <- avail_pkgs |> dplyr::filter(Package %in% pkg_names)
+    # if(length(base_pkgs$Package) != length(pkg_names)) {
+    #   missing_pkgs <- pkg_names[!pkg_names %in% base_pkgs$Package]
+    #   wrn_msg <- paste("Not all pkgs found in repo. Missing pkgs include:",
+    #                    paste(missing_pkgs, collapse = ", "))
+    #   warning(wrn_msg)
+    # }
+    # 
+    # # grab depends
+    # depends <- if("depends" %in% tolower(deps)){
+    #   base_pkgs |>
+    #     tidyr::unite(pkg_deps, c(Depends, Imports, LinkingTo), sep = ", ", na.rm = TRUE) |>
+    #     dplyr::pull(pkg_deps)
+    # } else NULL
+    # 
+    # # grab suggests
+    # suggests <- if("suggests" %in% tolower(deps)){
+    #   base_pkgs |> dplyr::pull(Suggests)
+    # } else NULL
+    # 
+    # # grab all unique pkgs to assess
+    # all_pkgs_v <- strsplit(paste(base_pkgs$Package, depends, suggests, sep = ", "),
+    #                        split = ", ")[[1]]
+    # pkgs <- 
+    #   avail_pkgs |>
+    #   dplyr::filter(Package %in% stringr::word(all_pkgs_v, 1)) |>
+    #   dplyr::pull(Package) 
     
-    # grab suggests
-    suggests <- if("suggests" %in% tolower(deps)){
-      base_pkgs |> dplyr::pull(Suggests)
-    } else NULL
+    # params for debugging:
+    # deps = NULL
+    # deps = "depends"
+    # deps = "suggests"
+    # deps = c("depends", "suggests")
+    # deps_recursive = TRUE
+    deps_low <- tolower(deps)
+    which_deps <- dplyr::case_when(
+      all(c("depends", "suggests") %in% deps_low) ~ "most",
+      deps_low == "depends" ~ "strong",
+      deps_low == "suggests" ~ "Suggests",
+      .default = NULL)[1] # will cause an error
+    if(!which_deps %in% c("most", "strong", "Suggests")) stop("problem with 'which_deps'")
     
-    # grab all unique pkgs to assesss
-    all_pkgs_v <- strsplit(paste(base_pkgs$Package, depends, suggests, sep = ", "),
-                           split = ", ")[[1]]
+    dep_tree <- tools::package_dependencies(
+      packages = pkg_names,
+      db = available.packages(),
+      which = which_deps[1],
+      recursive = deps_recursive)
+     
+    full_dep_tree <- dep_tree|> unlist(use.names = FALSE) |> 
+      c(names(full_dep_tree)) |>
+      unique() |>
+      sort()
     
-    all_pkgs <- avail_pkgs |>
-      dplyr::filter(Package %in% stringr::word(all_pkgs_v, 1)) |>
-      dplyr::pull(Package) 
-    pkgs <- all_pkgs
+    pkgs <-
+      avail_pkgs |>
+      dplyr::filter(Package %in% full_dep_tree) |>
+      dplyr::pull(Package)
   }
   vers <- avail_pkgs |>
     dplyr::filter(Package %in% pkgs) |>
     dplyr::pull(Version)
   pkgs_length <- length(pkgs)
   cat("\n-->", pkgs_length, "package(s) to process.\n\n")
+  
+  if(interactive() & pkgs_length >= 10) {
+    message("Wow, looks like there is more than 10 pkgs to assess. That could take a while. Do you want to continue?")
+    
+    # Prompt the user to confirm they want to continue
+    continue <- readline(prompt = "Continue: Y/N?")
+    
+    if(tolower(continue) == 'n') stop("User chose to stop the validation build.")
+  }
   
   #
   # ---- Define dirs for processing ----
@@ -114,7 +159,7 @@ val_build <- function(
     # skip building the bundle, but we still need to assess it's dependencies
     pkg_v <- paste(pkg, ver, sep = "_")
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
-    if(!file.exists(pkg_meta_file) | rerun) {
+    if(!file.exists(pkg_meta_file) | replace) {
       pkg_meta <- val_pkg(
         pkg = pkg,
         ver = ver,

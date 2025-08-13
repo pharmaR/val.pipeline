@@ -67,12 +67,11 @@ devtools::load_all()
 # What did Biogen do? CI/CD
 
 # High level summary of pkgs
+# --> riskscore PR/ workbench job
 
 # filter packages > 20k here
-# Eventualy using PACKAGES file
+# Eventually using PACKAGES file
 
-# use recursive dependencies functionality to get full list of pkgs
-# ?utils::install.packages
 
 # fix reason why not returning results. Likely related to:
 # Error in unclass(e1) - e2 : non-numeric argument to binary operator
@@ -85,14 +84,16 @@ devtools::load_all()
 #
 outtie <- val_build(
   pkg_names = 'zoo',
-  # ref = "remote",
-  ref = "source",
+  ref = "remote",
+  # ref = "source",
   metric_pkg = "riskmetric",
-  deps = NULL, #c("depends"), #, "suggests"),
+  # deps = NULL,
   # deps = "depends",
-  # deps = c("depends", "suggests"),
+  deps = c("depends", "suggests"),
+  # deps_recursive = FALSE,
+  deps_recursive = TRUE,
   val_date = Sys.Date(),
-  rerun = TRUE,
+  replace = FALSE,
   out = 'dev/riskassessments'
 )
 # outtie$pkgs_df
