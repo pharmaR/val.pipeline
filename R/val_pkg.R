@@ -204,18 +204,42 @@ val_pkg <- function(
   # ---- Assess ---- 
   #
   if(metric_pkg == "riskmetric"){
+    
+    # Update: can't remove these - will ruin some metrics like
+    # code coverage & R CMD Check
+    # Remove original docs, if they exist, because they force a
+    # user prompt when run interactively
+    # inst_doc <- file.path(sourced, pkg, "inst", "doc")
+    # if(dir.exists(inst_doc) & interactive()) {
+    #   unlink(inst_doc, recursive = TRUE, force = TRUE)
+    #   cat("\n-->", pkg_v,"removed original inst/doc.\n")
+    # }
+    
+    # Create pkg ref
+    src_ref <- if(ref == "source") 'pkg_source' else 'pkg_cran_remote'
     if(ref == "source") {
-      pkg_ref <- riskmetric::pkg_ref(file.path(sourced, pkg), source = "pkg_source")
+      pkg_ref <- riskmetric::pkg_ref(file.path(sourced, pkg), source = src_ref)
     } else { # ref == "remote"
       # remote has no 'prompt' issue when building assessment, but no code covr either
-      pkg_ref <- riskmetric::pkg_ref(pkg, source = "pkg_cran_remote")
+      pkg_ref <- riskmetric::pkg_ref(pkg, source = src_ref)
     } 
     cat("\n-->", pkg_v,"referrenced.\n")
     
-    # Do I need to pull a 'pkg_cran_remote' assessment here as well?
-    pkg_assessment <- riskmetric::pkg_assess(pkg_ref)
+    # Assessment
+    pkg_assessment <- pkg_ref |>
+      # dplyr::as_tibble() |> # no tibbles allowed for stip ^ or riskreports
+      riskmetric::pkg_assess() |>
+      strip_recording()
+    
+    # check some stuff
+    # inherits(pkg_assessment, "list_of_pkg_metric") # works
+    # names(pkg_assessment)
+    # pkg_assessment |> dplyr::as_tibble() # doesn't work
+    
+    # attr(pkg_assessment$covr_coverage, "label")
+    # pkg_assessment$covr_coverage |> names()
     # pkg_assessment$covr_coverage$totalcoverage
-    # covr <- riskmetric::assess_covr_coverage(pkg_ref)
+    
     
   } else if(metric_pkg == "risk.assessr") {
     if(ref == "source") {
@@ -270,14 +294,15 @@ val_pkg <- function(
     package_version = ver,
     # template_path = file.path(getwd(), "riskassessment"),
     output_format = "html", #"md", "pdf", "all",
-    # params: https://github.com/pharmaR/riskreports/blob/main/inst/report/package/pkg_template.qmd
+    # params list: https://github.com/pharmaR/riskreports/blob/main/inst/report/package/pkg_template.qmd
     params = list(
       assessment_path = assessment_file,
-      hide_reverse_deps = 'false'
+      hide_reverse_deps = 'false',
+      source = src_ref # defined above
     ),
     quiet = TRUE # To silence quarto output for readability
   )
-  pr
+  # pr
   
   cat("\n-->", pkg_v,"Report built.\n")
   

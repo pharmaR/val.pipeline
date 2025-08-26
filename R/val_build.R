@@ -214,9 +214,9 @@ val_build <- function(
   
   cat("\n--> Assigned 'final' decisions.\n")
   
-  end <- Sys.time()
-  end_txt <- capture.output(end - start)
-  cat(end_txt)
+  val_end <- Sys.time()
+  val_end_txt <- capture.output(val_end - val_start)
+  cat(val_end_txt)
   
   # Return object 
   return(list(
