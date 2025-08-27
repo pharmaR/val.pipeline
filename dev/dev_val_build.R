@@ -57,6 +57,8 @@ build_pkgs <- val_filter()
 #
 # ---- val_build() ----
 #
+
+# sandbox to play with packages with a small amount of dependencies
 # dput(dep_1)
 # tools::package_dependencies(
 #   packages = "askpass", 
@@ -68,7 +70,7 @@ build_pkgs <- val_filter()
 #   unlist(use.names = FALSE)
 
 outtie <- val_build(
-  # pkg_names = 'zoo',   
+  # pkg_names = 'zoo',   # has a prompt, plus depends on lattice which takes a while
   pkg_names = 'askpass', # 2.5 - 3 mins
   # pkg_names = build_pkgs,
   
@@ -88,12 +90,15 @@ outtie <- val_build(
   replace = FALSE,
   out = 'dev/riskassessments'
 )
+
+
+
+
+#
+# ---- Inspect outputs ----
+#
 outtie$val_dir
-pdf <- outtie$pkgs_df
-
-
-
-
+assessed <- outtie$pkgs_df
 
 # # Inspect the assessment dir
 # # valdate <- gsub("-", "", Sys.Date())
@@ -123,42 +128,22 @@ pdf <- outtie$pkgs_df
 # # val_build(pkg_names = c('aamatch'), deps = NULL) # No coverage
 
 
-# ---- val.criterion ----
-# Use org-level criterion to set thresholds and
-# Update final decision (if not already 'high risk')
-# AND then filter packages to a final list
-# Note: If pkgs file had assessments, we'd be doing this BEFORE val_build() only
+
+#
+# ---- val.criterion-ish ----
+#
+# Use org-level criterion to set thresholds and Update final decision (if not
+# already 'high risk') AND then filter packages to a final 'qualified' list
+#
+# Note: this needs to happen again because (1) we don't have metrics like
+# 'covr_coverage' represented, plus with have other non-riskmetric assessments,
+# like 'installed_cleanly', and (2) because val_filter() (our pre-filtering
+# engine) wasn't run on the intended system (aka, {riskscore} OR the PACKAGES)
+# file, so we have to run val_build() & re-filter.
+
+# maybe I should call it pre_filter() & post_filter()
 
 
-# Reverse Dependencies
-pkgs$reverse_dependencies |> as.numeric() |> hist(breaks = 20)
-# vhist(pkgs, field = "downloads_1yr") # freezes up...
-# Workshop a threshold
-( pkgs |>
-    filter(reverse_dependencies > 0.05) |>
-    nrow()
-) / tot
-
-
-# ---- Code Coverage ----
-# low risk:    > 70%, else
-# medium risk: > 50%, else
-# high risk
-
-
-
-# ---- Dependencies ----
-# Too many dependencies is problematic ... ?
-
-
-
-# ---- Bug status ----
-# A terrible bug status launches the pkg into 'medium' risk pool?
-
-
-
-# ---- Has Source Control ----
-# If no, launches the pkg into 'medium' risk pool?
 
 
 
