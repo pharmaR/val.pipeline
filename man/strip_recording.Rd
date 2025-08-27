@@ -10,4 +10,10 @@ strip_recording(assessment)
 Remove .recording attribute from all elements of the assessment,
 whilst maintaining classes
 }
+\examples{
+# riskmetric::pkg_ref("zoo", source = "pkg_cran_remote") |>
+#   riskmetric::pkg_assess() |>
+#   strip_recording()
+
+}
 \keyword{internal}

@@ -180,13 +180,15 @@ val_build <- function(
   
   #
   # ---- Convert to DF ----
+  #
+  # Reduce package bundles down into a data.frame containing specific info
   # names(pkg_bundles)
   # pkg_bundles$zoo |> dplyr::as_tibble()
   # pkg_bundles$zoo$suggests
   # pkg_bundles$lattice$suggests
   # rm(.x)
   # dput(pkg_bundles)
-  pkgs_df <- purrr::map( pkg_bundles,
+  pkgs_df0 <- purrr::map( pkg_bundles,
     ~ {
       # .x <- pkg_bundles$zoo
       x <- purrr::list_flatten(.x)
@@ -207,9 +209,26 @@ val_build <- function(
   #
   # So, after working through all those packages, we need to be able to
   # change 'final' decisions if a package's dependency doesn't pass
-  # Reduce package bundles down into a data.frame containing specific info
+  #
   
-  
+  # pkgs_df0$decision[1] <- "Low Risk"
+  # pkgs_df0$decision[2] <- "High Risk"
+  pkgs_df <- pkgs_df0 |>
+    dplyr::mutate(
+      final_decision = dplyr::case_when(
+        # if the pkg itself is a fail, then final is fail
+        decision == 'High Risk' ~ 'High Risk',
+        
+        # if any dependencies are High Risk, then final is High Risk
+        # (need to unnest the depends & suggests columns first)
+        purrr::map_lgl(depends, ~ any(.x %in% pkgs_df0$pkg[pkgs_df0$decision == 'High Risk'])) ~ 'High Risk',
+        purrr::map_lgl(suggests, ~ any(.x %in% pkgs_df0$pkg[pkgs_df0$decision == 'High Risk'])) ~ 'High Risk',
+        
+        # otherwise, leave the decision alone
+        .default = decision
+      )
+    )
+    # pkgs_df0$depends[2] |> unlist()
   
   
   cat("\n--> Assigned 'final' decisions.\n")

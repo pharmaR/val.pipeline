@@ -124,7 +124,7 @@ val_pkg <- function(
     tools::package_dependencies(
       packages = pkg,
       db = available.packages(),
-      which = "most", #c("Depends", "Imports", "LinkingTo"),
+      which = c("Depends", "Imports", "LinkingTo"),
       recursive = TRUE
     ) |>
     unlist(use.names = FALSE) 
