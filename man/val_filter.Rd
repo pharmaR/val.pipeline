@@ -4,7 +4,20 @@
 \alias{val_filter}
 \title{Filter Packages}
 \usage{
-val_filter(avail_pkgs = as.data.frame(available.packages()))
+val_filter(
+  pre = TRUE,
+  source = "riskscore",
+  avail_pkgs = as.data.frame(available.packages())
+)
+}
+\arguments{
+\item{pre}{logical, whether or not we are using pre or post filtering logic.
+May remove this later.}
+
+\item{source}{character, either "riskscore" (default), "PACKAGES", or a
+data.frame.}
+
+\item{avail_pkgs}{data.frame, the output of available.packages() as a data.frame}
 }
 \description{
 First whack at attempting to filter packages based on org-level criterion

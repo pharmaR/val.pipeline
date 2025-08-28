@@ -40,24 +40,68 @@ options(repos = opt_repos, pkgType = "source") # , rlang_interactive = FALSE
 #
 # ---- val.filter ----
 #
-build_pkgs <- val_filter()
+pre_filtered_pkg_metrics <- 
+  val_filter(
+    pre = TRUE,
+    source = "riskscore"
+    )
+build_pkgs <-
+  pre_filtered_pkg_metrics |>
+  dplyr::filter(!filter_risk %in% c("High")) |>
+  dplyr::pull(package)
 
+failed_pkgs <-
+  pre_filtered_pkg_metrics |>
+  dplyr::filter(filter_risk %in% c("High"))
 
-
-# TODO:
+#
+# ---- TODO: ----
+#
+#
 # val_pkg():
+#
 # Figure out what pkg_assess() prompt is for.
 # Doesn't happen during background job
 # --> opened issue on 'riskmetric' repo
 # --> basically un-avoidable - would have to mimic pak
-
-# riskreports
+#
+# Also need a decision_reason field to cite which metric failed first. Leaving
+# this here until the "fail first" logic is applied.
+#
+# So, val_pkg() stores a list (because that works better for stripping .recording
+# attributes), but val_filter() is designed to work with a {riskscore} df. We'll
+# need a way to easily convert the list to a df, or make val_filter() handle lists.
+#
+#
+# 
+# val_filter():
+#
+# Need user to enter in decision category on a 'likert' style scale,
+# which #1 is 'accepted' and the last one is treated as 'failed' by val_pkg().
+#
+# Also need a decision_reason field to cite which metric failed first. Leaving
+# this here until the "fail first" logic is applied.
+#
+# Automatically grab all available metrics with "meaningful" or
+# usable output. Right now, the metrics are hard coded. Exceptions
+# logic could default to "low" for each or could be user defined.
+# User should be able to override to use just the metrics they want,
+# in the order they want to assess them.
+#
+# Retool riskscore to have a cleaner data object
+#
+#
+# {riskreports}:
 # Install latest (dev) version of quarto?
+#
+
+
+
+
 
 #
 # ---- val_build() ----
 #
-
 # sandbox to play with packages with a small amount of dependencies
 # dput(dep_1)
 # tools::package_dependencies(
@@ -127,21 +171,14 @@ assessed <- outtie$pkgs_df
 # 
 # # val_build(pkg_names = c('aamatch'), deps = NULL) # No coverage
 
-
-
 #
-# ---- val.criterion-ish ----
+# ---- Wrap up ----
 #
-# Use org-level criterion to set thresholds and Update final decision (if not
-# already 'high risk') AND then filter packages to a final 'qualified' list
-#
-# Note: this needs to happen again because (1) we don't have metrics like
-# 'covr_coverage' represented, plus with have other non-riskmetric assessments,
-# like 'installed_cleanly', and (2) because val_filter() (our pre-filtering
-# engine) wasn't run on the intended system (aka, {riskscore} OR the PACKAGES)
-# file, so we have to run val_build() & re-filter.
+# determine qualified pkgs to provision for PPM
+qualified <- assessed |>
+  dplyr::filter(decision == "Low")
 
-# maybe I should call it pre_filter() & post_filter()
+# Provision PPM metadata for all pkgs
 
 
 

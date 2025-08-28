@@ -185,6 +185,7 @@ val_pkg <- function(
       metric_pkg = metric_pkg,
       # metrics = pkg_assessment, # saved separately for {riskreports}
       decision = "High Risk",
+      decision_reason = "Failed 'clean_install' step",
       final_decision = "High Risk",
       depends = if(identical(depends, character(0))) NA_character_ else depends,
       suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
@@ -262,7 +263,7 @@ val_pkg <- function(
       # pkg_assessment0$check_list 
     }
   } else if(metric_pkg == "val.meter") {
-  
+    stop("Not yet implemented: val_pkg() using 'val.meter' tooling")
   } # no else since we assert metric_pkg values at top of val_pkg().
   
   assessed_end <- Sys.time()
@@ -279,10 +280,28 @@ val_pkg <- function(
   cat("\n-->", pkg_v,"assessments saved.\n")
   
   #
-  # ---- Decision ----
+  # ---- Decision (val.criterion) ----
   #
-  # Make a risk decision for the package threshold criteria we set
+  #
+  # Use org-level criterion to set thresholds and Update final decision (if not
+  # already 'high risk') AND then filter packages to a final 'qualified' list
+  #
+  # Note: this needs to happen again because (1) we don't have metrics like
+  # 'covr_coverage' represented in our pre-filter, plus with have other
+  # non-riskmetric assessments, like 'installed_cleanly' we need to consider.
+  # (2) Secondly, because val_filter() (our pre-filtering engine) wasn't run on
+  # the intended system (aka, {riskscore} OR the PACKAGES) file, so we have to
+  # run val_build() & re-filter.
+  
+  # maybe I should call it pre_filter() & post_filter()
+  post_filtered_pkg_metrics <- 
+    val_filter(
+      pre = FALSE,
+      source = pkg_assessment
+    )
+  # clean_install
   decision <- sample(c(rep("Low Risk",6), rep("Medium Risk", 3), "High Risk"), 1)
+  decision_reason = "Decision randomly selected"
   
   #
   # ---- Build Report ----
@@ -322,6 +341,7 @@ val_pkg <- function(
     metric_pkg = metric_pkg,
     # metrics = pkg_assessment, # saved separately for {riskreports}
     decision = decision,
+    decision_reason = decision_reason,
     final_decision = NA_character_, # Will be set later
     depends = if(identical(depends, character(0))) NA_character_ else depends,
     suggests = if(identical(suggests, character(0))) NA_character_ else suggests,

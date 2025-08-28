@@ -8,47 +8,83 @@
 #' instead, we're going to use riskscore::cran_assessed_20250812 for the time
 #' being
 #'
-#' 
+#' @param pre logical, whether or not we are using pre or post filtering logic.
+#'   May remove this later.
+#' @param source character, either "riskscore" (default), "PACKAGES", or a
+#'   data.frame.
+#' @param avail_pkgs data.frame, the output of available.packages() as a data.frame
+#'
 #' @importFrom dplyr filter pull mutate case_when between rename left_join
 #'   across if_else everything
 #' @importFrom purrr map map_int
 #' @importFrom tools package_dependencies
 #' 
 val_filter <- function(
+    pre = TRUE,
+    source = "riskscore",
     avail_pkgs = available.packages() |> as.data.frame()
     ) {
   # @importFrom riskscore cran_assessed_20250812 cran_scored_20250812
   
   cat("\n\nFiltering available packages. Starting w/",nrow(avail_pkgs),"pkgs.\n")
   
-  # Use "pkg_cran_remote" data from riskscore::cran_assessed_20250812
-  # remotes::install_github("pharmar/riskscore", force = TRUE,
-  #                         ref = "ac-cran-20250811")
-  pv <- packageVersion("riskscore") # verify ‘v0.0.1'
-  cat(paste0("\n--> Using {riskscore} Version: 'v", pv, "'\n"))
   
+  # Use package metrics based on specified source
+  if(length(source) > 1) {
+    stop("Invalid source specified. Must be one of 'riskscore', 'PACKAGES', or a data.frame")
+  } else if(source == "riskscore") {
+    # Use "pkg_cran_remote" data from riskscore::cran_assessed_20250812
+    # remotes::install_github("pharmar/riskscore", force = TRUE,
+    #                         ref = "ac-cran-20250811")
+    pv <- packageVersion("riskscore") # verify ‘v0.0.1'
+    cat(paste0("\n--> Using {riskscore} Version: 'v", pv, "'\n"))
+    
+    pkgs <- avail_pkgs |>
+      dplyr::select(package = Package, version = Version) |>
+      dplyr::left_join(
+        riskscore::cran_assessed_latest |>
+          dplyr::select(package, version, 
+                        downloads_1yr, reverse_dependencies,
+                        has_vignettes, has_source_control, has_website,
+                        news_current, bugs_status
+          ),
+        by = c("package", "version")
+      )
+    pkgs_scored <- 
+      avail_pkgs |>
+      dplyr::select(package = Package, version = Version) |>
+      dplyr::left_join(
+        riskscore::cran_scored_latest |>
+          dplyr::select(package, version, news_current, bugs_status),
+        by = c("package", "version")
+      )
+    # object.size(pkgs) / 1000000000
+  } else if (is.data.frame(source)) {
+    pkgs <- avail_pkgs |>
+      dplyr::select(package = Package, version = Version) |>
+      dplyr::left_join(
+        source |>
+          dplyr::select(package, version, 
+                        downloads_1yr, reverse_dependencies,
+                        has_vignettes, has_source_control, has_website,
+                        news_current, bugs_status
+          ),
+        by = c("package", "version")
+      )
+    pkgs_scored <- 
+      avail_pkgs |>
+      dplyr::select(package = Package, version = Version) |>
+      dplyr::left_join(
+        source |>
+          dplyr::select(package, version, news_current, bugs_status),
+        by = c("package", "version")
+      )
+  } else if(source == "PACKAGES") {
+    stop("Not yet implemented: val_filter() using 'PACKAGES' file")
+  } else {
+    stop("Invalid source specified. Must be one of 'riskscore', 'PACKAGES', or a data.frame")
+  }
   
-  pkgs <- avail_pkgs |>
-    dplyr::select(package = Package, version = Version) |>
-    dplyr::left_join(
-      riskscore::cran_assessed_20250812 |>
-        dplyr::select(package, version, 
-                      downloads_1yr, reverse_dependencies,
-                      has_vignettes, has_source_control, has_website,
-                      news_current, bugs_status
-      ),
-      by = c("package", "version")
-    )
-  pkgs_scored <- 
-    avail_pkgs |>
-    dplyr::select(package = Package, version = Version) |>
-    dplyr::left_join(
-      riskscore::cran_scored_20250812 |>
-        dplyr::select(package, version, news_current, bugs_status),
-      by = c("package", "version")
-    )
-  
-  # object.size(pkgs) / 1000000000
   
   
   
@@ -437,12 +473,13 @@ val_filter <- function(
   )
   
   # Final pkg counts in each risk category
-  build_pkgs <-
+  build_pkgs_len <-
     pkgs |>
     dplyr::filter(!filter_risk %in% c("High")) |>
-    dplyr::pull(package)
+    dplyr::pull(package) |>
+    length()
   
-  cat("\n--> Final Risk decision counts based off annual downloads w/ exceptions: returning",length(build_pkgs),"pkgs for build.\n")
+  cat("\n--> Final Risk decision counts based off annual downloads w/ exceptions: returning", build_pkgs_len, "pkgs for build.\n")
   print(
     pkgs$filter_risk |>
       factor(levels = c("Low", "Medium", "High")) |>
@@ -458,5 +495,5 @@ val_filter <- function(
   
   
   
-  return(build_pkgs)
+  return(pkgs)
 }
