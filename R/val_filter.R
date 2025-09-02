@@ -35,7 +35,7 @@ val_filter <- function(
   } else if(source == "riskscore") {
     # Use "pkg_cran_remote" data from riskscore::cran_assessed_20250812
     # remotes::install_github("pharmar/riskscore", force = TRUE,
-    #                         ref = "ac-cran-20250811")
+    #                         ref = "main")
     pv <- packageVersion("riskscore") # verify ‘v0.0.1'
     cat(paste0("\n--> Using {riskscore} Version: 'v", pv, "'\n"))
     

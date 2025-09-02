@@ -57,6 +57,7 @@ failed_pkgs <-
 #
 # ---- TODO: ----
 #
+# Add a logger like logRx
 #
 # val_pkg():
 #

@@ -204,6 +204,8 @@ val_pkg <- function(
   #
   # ---- Assess ---- 
   #
+  #### riskmetric ####
+  #
   if(metric_pkg == "riskmetric"){
     
     # Update: can't remove these - will ruin some metrics like
@@ -216,7 +218,9 @@ val_pkg <- function(
     #   cat("\n-->", pkg_v,"removed original inst/doc.\n")
     # }
     
-    # Create pkg ref
+    #
+    ### Create pkg ref ###
+    #
     src_ref <- if(ref == "source") 'pkg_source' else 'pkg_cran_remote'
     if(ref == "source") {
       pkg_ref <- riskmetric::pkg_ref(file.path(sourced, pkg), source = src_ref)
@@ -226,22 +230,44 @@ val_pkg <- function(
     } 
     cat("\n-->", pkg_v,"referrenced.\n")
     
-    # Assessment
-    pkg_assessment <- pkg_ref |>
-      # dplyr::as_tibble() |> # no tibbles allowed for stip ^ or riskreports
-      riskmetric::pkg_assess() |>
+    #
+    ### Assessment ###
+    #
+    pkg_assessment0 <- pkg_ref |>
+      dplyr::as_tibble() |> # no tibbles allowed for stip ^ or riskreports
+      riskmetric::pkg_assess()
+    # strip assessment of '.recording' attribute:
+    pkg_assessment <-  pkg_assessment0 |> 
       strip_recording()
     
     # check some stuff
+    # object.size(pkg_assessment0) # 'askpass' 136,744 bytes
+    # object.size(pkg_assessment) # 'askpass' 20,896 bytes
     # inherits(pkg_assessment, "list_of_pkg_metric") # works
+    # class(pkg_assessment)
     # names(pkg_assessment)
+    
+    # Possible to convert to tibble?
+    # pkg_assessment00 <- pkg_ref |>
+    #   dplyr::as_tibble() |> # no tibbles allowed for stip ^ or riskreports
+    #   riskmetric::pkg_assess()
+    # class(pkg_assessment00)
     # pkg_assessment |> dplyr::as_tibble() # doesn't work
+    # pkg_ass <- pkg_assessment |>
+    #   ?list2DF()
+      
+
+    # class(pkg_ass) <- "list"
+    # pkg_ass |>
+    #   dplyr::as_tibble
     
     # attr(pkg_assessment$covr_coverage, "label")
     # pkg_assessment$covr_coverage |> names()
     # pkg_assessment$covr_coverage$totalcoverage
-    
-    
+  
+  #
+  #### risk.assessr ####
+  #
   } else if(metric_pkg == "risk.assessr") {
     if(ref == "source") {
       pkg_assessment <- risk.assessr::risk_assess_pkg(tar_file)
@@ -262,15 +288,23 @@ val_pkg <- function(
       # pkg_assessment0$tm        
       # pkg_assessment0$check_list 
     }
+    
+  #
+  #### val.meter ####
+  #
   } else if(metric_pkg == "val.meter") {
     stop("Not yet implemented: val_pkg() using 'val.meter' tooling")
   } # no else since we assert metric_pkg values at top of val_pkg().
+  
   
   assessed_end <- Sys.time()
   ass_mins <- difftime(assessed_end, start, units = "mins")
   ass_mins_txt <- capture.output(assessed_end - start)
   cat("\n-->", pkg_v,"assessed.\n")
   cat("--> (", ass_mins_txt, ")\n")
+  
+  
+  
   
   #
   # ---- Save Assessment---- 

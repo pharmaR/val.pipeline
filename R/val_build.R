@@ -235,7 +235,7 @@ val_build <- function(
   
   val_end <- Sys.time()
   val_end_txt <- capture.output(val_end - val_start)
-  cat(val_end_txt)
+  cat("\n--> Build", val_end_txt,"\n")
   
   # Return object 
   return(list(
