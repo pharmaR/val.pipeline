@@ -33,6 +33,8 @@ val_filter <- function(
   if(length(source) > 1) {
     stop("Invalid source specified. Must be one of 'riskscore', 'PACKAGES', or a data.frame")
   } else if(source == "riskscore") {
+    
+    requireNamespace("riskscore", quietly = TRUE)
     # Use "pkg_cran_remote" data from riskscore::cran_assessed_20250812
     # remotes::install_github("pharmar/riskscore", force = TRUE,
     #                         ref = "main")

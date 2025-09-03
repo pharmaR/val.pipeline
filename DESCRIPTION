@@ -28,6 +28,7 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 Suggests: 
     risk.assessr (>= 2.0.0),
+    riskscore (>= 0.0.1),
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Imports: 
@@ -39,7 +40,8 @@ Imports:
     stringr,
     tidyr,
     tools
-Remotes: 
+Remotes:  
     pharmaR/riskmetric,
     pharmaR/riskreports,
-    Sanofi-Public/risk.assessr
+    Sanofi-Public/risk.assessr,
+    pharmar/riskscore

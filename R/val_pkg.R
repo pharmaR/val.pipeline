@@ -254,6 +254,7 @@ val_pkg <- function(
   #### risk.assessr ####
   #
   } else if(metric_pkg == "risk.assessr") {
+    requireNamespace("risk.assessr", quietly = TRUE)
     if(ref == "source") {
       pkg_assessment <- risk.assessr::risk_assess_pkg(tar_file)
       # names(pkg_assessment)
