@@ -31,9 +31,10 @@ usethis::use_package("stringr")
 usethis::use_package("purrr")
 usethis::use_package("glue")
 usethis::use_package("tidyr")
+usethis::use_package("tools")
 usethis::use_dev_package("riskmetric") #, min_version = "0.2.5") 
 usethis::use_dev_package("riskreports")
-usethis::use_dev_package("risk.assessr")
+usethis::use_dev_package("risk.assessr", type = "Suggests")
 
 # renv
 pak::pak("renv")
