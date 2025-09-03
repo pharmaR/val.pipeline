@@ -2,7 +2,19 @@ Package: val.pipeline
 Title: Validation Pipeline Example
 Version: 0.0.0.9000
 Authors@R: 
-    person("Aaron", "Clark", role = c("aut", "cre"), email = "clark.aaronchris@gmail.com")
+  c(
+    person(
+      "Aaron", "Clark",
+      email = "clark.aaronchris@gmail.com"
+      role = c("aut", "cre"),
+    ),
+    person(
+      "R Validation Hub",
+      email = "r-val-hub-maintainers@lists.r-consortium.org",
+      comment = c("website" = "https://www.pharmar.org"),
+      role = c("cph")
+    )
+  )
 Description: An experimental repository with the goal of bringing together a lot of the R Val Hub's tools under a single workflow to produce the outputs necessary to qualify R packages for a GxP system.
 License: MIT + file LICENSE
 Encoding: UTF-8

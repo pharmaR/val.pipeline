@@ -234,7 +234,7 @@ val_pkg <- function(
     ### Assessment ###
     #
     pkg_assessment0 <- pkg_ref |>
-      dplyr::as_tibble() |> # no tibbles allowed for stip ^ or riskreports
+      # dplyr::as_tibble() |> # no tibbles allowed for stip ^ or riskreports
       riskmetric::pkg_assess()
     # strip assessment of '.recording' attribute:
     pkg_assessment <-  pkg_assessment0 |> 
@@ -246,21 +246,6 @@ val_pkg <- function(
     # inherits(pkg_assessment, "list_of_pkg_metric") # works
     # class(pkg_assessment)
     # names(pkg_assessment)
-    
-    # Possible to convert to tibble?
-    # pkg_assessment00 <- pkg_ref |>
-    #   dplyr::as_tibble() |> # no tibbles allowed for stip ^ or riskreports
-    #   riskmetric::pkg_assess()
-    # class(pkg_assessment00)
-    # pkg_assessment |> dplyr::as_tibble() # doesn't work
-    # pkg_ass <- pkg_assessment |>
-    #   ?list2DF()
-      
-
-    # class(pkg_ass) <- "list"
-    # pkg_ass |>
-    #   dplyr::as_tibble
-    
     # attr(pkg_assessment$covr_coverage, "label")
     # pkg_assessment$covr_coverage |> names()
     # pkg_assessment$covr_coverage$totalcoverage
