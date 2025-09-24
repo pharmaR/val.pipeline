@@ -43,16 +43,24 @@ options(repos = opt_repos, pkgType = "source") # , rlang_interactive = FALSE
 pre_filtered_pkg_metrics <- 
   val_filter(
     pre = TRUE,
-    source = "riskscore"
+    source = "riskscore",
+    avail_pkgs = available.packages() |> as.data.frame(),
+    decision_cats = c("Low", "Medium", "High"),
+    metrics = c("downloads_1yr", "reverse_dependencies",
+                "dependencies", "news_current", #"bugs_status",
+                "has_vignettes", "has_source_control", "has_website"
+    ),
+    decisions_df = build_decisions_df(),
+    else_cat = "High"
     )
 build_pkgs <-
   pre_filtered_pkg_metrics |>
-  dplyr::filter(!filter_risk %in% c("High")) |>
+  dplyr::filter(!final_risk %in% c("High")) |>
   dplyr::pull(package)
 
 failed_pkgs <-
   pre_filtered_pkg_metrics |>
-  dplyr::filter(filter_risk %in% c("High"))
+  dplyr::filter(final_risk %in% c("High"))
 
 #
 # ---- TODO: ----
@@ -61,10 +69,10 @@ failed_pkgs <-
 #
 # val_pkg():
 #
-# Figure out what pkg_assess() prompt is for.
+# Figure out how to deal with pkg_assess() prompt
 # Doesn't happen during background job
 # --> opened issue on 'riskmetric' repo
-# --> basically un-avoidable - would have to mimic pak
+# --> basically un-avoidable - would have to mimic pak::pkg_install()
 #
 # Also need a decision_reason field to cite which metric failed first. Leaving
 # this here until the "fail first" logic is applied.
@@ -73,7 +81,8 @@ failed_pkgs <-
 # attributes), but val_filter() is designed to work with a {riskscore} df. We'll
 # need a way to easily convert the list to a df, or make val_filter() handle lists.
 #
-#
+
+
 # 
 # val_filter():
 #
@@ -81,15 +90,13 @@ failed_pkgs <-
 # which #1 is 'accepted' and the last one is treated as 'failed' by val_pkg().
 #
 # Also need a decision_reason field to cite which metric failed first. Leaving
-# this here until the "fail first" logic is applied.
+# this here until the "fail first" logic is applied. For 'post' only?
 #
 # Automatically grab all available metrics with "meaningful" or
 # usable output. Right now, the metrics are hard coded. Exceptions
 # logic could default to "low" for each or could be user defined.
 # User should be able to override to use just the metrics they want,
 # in the order they want to assess them.
-#
-# Retool riskscore to have a cleaner data object
 #
 #
 # {riskreports}:
@@ -179,7 +186,8 @@ assessed <- outtie$pkgs_df
 qualified <- assessed |>
   dplyr::filter(decision == "Low")
 
-# Provision PPM metadata for all pkgs
+# Store as pins board?
+# How to Provision PPM metadata for all pkgs
 
 
 
