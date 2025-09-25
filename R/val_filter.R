@@ -57,7 +57,7 @@ val_filter <- function(
     pv <- packageVersion("riskscore") # verify ‘v0.0.1'
     cat(paste0("\n--> Using {riskscore} Version: 'v", pv, "'\n"))
     
-    pkgs <- avail_pkgs |>
+    pkgs0 <- avail_pkgs |>
       dplyr::select(package = Package, version = Version) |>
       dplyr::left_join(
         riskscore::cran_assessed_latest |>
@@ -84,14 +84,9 @@ val_filter <- function(
     # This will be the #1 decider for filtering packages
     # extract list values into a numeric vector
     if("downloads_1yr" %in% decisions_df$metric) {
-      pkgs <- pkgs |>
-        dplyr::mutate(
-          dwnlds = ifelse(is.na(downloads_1yr), NA,
-                          downloads_1yr |>
-                            purrr::map(~.x[[1]]) |>
-                            unlist() |>
-                            as.numeric()
-          ))
+      pkgs$dwnlds <- purrr::map_dbl(pkgs$downloads_1yr, ~ {
+          if(is.null(.x[[1]])) NA_real_ else as.numeric(.x[[1]])
+        })
     }
     if("reverse_dependencies" %in% decisions_df$metric) {
       pkgs$rev_deps <- pkgs$reverse_dependencies |>
@@ -124,12 +119,10 @@ val_filter <- function(
     }
     if("has_vignettes" %in% decisions_df$metric) {
       # is.integer(pkgs$has_vignettes[[11]][[1]])
-      pkgs$n_vig <- 
-        ifelse(is.na(pkgs$has_vignettes), NA,
-               pkgs$has_vignettes |>
-                 purrr::map(~.x[[1]]) |>
-                 unlist()
-        )
+      # pkgs$n_vig <- NULL
+      pkgs$n_vig <- purrr::map_dbl(pkgs$has_vignettes, ~ {
+        if(is.null(.x[[1]])) NA_real_ else as.numeric(.x[[1]])
+      })
     }
     if("has_source_control" %in% decisions_df$metric) {
       # is.integer(pkgs$has_source_control[[11]][[1]] |> length())
@@ -214,7 +207,13 @@ val_filter <- function(
   primary_metrics <- decisions_df |>
     dplyr::filter(tolower(metric_type) == "primary")
     # dplyr::filter(tolower(metric) %in% c("downloads_1yr", "reverse_dependencies"))
-  rip_cats(
+  
+  # Share a note
+  prime_met_len <- primary_metrics$metric |> unique() |> length()
+  cat(glue::glue("\n\n> Applying Decisions Categories for {prime_met_len} 'Primary' risk metric(s).\n\n"))
+  
+  # Create metric-based risk categories decision columns
+  pkgs_primed <- rip_cats(
     met_dec_df = primary_metrics,
     pkgs_df = pkgs,
     else_cat = else_cat
@@ -222,37 +221,100 @@ val_filter <- function(
   
   
   # ---- Filter Pkgs on Primary Metrics ----
-  # Initiate a final_risk column & subset pkgs df to those. Why subset? Well,
-  # it will save us time running thru the Exceptions code block below.
+  # Initiate a final_risk column & subset pkgs df to those. 
   # Later, we will join this back to the full pkgs df
-  pkgs_prime <-
-    pkgs |>
-    dplyr::filter(primary_risk_cat == decisions[1])
-  
-  build_pkgs_len <-
-    pkgs |>
-    dplyr::filter(!dwnlds_cat %in% c("High")) |>
-    dplyr::pull(package) |>
-    length()
-  
+  # prime_only <-
+  #   pkgs_primed |>
+  #   dplyr::filter(final_risk_cat == decisions[1]) |>
+  #   # remove any previously created _cat columns
+  #   dplyr::select(-final_risk_cat)
+  # 
+  # prime_len <- nrow(pkgs_prime)
   
 
   # ---- Exceptions ----
   # Exceptions to this? Perhaps some 'high' risk pkgs
-  # could move to 'medium' if they have other outstanding metrics?
+  # could move to 'medium' if they have other outstanding metrics? Similarly,
+  # "Medium" could move to "Low".
   exception_metrics <- decisions_df |>
     dplyr::filter(tolower(metric_type) != "primary") 
   
+  exc_met_len <- exception_metrics$metric |> unique() |> length()
+  
   if(nrow(exception_metrics > 0)){
-    rip_cats(
+    
+    cat(glue::glue("\n\n> Applying Decisions Categories to {exc_met_len} 'Exception' risk metric(s).\n\n"))
+    
+    
+    # Create metric-based risk categories decision columns
+    # rm(pkgs_all_cats)
+    pkgs_all_cats <- pkgs_prime_cats <- rip_cats(
       met_dec_df = exception_metrics,
-      pkgs_df = pkgs,
+      pkgs_df =  
+        pkgs_primed |>
+          dplyr::rename(primary_risk_category = final_risk_cat) |>
+          dplyr::select(-dplyr::ends_with("_cat")),
       else_cat = else_cat
-      )
+      ) |>
+      # pkgs_all_cats <- pkgs_all_cats |>
+      dplyr::rename(exception_risk_category = final_risk_cat)
+    str(pkgs_all_cats[c("package", "primary_risk_category", "exception_risk_category")])
+    #
+    # ---- Promote Exceptions ----
+    #
+    promos <-
+      pkgs_all_cats |>
+      
+      # create final_risk variable that reduces the decision category
+      # from primary_risk_category if exception_risk_category is the lowest risk
+      dplyr::mutate(
+        final_risk = 
+          dplyr::case_when(
+            primary_risk_category == "Medium" &
+              exception_risk_category == "Low" ~ "Low",
+            primary_risk_category == "High" &
+              exception_risk_category == "Low" ~ "Medium",
+            .default = primary_risk_category
+          )
+      ) |>
+      dplyr::select(
+        package, version,
+        dwnlds,
+        primary_risk_category, exception_risk_category,
+        final_risk, dplyr::everything())
+    
+    # Pkgs that shifted thanks to exceptions
+    cat("\n--> Exceptions to Primary metric decisions based on meeting ALL of the following metric criterion:\n\n")
+    diff_table <- {
+      pkgs$final_risk |>
+        factor(levels = levels(decisions_df$decision)) |>
+        table()
+    } - {
+      pkgs$dwnlds_cat |>
+        factor(levels = levels(decisions_df$decision)) |>
+        table()
+    }
+    
+    # print note on promotions to console
+    print(
+      exdf |>
+        dplyr::select(Metric = metric_name, Conditions = conds, `Exception If` = exception_cats)
+    )
+    cat("\n")
+    print(
+      diff_table |>
+        as.data.frame() |>
+        dplyr::rename(`Risk Shifted` = Var1, Added = Freq)
+    )
+    
+    
+  } else {
+    pkgs_all_cats <- pkgs_primed
   }
     
+  
 
-    
+  
   #
   # ---- Filter ----
   # 
@@ -272,74 +334,74 @@ val_filter <- function(
   #     pkgs$website_cat == "Low" 
   # }
   
-  pull_ex <- function(metric) {
-    eval(parse(text=
-                 dplyr::filter(exdf, metric_name == metric) |>
-                 dplyr::pull(exception_cats)
-    )) 
-  }
-  rev_deps_excat <- pull_ex("reverse_dependencies") 
-  n_deps_excat <-  pull_ex("dependencies")
-  news_curr_excat <-  pull_ex("news_current") 
-  n_vig_excat <-  pull_ex("has_vignettes")
-  src_cntrl_excat <-  pull_ex("has_source_control")
-  site_excat <-  pull_ex("has_website")
-  
-  # pkgs$final_risk <- NULL
-  pkgs <-
-    pkgs |>
-    dplyr::mutate(
-      final_risk = 
-        dplyr::case_when(
-          
-          dwnlds_cat == "Medium" &
-            # exceptions()
-            rev_deps_cat %in% rev_deps_excat &
-            n_deps_cat %in% n_deps_excat &
-            # pkgs$bug_stat_cat == "Low" & # {riskscore} data not usable
-            news_curr_cat == news_curr_excat &
-            n_vig_cat == n_vig_excat &
-            src_cntrl_cat == src_cntrl_excat &
-            website_cat == site_excat ~ "Low",
-          
-          dwnlds_cat == "High" &
-            dwnlds > 10000 & # snuck this in
-            
-            # exceptions()
-            rev_deps_cat %in% rev_deps_excat &
-            n_deps_cat %in% n_deps_excat &
-            # pkgs$bug_stat_cat == "Low" & # {riskscore} data not usable
-            news_curr_cat == news_curr_excat &
-            n_vig_cat == n_vig_excat &
-            src_cntrl_cat == src_cntrl_excat &
-            website_cat == site_excat ~ "Medium",
-          
-          .default = dwnlds_cat
-        )
-    ) |>
-    dplyr::select(package, version, final_risk, dplyr::everything())
-  
-  # Pkgs that shifted thanks to exceptions
-  cat("\n--> Exceptions to 'downloads_1yr'-based decisions based on meeting ALL of the following metric criterion:\n\n")
-  diff_table <- {
-    pkgs$final_risk |>
-      factor(levels = c("Low", "Medium", "High")) |>
-      table()
-  } - {
-    pkgs$dwnlds_cat |>
-      factor(levels = c("Low", "Medium", "High")) |>
-      table()
-  }
-  print(
-    exdf |>
-      dplyr::select(Metric = metric_name, Conditions = conds, `Exception If` = exception_cats)
-  )
-  cat("\n")
-  print(
-    diff_table |>
-      as.data.frame() |>
-      dplyr::rename(`Risk Shifted` = Var1, Added = Freq)
-  )
+  # pull_ex <- function(metric) {
+  #   eval(parse(text=
+  #                dplyr::filter(exdf, metric_name == metric) |>
+  #                dplyr::pull(exception_cats)
+  #   )) 
+  # }
+  # rev_deps_excat <- pull_ex("reverse_dependencies") 
+  # n_deps_excat <-  pull_ex("dependencies")
+  # news_curr_excat <-  pull_ex("news_current") 
+  # n_vig_excat <-  pull_ex("has_vignettes")
+  # src_cntrl_excat <-  pull_ex("has_source_control")
+  # site_excat <-  pull_ex("has_website")
+  # 
+  # # pkgs$final_risk <- NULL
+  # pkgs <-
+  #   pkgs |>
+  #   dplyr::mutate(
+  #     final_risk = 
+  #       dplyr::case_when(
+  #         
+  #         dwnlds_cat == "Medium" &
+  #           # exceptions()
+  #           rev_deps_cat %in% rev_deps_excat &
+  #           n_deps_cat %in% n_deps_excat &
+  #           # pkgs$bug_stat_cat == "Low" & # {riskscore} data not usable
+  #           news_curr_cat == news_curr_excat &
+  #           n_vig_cat == n_vig_excat &
+  #           src_cntrl_cat == src_cntrl_excat &
+  #           website_cat == site_excat ~ "Low",
+  #         
+  #         dwnlds_cat == "High" &
+  #           dwnlds > 10000 & # snuck this in
+  #           
+  #           # exceptions()
+  #           rev_deps_cat %in% rev_deps_excat &
+  #           n_deps_cat %in% n_deps_excat &
+  #           # pkgs$bug_stat_cat == "Low" & # {riskscore} data not usable
+  #           news_curr_cat == news_curr_excat &
+  #           n_vig_cat == n_vig_excat &
+  #           src_cntrl_cat == src_cntrl_excat &
+  #           website_cat == site_excat ~ "Medium",
+  #         
+  #         .default = dwnlds_cat
+  #       )
+  #   ) |>
+  #   dplyr::select(package, version, final_risk, dplyr::everything())
+  # 
+  # # Pkgs that shifted thanks to exceptions
+  # cat("\n--> Exceptions to 'downloads_1yr'-based decisions based on meeting ALL of the following metric criterion:\n\n")
+  # diff_table <- {
+  #   pkgs$final_risk |>
+  #     factor(levels = c("Low", "Medium", "High")) |>
+  #     table()
+  # } - {
+  #   pkgs$dwnlds_cat |>
+  #     factor(levels = c("Low", "Medium", "High")) |>
+  #     table()
+  # }
+  # print(
+  #   exdf |>
+  #     dplyr::select(Metric = metric_name, Conditions = conds, `Exception If` = exception_cats)
+  # )
+  # cat("\n")
+  # print(
+  #   diff_table |>
+  #     as.data.frame() |>
+  #     dplyr::rename(`Risk Shifted` = Var1, Added = Freq)
+  # )
   
   
   # Final pkg counts in each risk category

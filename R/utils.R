@@ -477,18 +477,19 @@ rip_cats <- function(
     )
   })
   # pkgs$dwnlds_cat <- NULL
-  pkgs <<- pkgs_df |>
+  return_pkgs <- pkgs_df |>
     dplyr::mutate(
-      primary_risk_cat = pmin(!!!rlang::syms(paste0(met_der$derived_col, "_cat")), na.rm = TRUE)
-    ) |>
-    dplyr::mutate(
-      across(ends_with("_cat"), ~ factor(.x, levels = levels(met_dec_df$decision))), # Not needed
-    ) 
+      # convert cat vars into factors so we can use pmax() on them
+      across(ends_with("_cat"), ~ factor(.x, levels = levels(met_dec_df$decision))),
+      # higher risk trumps lower risk amongst all _cat vars (e.g., High > Medium > Low)
+      final_risk_cat = pmin(!!!rlang::syms(paste0(met_der$derived_col, "_cat")), na.rm = TRUE)
+    )
+  rm(pkgs_df) # verify we don't accidentally use it later
   
   # Report of changes for primary risk alone
   if(nrow(met_der) > 1) {
     cat(glue::glue("\n\n--> Decisions based off {nrow(met_der)} 'Primary' risk metric(s):\n\n"))
-    Var1 <- pkgs[["primary_risk_cat"]]
+    Var1 <- return_pkgs[["final_risk_cat"]]
     print(
       Var1 |>
         factor(levels = levels(met_dec_df$decision)) |>
@@ -502,6 +503,7 @@ rip_cats <- function(
         dplyr::select(Risk = Var1, Cnt = Freq.x, Pct = Freq.y)
     )
   }
+  return(return_pkgs)
 }
 
 
