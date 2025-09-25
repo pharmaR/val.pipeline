@@ -18,21 +18,19 @@
 #' @param source character, either "riskscore" (default), "PACKAGES", or a
 #'   data.frame.
 #' @param avail_pkgs data.frame, the output of available.packages() as a data.frame
+#' @param decisions_df data.frame, the output of build_decisions_df()
+#' @param else_cat character, the default risk category if no conditions are met.
 #'
 #' @importFrom dplyr filter pull mutate case_when between rename left_join
-#'   across if_else everything
-#' @importFrom purrr map map_int
+#'   across if_else everything select
+#' @importFrom purrr map map_int 
 #' @importFrom tools package_dependencies
+#' 
 #' 
 val_filter <- function(
     pre = TRUE,
     source = "riskscore",
     avail_pkgs = available.packages() |> as.data.frame(),
-    decision_cats = c("Low", "Medium", "High"),
-    metrics = c("downloads_1yr", "reverse_dependencies",
-                "dependencies", "news_current", "bugs_status",
-                "has_vignettes", "has_source_control", "has_website"
-    ),
     decisions_df = build_decisions_df(),
     else_cat = "High"
 ) {
@@ -41,8 +39,8 @@ val_filter <- function(
   cat("\n\nFiltering available packages. Starting w/", nrow(avail_pkgs), "pkgs.\n")
   
   # verify decisions_df is compliant
-  if(!all(c("metric", "decision", "condition", "lower_limit", "upper_limit", "metric_type", "condition_applied") %in% colnames(decisions_df))) {
-    stop("'decisions_df' is not compliant. Must contain columns: 'metric_name', 'metric_lab', 'low_cutoff', 'medium_cutoff', 'conds', 'exception_cats'")
+  if(!all(c("metric", "decision", "condition", "metric_type", "accept_condition") %in% colnames(decisions_df))) {
+    stop("'decisions_df' is not compliant. Must contain columns: 'metric', 'decision', 'condition', 'metric_type', 'accept_condition'")
   }
   
   # Use package metrics based on specified source
@@ -83,7 +81,7 @@ val_filter <- function(
     #
     # This will be the #1 decider for filtering packages
     # extract list values into a numeric vector
-    if("downloads_1yr" %in% metrics) {
+    if("downloads_1yr" %in% decisions_df$metric) {
       pkgs <- pkgs |>
         dplyr::mutate(
           dwnlds = ifelse(is.na(downloads_1yr), NA,
@@ -93,13 +91,13 @@ val_filter <- function(
                             as.numeric()
           ))
     }
-    if("reverse_dependencies" %in% metrics) {
+    if("reverse_dependencies" %in% decisions_df$metric) {
       pkgs$rev_deps <- pkgs$reverse_dependencies |>
         purrr::map(~length(.x[[1]])) |>
         unlist() |>
         as.numeric()
     }
-    if("dependencies" %in% metrics) {
+    if("dependencies" %in% decisions_df$metric) {
       pkgs <- pkgs |>
         dplyr::mutate(
           deps = 
@@ -112,7 +110,7 @@ val_filter <- function(
           n_deps = purrr::map_int(deps, ~length(.x))
         )
     }
-    if("news_current" %in% metrics) {
+    if("news_current" %in% decisions_df$metric) {
       pkgs <- pkgs |>
         # dplyr::rename(version = version.x) |>
         dplyr::left_join(
@@ -122,7 +120,7 @@ val_filter <- function(
           by = c("package", "version")
         )
     }
-    if("has_vignettes" %in% metrics) {
+    if("has_vignettes" %in% decisions_df$metric) {
       # is.integer(pkgs$has_vignettes[[11]][[1]])
       pkgs$n_vig <- 
         ifelse(is.na(pkgs$has_vignettes), NA,
@@ -131,13 +129,13 @@ val_filter <- function(
                  unlist()
         )
     }
-    if("has_source_control" %in% metrics) {
+    if("has_source_control" %in% decisions_df$metric) {
       # is.integer(pkgs$has_source_control[[11]][[1]] |> length())
       pkgs$src_cntrl <- pkgs$has_source_control |>
         purrr::map(~.x[[1]] |> length()) |>
         unlist()
     }
-    if("has_website" %in% metrics) {
+    if("has_website" %in% decisions_df$metric) {
       # is.integer(pkgs$has_website[[11]][[1]] |> length())
       pkgs$n_sites <- pkgs$has_website |>
         purrr::map(~.x[[1]] |> length()) |>
@@ -209,19 +207,28 @@ val_filter <- function(
   # ---- Apply Decisions ----
   #
   
-  # Need to move this into utils.R
-  decisions_df <- decisions_df |>
-    dplyr::mutate(decision = factor(decision, levels = c("Low", "Medium", "High")))
-  
 
   # ---- Primary Metrics ----
   primary_metrics <- decisions_df |>
     dplyr::filter(tolower(metric_type) == "primary")
+    # dplyr::filter(tolower(metric) %in% c("downloads_1yr", "reverse_dependencies"))
   rip_cats(
-    decision_df = primary_metrics,
+    met_dec_df = primary_metrics,
     pkgs_df = pkgs,
     else_cat = else_cat
   )
+  
+  
+  # ---- Filter Pkgs on Primary Metrics ----
+  # Initiate a final_risk column & subset pkgs df to those. Why subset? Well,
+  # it will save us time running thru the Exceptions code block below.
+  # Later, we will join this back to the full pkgs df
+  build_pkgs_len <-
+    pkgs |>
+    dplyr::filter(!dwnlds_cat %in% c("High")) |>
+    dplyr::pull(package) |>
+    length()
+  
   
 
   # ---- Exceptions ----
@@ -232,7 +239,7 @@ val_filter <- function(
   
   if(nrow(exception_metrics > 0)){
     rip_cats(
-      decision_df = exception_metrics,
+      met_dec_df = exception_metrics,
       pkgs_df = pkgs,
       else_cat = else_cat
       )
@@ -376,7 +383,7 @@ val_filter <- function(
 #' @importFrom purrr map map_int
 #' @importFrom tools package_dependencies
 #' 
-val_filter_manual <- function(
+manual_val_filter <- function(
     pre = TRUE,
     source = "riskscore",
     avail_pkgs = available.packages() |> as.data.frame(),

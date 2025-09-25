@@ -45,13 +45,8 @@ pre_filtered_pkg_metrics <-
     pre = TRUE,
     source = "riskscore",
     avail_pkgs = available.packages() |> as.data.frame(),
-    decision_cats = c("Low", "Medium", "High"),
-    metrics = c("downloads_1yr", "reverse_dependencies",
-                "dependencies", "news_current", #"bugs_status",
-                "has_vignettes", "has_source_control", "has_website"
-    ),
     decisions_df = build_decisions_df(),
-    else_cat = "High"
+    else_cat = "High" # should this be moved into decisions df?
     )
 build_pkgs <-
   pre_filtered_pkg_metrics |>
