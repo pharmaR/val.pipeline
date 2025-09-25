@@ -1,12 +1,53 @@
 
 #' Build Validation
-#' 
-#' 
+#'
+#' Build a risk assessment validation for a set of R packages from various
+#' sources (CRAN / Bioconductor / GitHub), with the ability to include
+#' (optionally recursive) dependencies and suggests, and save the results in a
+#' structured directory. The cherry on top is that this build will use logic
+#' from val_filter() to not only apply risk decisions too all packages assessed,
+#' but goes back around and will re-categorize (invalidated) decisions based on
+#' whether any dependencies were categorized as "High Risk" / "Rejected".
+#'
+#' @param pkg_names Character vector of package names to assess. If NULL
+#'   (default), all packages available from the specified repository will be
+#'   assessed.
+#' @param ref Character string indicating the source of the packages to assess.
+#'   Either "source" (default) for source packages, or "remote" for packages
+#'   from remote repositories like CRAN/Bioconductor.
+#' @param metric_pkg Character string specifying the risk assessment package to
+#'   use. Either "riskmetric" (default) & or "val.meter" (not implemented yet).
+#' @param deps Character vector specifying which types of dependencies to
+#'   include in the assessment. Options are "depends", "suggests", or both
+#'   (default). If NULL, only the specified packages from 'pkg_names' will be
+#'   assessed without their dependencies.
+#' @param deps_recursive Logical indicating whether to include dependencies
+#'   recursively. Default is TRUE.
+#' @param val_date Date object or character string representing the date of the
+#'   validation build. Default is the current date (Sys.Date()).
+#' @param out Character string specifying the output directory for the
+#'   validation build. Default is "riskassessment" in the current working
+#'   directory.
+#' @param replace Logical indicating whether to replace existing assessments for
+#'   packages that have already been assessed. Default is FALSE.
+#' @param opt_repos Named character vector specifying the repository options for
+#'   package installation. Default is CRAN.
+#'
 #' @importFrom glue glue
 #' @importFrom tidyr unite
-#' @importFrom dplyr filter pull
-#' @importFrom purrr map2 set_names
+#' @importFrom dplyr filter pull mutate case_when as_tibble bind_rows
+#' @importFrom purrr map2 set_names reduce map map_lgl list_flatten
 #' @importFrom stringr word
+#' @importFrom tools package_dependencies
+#' @importFrom utils available.packages
+#'
+#' @return A list containing:
+#' - val_dir: The directory where the validation build results are stored.
+#' - pkgs_df: A data frame summarizing the risk assessment results for all packages assessed,
+#'   including their dependencies and final risk decisions.
+#'
+#' @export
+#'
 #' 
 val_build <- function(
     pkg_names = NULL, #

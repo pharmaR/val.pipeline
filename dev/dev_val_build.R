@@ -74,6 +74,55 @@ failed_pkgs <-
 cat("\n--> Final Decision Category Counts for'pre' assessment risk: \n----> Returned", prettyNum(length(build_pkgs), big.mark = ","), "pkgs for build.\n")
 
 
+
+
+#
+# ---- val_build() ----
+#
+
+# See the full dependency tree before running val_build()
+tree <- tools::package_dependencies(
+  packages = "askpass",
+  # packages = build_pkgs,
+  db = available.packages(),
+  # which = c("Suggests"),
+  # which = c("Depends", "Imports", "LinkingTo"),
+  which = c("Depends", "Imports", "LinkingTo", "Suggests"), # prod
+  # recursive = TRUE
+  recursive = FALSE
+) |>
+  unlist(use.names = FALSE) |>
+  unique()
+length(tree)
+
+# Validation build
+outtie <- val_build(
+  
+  # pkg_names = 'zoo',   # has a prompt, plus depends on lattice which takes a while
+  pkg_names = 'askpass', # 2.5 - 3 mins when deps
+  # pkg_names = build_pkgs,
+  
+  ref = "source", # default
+  # ref = "remote",
+  
+  metric_pkg = "riskmetric", # default
+  
+  deps = c("depends", "suggests"), # default
+  # deps = "depends",  # this means --> c("Depends", "Imports", "LinkingTo")
+  # deps = NULL,
+  
+  deps_recursive = FALSE,
+  # deps_recursive = TRUE, # default
+  
+  val_date = val_date, # Sys.Date() # is  default
+  
+  replace = FALSE,# default
+  # replace = TRUE, 
+  
+  out = 'dev/riskassessments'
+)
+
+
 #
 # ---- TODO: ----
 #
@@ -107,50 +156,6 @@ cat("\n--> Final Decision Category Counts for'pre' assessment risk: \n----> Retu
 # {riskreports}:
 # Install latest (dev) version of quarto?
 #
-
-
-#
-# ---- val_build() ----
-#
-
-# See the full dependency tree before running val_build()
-tree <- tools::package_dependencies(
-  # packages = "askpass",
-  packages = build_pkgs,
-  db = available.packages(),
-  # which = c("Suggests"),
-  which = c("Depends", "Imports", "LinkingTo"),
-  recursive = TRUE
-  # recursive = FALSE
-) |>
-  unlist(use.names = FALSE) |>
-  unique()
-length(tree)
-
-# Validation build
-outtie <- val_build(
-  # pkg_names = 'zoo',   # has a prompt, plus depends on lattice which takes a while
-  pkg_names = 'askpass', # 2.5 - 3 mins
-  # pkg_names = build_pkgs,
-  
-  # ref = "remote",
-  ref = "source",
-  metric_pkg = "riskmetric",
-  
-  # deps = NULL,
-  deps = "depends",  # this means --> c("Depends", "Imports", "LinkingTo")
-  # deps = c("depends", "suggests"),
-  
-  deps_recursive = FALSE,
-  # deps_recursive = TRUE,
-  
-  val_date = Sys.Date(),
-  # replace = TRUE,
-  replace = FALSE,
-  out = 'dev/riskassessments'
-)
-
-
 
 
 #

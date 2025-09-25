@@ -236,9 +236,13 @@ val_pkg <- function(
     pkg_assessment0 <- pkg_ref |>
       # dplyr::as_tibble() |> # no tibbles allowed for stip ^ or riskreports
       riskmetric::pkg_assess()
+    
     # strip assessment of '.recording' attribute:
     pkg_assessment <-  pkg_assessment0 |> 
       strip_recording()
+    
+    pkg_score <- riskmetric::pkg_score(pkg_assessment) # What should I do with this?
+    
     
     # check some stuff
     # object.size(pkg_assessment0) # 'askpass' 136,744 bytes
@@ -296,13 +300,17 @@ val_pkg <- function(
   # ---- Save Assessment---- 
   #
   assessment_file <- file.path(assessed, glue::glue("{pkg_v}_assessments.rds"))
+  scores_file <- file.path(assessed, glue::glue("{pkg_v}_scores.rds"))
   saveRDS(pkg_assessment, assessment_file)
-  cat("\n-->", pkg_v,"assessments saved.\n")
+  saveRDS(pkg_score, scores_file)
+  cat("\n-->", pkg_v,"assessments & scores saved.\n")
+  
   
   #
   # ---- Decision (val.criterion) ----
   #
   #
+  
   # Use org-level criterion to set thresholds and Update final decision (if not
   # already 'high risk') AND then filter packages to a final 'qualified' list
   #
@@ -316,8 +324,94 @@ val_pkg <- function(
   # maybe I should call it pre_filter() & post_filter()
   post_filtered_pkg_metrics <- 
     val_filter(
-      pre = FALSE,
-      source = pkg_assessment
+      pre = FALSE, 
+      source = pkg_assessment, # pass in pkg_assessment
+      avail_pkgs = available.packages() |> as.data.frame(),
+      decisions = c("Low", "Medium", "High"), # need to pass decisions into val_pkg()
+      else_cat = "High",
+      decisions_df =
+        build_decisions_df(
+          decision_lst = c("Low", "Medium", "High"),
+          
+          rules_lst = list(
+            downloads_1yr = list(
+              cond = list(
+                High = ~ is.na(.x),
+                High = ~ .x < 120000,
+                Medium = ~ dplyr::between(.x, 120000, 240000),
+                Low = ~ .x > 240000
+              ),
+              type = "primary",
+              accept_cats = c("Low"),
+              min_value = 40000
+            ),
+            reverse_dependencies = list(
+              cond = list(
+                High = ~ is.na(.x),
+                High = ~ .x < 2,
+                Medium = ~ dplyr::between(.x, 2, 7),
+                Low = ~ .x > 7
+              ),
+              type = "exception",
+              accept_cats = c("Low", "Medium")
+            ),
+            dependencies =  list(
+              cond = list(
+                High = ~ is.na(.x),
+                High = ~ .x > 8,
+                Medium = ~ dplyr::between(.x, 4, 8),
+                Low = ~ .x < 4
+              ),
+              type = "exception",
+              accept_cats = c("Low", "Medium")
+            ),
+            news_current =  list(
+              cond = list(
+                High = ~ is.na(.x),
+                High = ~ .x != 1,
+                Low = ~ .x == 1
+              ),
+              type = "exception",
+              accept_cats = c("Low")
+            ),
+            # bugs_status = list(
+            #   cond = list(
+            #       High = ~ is.na(.x) | .x != 1,
+            #       Low = ~ .x == 1
+            #     ),
+            #   type = "exception",
+            #   accept_cats = c("Low")
+            #   ),
+            has_vignettes =  list(
+              cond = list(
+                High = ~ is.na(.x),
+                High = ~ .x < 1,
+                Medium = ~ .x == 1,
+                Low = ~ .x > 1
+              ),
+              type = "exception",
+              accept_cats = c("Low")
+            ),
+            has_source_control =  list(
+              cond = list(
+                High = ~ is.na(.x),
+                High = ~ .x == 0,
+                Low = ~ .x > 0
+              ),
+              type = "exception",
+              accept_cats = c("Low")
+            ),
+            has_website =  list(
+              cond = list(
+                High = ~ is.na(.x),
+                High = ~ .x == 0,
+                Low = ~ .x > 0
+              ),
+              type = "exception",
+              accept_cats = c("Low")
+            )
+          )
+        )
     )
   # clean_install
   decision <- sample(c(rep("Low Risk",6), rep("Medium Risk", 3), "High Risk"), 1)
