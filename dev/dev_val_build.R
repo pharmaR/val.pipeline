@@ -26,8 +26,12 @@ val_date <- as.Date(val_start)
 val_date_txt <- gsub("-", "", val_date)
 cat(paste0("\n\n\nValidation pipeline initiated: R v", r_ver, " @ ", val_start_txt,"\n\n"))
 
+# 
+# ---- Inputs
+#
 # For now, let's just filter using cranlogs to determine downloaded pkgs
 opt_repos = c(val_build_repo = "https://cran.r-project.org")
+decisions = c("Low", "Medium", "High")
 
 #
 # ---- Set repos option ----
@@ -45,23 +49,37 @@ pre_filtered_pkg_metrics <-
     pre = TRUE,
     source = "riskscore",
     avail_pkgs = available.packages() |> as.data.frame(),
-    decisions = c("Low", "Medium", "High"),
+    decisions = decisions,
     else_cat = "High",
     decisions_df = build_decisions_df()
     )
+# Final pkg counts in each risk category
+# build_pkgs_len <-
+#   pkgs_final |>
+#   dplyr::filter(final_risk %in% decisions[1]) |>
+#   dplyr::pull(package) |>
+#   length()
+# 
+
 build_pkgs <-
   pre_filtered_pkg_metrics |>
-  dplyr::filter(!final_risk %in% c("High")) |>
+  dplyr::filter(final_risk %in% decisions[1]) |>
   dplyr::pull(package)
 
 failed_pkgs <-
   pre_filtered_pkg_metrics |>
-  dplyr::filter(final_risk %in% c("High"))
+  dplyr::filter(!final_risk %in% decisions[1])
+
+
+cat("\n--> Final Decision Category Counts for'pre' assessment risk: \n----> Returned", prettyNum(length(build_pkgs), big.mark = ","), "pkgs for build.\n")
+
 
 #
 # ---- TODO: ----
 #
 # Add a logger like logRx
+#
+
 #
 # val_pkg():
 #
@@ -82,41 +100,34 @@ failed_pkgs <-
 # 
 # val_filter():
 #
-# Need user to enter in decision category on a 'likert' style scale,
-# which #1 is 'accepted' and the last one is treated as 'failed' by val_pkg().
-#
-# Also need a decision_reason field to cite which metric failed first. Leaving
-# this here until the "fail first" logic is applied. For 'post' only?
-#
-# Automatically grab all available metrics with "meaningful" or
-# usable output. Right now, the metrics are hard coded. Exceptions
-# logic could default to "low" for each or could be user defined.
-# User should be able to override to use just the metrics they want,
-# in the order they want to assess them.
-#
+
+
+
 #
 # {riskreports}:
 # Install latest (dev) version of quarto?
 #
 
 
-
-
-
 #
 # ---- val_build() ----
 #
-# sandbox to play with packages with a small amount of dependencies
-# dput(dep_1)
-# tools::package_dependencies(
-#   packages = "askpass", 
-#   db = available.packages(),
-#   which = c("Suggests"),
-#   # which = c("Depends", "Imports", "LinkingTo"),
-#   recursive = FALSE
-# ) |>
-#   unlist(use.names = FALSE)
 
+# See the full dependency tree before running val_build()
+tree <- tools::package_dependencies(
+  # packages = "askpass",
+  packages = build_pkgs,
+  db = available.packages(),
+  # which = c("Suggests"),
+  which = c("Depends", "Imports", "LinkingTo"),
+  recursive = TRUE
+  # recursive = FALSE
+) |>
+  unlist(use.names = FALSE) |>
+  unique()
+length(tree)
+
+# Validation build
 outtie <- val_build(
   # pkg_names = 'zoo',   # has a prompt, plus depends on lattice which takes a while
   pkg_names = 'askpass', # 2.5 - 3 mins
@@ -127,7 +138,7 @@ outtie <- val_build(
   metric_pkg = "riskmetric",
   
   # deps = NULL,
-  deps = "depends",
+  deps = "depends",  # this means --> c("Depends", "Imports", "LinkingTo")
   # deps = c("depends", "suggests"),
   
   deps_recursive = FALSE,

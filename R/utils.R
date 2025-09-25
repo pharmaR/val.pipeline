@@ -455,7 +455,7 @@ rip_cats <- function(
     
     # pkgs_df$dwnlds_cat <- NULL
     pkgs_df <<- pkgs_df |>
-      dplyr::rowwise() |>
+      dplyr::rowwise() |> # Boo! Rowwise is really slow. We need to find a better way eventually.
       dplyr::mutate(!!! cond_exprs) |>
       dplyr::ungroup()
     
