@@ -486,20 +486,22 @@ rip_cats <- function(
     ) 
   
   # Report of changes for primary risk alone
-  cat(glue::glue("\n\n--> Decisions based off {nrow(met_der)} 'Primary' risk metric(s):\n\n"))
-  Var1 <- pkgs[["primary_risk_cat"]]
-  print(
-    Var1 |>
-      factor(levels = levels(met_dec_df$decision)) |>
-      table() |>
-      as.data.frame() |>
-      dplyr::left_join(
-        {round(prop.table(table(Var1)), 3) * 100} |>
-          as.data.frame(),
-        by = "Var1"
-      ) |>
-      dplyr::select(Risk = Var1, Cnt = Freq.x, Pct = Freq.y)
-  )
+  if(nrow(met_der) > 1) {
+    cat(glue::glue("\n\n--> Decisions based off {nrow(met_der)} 'Primary' risk metric(s):\n\n"))
+    Var1 <- pkgs[["primary_risk_cat"]]
+    print(
+      Var1 |>
+        factor(levels = levels(met_dec_df$decision)) |>
+        table() |>
+        as.data.frame() |>
+        dplyr::left_join(
+          {round(prop.table(table(Var1)), 3) * 100} |>
+            as.data.frame(),
+          by = "Var1"
+        ) |>
+        dplyr::select(Risk = Var1, Cnt = Freq.x, Pct = Freq.y)
+    )
+  }
 }
 
 

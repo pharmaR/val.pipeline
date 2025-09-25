@@ -18,8 +18,9 @@
 #' @param source character, either "riskscore" (default), "PACKAGES", or a
 #'   data.frame.
 #' @param avail_pkgs data.frame, the output of available.packages() as a data.frame
-#' @param decisions_df data.frame, the output of build_decisions_df()
+#' @param decisions character vector, the risk categories to use.
 #' @param else_cat character, the default risk category if no conditions are met.
+#' @param decisions_df data.frame, the output of build_decisions_df()
 #'
 #' @importFrom dplyr filter pull mutate case_when between rename left_join
 #'   across if_else everything select
@@ -31,8 +32,9 @@ val_filter <- function(
     pre = TRUE,
     source = "riskscore",
     avail_pkgs = available.packages() |> as.data.frame(),
-    decisions_df = build_decisions_df(),
-    else_cat = "High"
+    decisions = c("Low", "Medium", "High"),
+    else_cat = "High",
+    decisions_df = build_decisions_df()
 ) {
   # @importFrom riskscore cran_assessed_20250812 cran_scored_20250812
   
@@ -223,6 +225,10 @@ val_filter <- function(
   # Initiate a final_risk column & subset pkgs df to those. Why subset? Well,
   # it will save us time running thru the Exceptions code block below.
   # Later, we will join this back to the full pkgs df
+  pkgs_prime <-
+    pkgs |>
+    dplyr::filter(primary_risk_cat == decisions[1])
+  
   build_pkgs_len <-
     pkgs |>
     dplyr::filter(!dwnlds_cat %in% c("High")) |>

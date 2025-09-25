@@ -8,8 +8,9 @@ val_filter(
   pre = TRUE,
   source = "riskscore",
   avail_pkgs = as.data.frame(available.packages()),
-  decisions_df = build_decisions_df(),
-  else_cat = "High"
+  decisions = c("Low", "Medium", "High"),
+  else_cat = "High",
+  decisions_df = build_decisions_df()
 )
 }
 \arguments{
@@ -21,9 +22,11 @@ data.frame.}
 
 \item{avail_pkgs}{data.frame, the output of available.packages() as a data.frame}
 
-\item{decisions_df}{data.frame, the output of build_decisions_df()}
+\item{decisions}{character vector, the risk categories to use.}
 
 \item{else_cat}{character, the default risk category if no conditions are met.}
+
+\item{decisions_df}{data.frame, the output of build_decisions_df()}
 }
 \description{
 First whack at attempting to filter packages based on org-level criterion

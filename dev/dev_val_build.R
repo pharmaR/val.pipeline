@@ -45,8 +45,9 @@ pre_filtered_pkg_metrics <-
     pre = TRUE,
     source = "riskscore",
     avail_pkgs = available.packages() |> as.data.frame(),
-    decisions_df = build_decisions_df(),
-    else_cat = "High" # should this be moved into decisions df?
+    decisions = c("Low", "Medium", "High"),
+    else_cat = "High",
+    decisions_df = build_decisions_df()
     )
 build_pkgs <-
   pre_filtered_pkg_metrics |>
