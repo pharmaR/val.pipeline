@@ -27,11 +27,13 @@ val_date_txt <- gsub("-", "", val_date)
 cat(paste0("\n\n\nValidation pipeline initiated: R v", r_ver, " @ ", val_start_txt,"\n\n"))
 
 # 
-# ---- Inputs
+# ---- Pull config variables ----
 #
 # For now, let's just filter using cranlogs to determine downloaded pkgs
-opt_repos = c(val_build_repo = "https://cran.r-project.org")
-decisions = c("Low", "Medium", "High")
+# opt_repos = c(val_build_repo = "https://cran.r-project.org") # put in config
+opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
+decisions <- pull_config(val = "decisions_lst", rule_type = "default")
+
 
 #
 # ---- Set repos option ----
@@ -39,13 +41,13 @@ decisions = c("Low", "Medium", "High")
 old <- options()
 on.exit(function() options(old))
 options(repos = opt_repos, pkgType = "source") # , rlang_interactive = FALSE
-
+options("repos") # verify
 
 #
-# ---- val.filter ----
+# ---- val_categorize() ----
 #
 pre_filtered_pkg_metrics <- 
-  val_filter(
+  val_categorize(
     pre = TRUE,
     source = "riskscore",
     avail_pkgs = available.packages() |> as.data.frame(),
@@ -53,14 +55,13 @@ pre_filtered_pkg_metrics <-
     else_cat = "High",
     decisions_df = build_decisions_df()
     )
-# Final pkg counts in each risk category
-# build_pkgs_len <-
-#   pkgs_final |>
-#   dplyr::filter(final_risk %in% decisions[1]) |>
-#   dplyr::pull(package) |>
-#   length()
-# 
 
+#
+# ---- Reduce pkgs ----
+#
+# Note: has to be decisions[1] ("Low") only because of the way we allowed
+# 'High' risk pkgs to get promoted to "Medium" in `pre_filtered_pkg_metrics`.
+# Specifically, a 'High' Risk pkg could have a severly low annual downloads #.
 build_pkgs <-
   pre_filtered_pkg_metrics |>
   dplyr::filter(final_risk %in% decisions[1]) |>
@@ -93,7 +94,7 @@ tree <- tools::package_dependencies(
 ) |>
   unlist(use.names = FALSE) |>
   unique()
-length(tree)
+length(tree) # total count
 
 # Validation build
 outtie <- val_build(
@@ -130,32 +131,48 @@ outtie <- val_build(
 #
 
 #
+# {riskscore}
+#
+# - Rebuild CRAN pkg metrics for the latest month
+# - Build Bioc output for the first time
+# - Save as .parquet instead of .rda (pkg feels bloated with firsttime use)
+# - Set this up on a schedule on Posit Connect
+#
+
+#
+# build_decisions_df()
+#
+# This function really needs to draw out certain rules_lists by type:
+# - Pre categorization tasks
+# - Individual pkg decisions for CRAN vs GitHub vs internal?
+# Probably need to leverage a YAML config file so we can pull the correct
+# list in, and make it more agile for others to use
+#
+
+#
 # val_pkg():
 #
+# Old:
 # Figure out how to deal with pkg_assess() prompt
 # Doesn't happen during background job
 # --> opened issue on 'riskmetric' repo
 # --> basically un-avoidable - would have to mimic pak::pkg_install()
 #
-# Also need a decision_reason field to cite which metric failed first. Leaving
-# this here until the "fail first" logic is applied.
-#
-# So, val_pkg() stores a list (because that works better for stripping .recording
-# attributes), but val_filter() is designed to work with a {riskscore} df. We'll
-# need a way to easily convert the list to a df, or make val_filter() handle lists.
-#
 
 
 # 
-# val_filter():
+# val_build():
 #
-
-
+# Re-categorizing decisions based on dependencies / rev_deps needs to be recursive
+#
 
 #
 # {riskreports}:
+#
 # Install latest (dev) version of quarto?
 #
+
+
 
 
 #
@@ -191,6 +208,10 @@ assessed <- outtie$pkgs_df
 # 
 # # val_build(pkg_names = c('aamatch'), deps = NULL) # No coverage
 
+
+
+
+
 #
 # ---- Wrap up ----
 #
@@ -205,6 +226,11 @@ qualified <- assessed |>
 
 
 
+# TODO some day, but not right now:
+
+#
+# Be able to export / store work done here into the {riskassessment} app
+#
 
 
 

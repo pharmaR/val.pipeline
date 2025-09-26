@@ -97,7 +97,7 @@ strip_recording_df <- function(assessment) {
 #' @keywords internal
 to_the_limit <- function(condition, low = TRUE) {
   purrr::map_dbl(condition, \(cond){
-    # cond <- decisions_df$condition[2] # for debugging
+    # cond <- decisions_df0$condition[1] # for debugging
     # print(cond)
     expr <- rlang::expr(!!rlang::parse_expr(cond))
     if (rlang::is_call(expr[[2]], name = c("<", ">", "<=", ">="))) {
@@ -122,8 +122,91 @@ to_the_limit <- function(condition, low = TRUE) {
   })
 }
 
-
-
+#' Pull Config
+#'
+#' Pull in relevant rules defined in confg.yml. Also verifies that the
+#' conditions only reference decision categories that are allowed in
+#' `decision_lst`.
+#'
+#' @param rule_type A character string indicating whether the decision
+#'   categories are used to "categorize" risk levels (e.g., "Low", "Medium",
+#'   "High") via val_categorize() or val_decision(). The difference being that
+#'   "categorize" is going to be used to filter the initial list of packages
+#'   using a remote pkg_ref() assessment, whereas "decision" is used to filter
+#'   the final list of packages after a 'pkg_source' pkg_ref() assessment is
+#'   produced locally on the GxP system of interest.
+#' @param config_path A character string indicating the path to the config.yml
+#'
+#' @importFrom config get
+#' @importFrom purrr map map_lgl set_names
+#' @importFrom glue glue
+#'
+#' @examples pull_config()
+#' @examples pull_config("decide_github")
+#' 
+#' @return A named list of lists
+#' 
+#' @export
+pull_config <- function(
+    val = NULL,
+    rule_type = c("remote_reduce", "decide_remote", "decide_github", "default")[1],
+    config_path = system.file("config.yml", package = "val.pipeline")
+) {
+  
+  configgy <- config::get(
+    value = val, # NULL means grab everything
+    config = rule_type,
+    file = config_path
+    # ,use_parent = TRUE # The default
+  )
+  
+  if(!is.null(val)) {
+    return(configgy)
+  }
+  
+  fig_names <- names(configgy)
+  inherits_pos <- which(fig_names == "inherits")[1] # grab first time 'inherits' shows up
+  default_names <- fig_names[1:(inherits_pos - 1)] # Not being used
+  rule_names <- fig_names[(inherits_pos + 1): length(fig_names)]
+  
+  # decision_lst <- configgy[["decisions_lst"]]
+  default_lst <- configgy[default_names]
+  decision_lst <- default_lst[["decisions_lst"]]
+  rule_lst <- configgy[rule_names]
+  
+  # Verify that conditions (conds) are valid - aka, they only declared
+  # decision categories (in `decision_list`). Else, we have to drop that rule
+  rule_metric_nm <- names(rule_lst)
+  metric_cond_cats <-
+    purrr::map(rule_metric_nm, ~ rule_lst[[.x]][["cond"]] |> names()) |>
+    purrr::set_names(rule_metric_nm)
+  metric_nms <- names(metric_cond_cats)
+  valid_cats_in_conds <-
+    purrr::map_lgl(metric_nms, ~ {if(all(metric_cond_cats[[.x]] %in% decision_lst)) TRUE else FALSE}) |>
+    purrr::set_names(metric_nms) 
+  # valid_cats_in_conds <- metric_cond_cats |> unlist() %in% decision_lst
+  if (any(!valid_cats_in_conds)) {
+    metrics_which_conds_invalid <- valid_cats_in_conds[which(!valid_cats_in_conds)] |> names()
+    warning(glue::glue("\nThe decision category(ies) referenced in these metric 'cond' list do not match those allowed in 'decision_lst': {paste(metrics_which_conds_invalid, collapse = ', ')}. Dropping those rules from 'rule_lst'.\n"))
+    rule_lst <- rule_lst[valid_cats_in_conds]
+  }
+  
+  # Verify that accept_cats are valid, else drop that rule.
+  rule_metric_nm <- names(rule_lst)
+  metric_exc_cats <- purrr::map(rule_metric_nm, ~ rule_lst[[.x]][["accept_cats"]]) |> purrr::set_names(rule_metric_nm)
+  # valid_cats_in_exc <- metric_exc_cats |> unlist() %in% decision_lst # old
+  metric_nms <- names(metric_exc_cats)
+  valid_cats_in_exc <-
+    purrr::map_lgl(metric_nms, ~ {if(all(metric_exc_cats[[.x]] %in% decision_lst)) TRUE else FALSE}) |>
+    purrr::set_names(metric_nms) 
+  if (any(!valid_cats_in_exc)) {
+    metrics_which_exc_invalid <- valid_cats_in_exc[which(!valid_cats_in_exc)] |> names()
+    warning(glue::glue("\nThe decision category(ies) referenced in these metric 'accept_cats' list do not match those allowed in 'decision_lst': {paste(metrics_which_exc_invalid, collapse = ', ')}. Dropping those rules from 'rule_lst'.\n"))
+    rule_lst <- rule_lst[valid_cats_in_exc]
+  }
+  
+  return(list(default_lst = default_lst, rule_lst = rule_lst))
+}
 
 #' Build Decisions Data.Frame
 #'
@@ -133,7 +216,14 @@ to_the_limit <- function(condition, low = TRUE) {
 #'
 #' @param decision_lst A character vector of decision categories, ordered from
 #'   highest risk to lowest risk.
-#' @param rules_lst A named list of lists, where each sub-list contains:
+#' @param rule_type A character string indicating whether the decision
+#'   categories are used to "categorize" risk levels (e.g., "Low", "Medium",
+#'   "High") via val_categorize() or val_decision(). The difference being that
+#'   "categorize" is going to be used to filter the initial list of packages
+#'   using a remote pkg_ref() assessment, whereas "decision" is used to filter
+#'   the final list of packages after a 'pkg_source' pkg_ref() assessment is
+#'   produced locally on the GxP system of interest.
+#' @param rule_lst A named list of lists, where each sub-list contains:
 #' - cond: A named list of formulas, where the names correspond to decision
 #'   categories in `decision_lst`, and the formulas define the conditions for
 #'   each category.
@@ -163,127 +253,30 @@ to_the_limit <- function(condition, low = TRUE) {
 #'
 #' @export
 build_decisions_df <- function(
-    
-    decision_lst = c("Low", "Medium", "High"),
-    
-    rules_lst = list(
-      downloads_1yr = list(
-        cond = list(
-          High = ~ is.na(.x),
-          High = ~ .x < 120000,
-          Medium = ~ dplyr::between(.x, 120000, 240000),
-          Low = ~ .x > 240000
-        ),
-        type = "primary",
-        accept_cats = c("Low"),
-        min_value = 40000
-      ),
-      reverse_dependencies = list(
-        cond = list(
-          High = ~ is.na(.x),
-          High = ~ .x < 2,
-          Medium = ~ dplyr::between(.x, 2, 7),
-          Low = ~ .x > 7
-        ),
-        type = "exception",
-        accept_cats = c("Low", "Medium")
-        ),
-      dependencies =  list(
-        cond = list(
-          High = ~ is.na(.x),
-          High = ~ .x > 8,
-          Medium = ~ dplyr::between(.x, 4, 8),
-          Low = ~ .x < 4
-        ),
-        type = "exception",
-        accept_cats = c("Low", "Medium")
-      ),
-      news_current =  list(
-        cond = list(
-          High = ~ is.na(.x),
-          High = ~ .x != 1,
-          Low = ~ .x == 1
-        ),
-        type = "exception",
-        accept_cats = c("Low")
-      ),
-      # bugs_status = list(
-      #   cond = list(
-      #       High = ~ is.na(.x) | .x != 1,
-      #       Low = ~ .x == 1
-      #     ),
-      #   type = "exception",
-      #   accept_cats = c("Low")
-      #   ),
-      has_vignettes =  list(
-        cond = list(
-          High = ~ is.na(.x),
-          High = ~ .x < 1,
-          Medium = ~ .x == 1,
-          Low = ~ .x > 1
-        ),
-        type = "exception",
-        accept_cats = c("Low")
-      ),
-      has_source_control =  list(
-        cond = list(
-          High = ~ is.na(.x),
-          High = ~ .x == 0,
-          Low = ~ .x > 0
-        ),
-        type = "exception",
-        accept_cats = c("Low")
-      ),
-      has_website =  list(
-        cond = list(
-          High = ~ is.na(.x),
-          High = ~ .x == 0,
-          Low = ~ .x > 0
-        ),
-        type = "exception",
-        accept_cats = c("Low")
-        )
-      )
+    rule_type = c("default", "remote_reduce", "decide_remote", "decide_github")[1],
+    rule_lst = NULL # could input custom rules list here
   ) {
   
+  if (is.null(rule_lst)) {
+    message(glue::glue("\nNo 'rule_lst' provided. Using default rules from '{rule_type}' decision type.\n"))
+    
+    configgy <- pull_config(rule_type = rule_type)
+    decision_lst <- configgy$default_lst$decisions_lst
+    rule_lst <- configgy$rule_lst
+  }
+    
   #
   # Clean up rules list & decision categories 
   #
-
-  # Verify that conditions (conds) are valid - aka, they only declared
-  # decision categories (in `decision_list`). Else, we have to drop that rule
-  rule_metric_nm <- names(rules_lst)
+  rule_metric_nm <- names(rule_lst)
   metric_cond_cats <-
-    purrr::map(rule_metric_nm, ~ rules_lst[[.x]][["cond"]] |> names()) |>
+    purrr::map(rule_metric_nm, ~ rule_lst[[.x]][["cond"]] |> names()) |>
     purrr::set_names(rule_metric_nm)
-  metric_nms <- names(metric_cond_cats)
-  valid_cats_in_conds <-
-    purrr::map_lgl(metric_nms, ~ {if(all(metric_cond_cats[[.x]] %in% decision_lst)) TRUE else FALSE}) |>
-    purrr::set_names(metric_nms) 
-  # valid_cats_in_conds <- metric_cond_cats |> unlist() %in% decision_lst
-  if (any(!valid_cats_in_conds)) {
-    metrics_which_conds_invalid <- valid_cats_in_conds[which(!valid_cats_in_conds)] |> names()
-    warning(glue::glue("\nThe decision category(ies) referenced in these metric 'cond' list do not match those allowed in 'decision_lst': {paste(metrics_which_conds_invalid, collapse = ', ')}. Dropping those rules from 'rule_lst'.\n"))
-    rules_lst <- rules_lst[valid_cats_in_conds]
-  }
-  
-  # Verify that accept_cats are valid, else drop that rule.
-  rule_metric_nm <- names(rules_lst)
-  metric_exc_cats <- purrr::map(rule_metric_nm, ~ rules_lst[[.x]][["accept_cats"]]) |> purrr::set_names(rule_metric_nm)
-  # valid_cats_in_exc <- metric_exc_cats |> unlist() %in% decision_lst # old
-  metric_nms <- names(metric_exc_cats)
-  valid_cats_in_exc <-
-    purrr::map_lgl(metric_nms, ~ {if(all(metric_exc_cats[[.x]] %in% decision_lst)) TRUE else FALSE}) |>
-    purrr::set_names(metric_nms) 
-  if (any(!valid_cats_in_exc)) {
-    metrics_which_exc_invalid <- valid_cats_in_exc[which(!valid_cats_in_exc)] |> names()
-    warning(glue::glue("\nThe decision category(ies) referenced in these metric 'accept_cats' list do not match those allowed in 'decision_lst': {paste(metrics_which_exc_invalid, collapse = ', ')}. Dropping those rules from 'rule_lst'.\n"))
-    rules_lst <- rules_lst[valid_cats_in_exc]
-  }
+    
   
   # Inform the user of which rules can & will be evaluated
-  message("\n--> Building exceptions data.frame using the 'rule sets' for the following metrics:\n")
-  cat("\n---->", paste(names(rules_lst), collapse = '\n----> '), "\n")
+  message("\n--> Building decision data.frame using the 'rule sets' for the following metrics:\n")
+  cat("\n---->", paste(rule_metric_nm, collapse = '\n----> '), "\n")
 
   
   # Build exceptions data.frame
@@ -302,6 +295,8 @@ build_decisions_df <- function(
     dplyr::mutate(decision = factor(decision, levels = decision_lst)) |>
     
     # Create a numeric ID field that uniquely identifies decision within metric
+    # useful when we were using more than 1 condition per decision category
+    # (eg. "High" would have two conditions)... but that doesn't work well with config::get()
     dplyr::mutate(decision_id = dplyr::row_number(), .by = c("metric", "decision")) |>
     
     # add condition from rules list into data.frame column
@@ -309,30 +304,37 @@ build_decisions_df <- function(
       condition = purrr::pmap_chr(
         list(metric, decision, decision_id), \(met, dec, did) {
           # met <- "downloads_1yr"; dec <- "High"; did <- 2 # for debugging
-          met_cond <- rules_lst[[met]][["cond"]] 
-          met_cond[which(names(met_cond) %in% dec)][[did]] |> rlang::expr_text()
+          met_cond <- rule_lst[[met]][["cond"]] 
+          met_cond[which(names(met_cond) %in% dec)][[did]] |>
+            rlang::expr_text() |>
+            rlang::parse_expr() # lose the quotes
             # Or use rlang::expr_text()?
         })
     ) |> 
-    # decisions_df$cond |> class()
+    # Add in column for metric_type
     dplyr::mutate(
-      # extract lower & Upper limit of the condition
-      lower_limit = to_the_limit(condition),
-      upper_limit = to_the_limit(condition, low = FALSE),
-      # rationale = NA_character_,
-      metric_type = ifelse(metric == "downloads_1yr", "Primary", "Exception")
+      metric_type = purrr::map_chr(metric, ~ rule_lst[[.x]][["type"]] %||% "Exception")
     ) |>
+    # dplyr::mutate(
+      # extract lower & Upper limit of the condition
+      # Note: to_the_limit() doesn't work well when there are multiple
+      # expressions in one condition, so we will remove them for now
+      # lower_limit = to_the_limit(condition),              # Not required
+      # upper_limit = to_the_limit(condition, low = FALSE), # Not required
+      # rationale = NA_character_,
+    #   metric_type = ifelse(metric == "downloads_1yr", "Primary", "Exception")
+    # ) |>
     dplyr::select(-decision_id)
   
   
   # Add on the "accept_condition" column
-  if (!rlang::is_empty(rules_lst)) {
+  if (!rlang::is_empty(rule_lst)) {
     decisions_df <- 
       decisions_df0 |>
       # Join in accept_cats from rules list
       dplyr::left_join(
-        purrr::imap_dfr(rules_lst, ~ {
-          # .x <- rules_lst[[1]]; .y <- names(rules_lst)[1] # for debugging
+        purrr::imap_dfr(rule_lst, ~ {
+          # .x <- rule_lst[[1]]; .y <- names(rule_lst)[1] # for debugging
           dplyr::tibble(
             metric = .y,
             accept_cats = list(.x[["accept_cats"]])
@@ -354,7 +356,9 @@ build_decisions_df <- function(
     decisions_df <- 
       decisions_df0 |>
       dplyr::mutate(
-        accept_condition = if(tolower(metric_type) == "primary") TRUE else FALSE
+        accept_condition = 
+          if(tolower(metric_type) == "primary" &
+             decision == decision_lst[1]) TRUE else FALSE
       )
   }
   return(decisions_df)

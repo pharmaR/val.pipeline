@@ -1,10 +1,5 @@
 
-
-
-
-
-
-#' Filter Packages
+#' Assign a decision
 #'
 #' First whack at attempting to filter packages based on org-level criterion
 #' used to set thresholds (and later update final decision (if not already 'high
@@ -13,8 +8,296 @@
 #' instead, we're going to use riskscore::cran_assessed_20250812 for the time
 #' being
 #'
-#' @param pre logical, whether or not we are using pre or post filtering logic.
-#'   May remove this later.
+#' @param source character, either "riskscore" (default), "PACKAGES", or a
+#'   data.frame.
+#' @param decisions character vector, the risk categories to use.
+#' @param else_cat character, the default risk category if no conditions are met.
+#' @param decisions_df data.frame, the output of build_decisions_df()
+#'
+#' @importFrom dplyr filter pull mutate case_when between rename left_join
+#'   across if_else everything select
+#' @importFrom purrr map map_int 
+#' @importFrom tools package_dependencies
+#' 
+val_decision <- function(
+    pkg = NULL,
+    source = NULL,
+    decisions = c("Low", "Medium", "High"),
+    else_cat = "High",
+    decisions_df = build_decisions_df(rule_type = "decide_remote")
+) {
+  # Verify pkg is not null
+  if(is.null(pkg)) {
+    stop("Must provide a package name to 'pkg'")
+  }
+  
+  # verify decisions_df is compliant
+  if(!all(c("metric", "decision", "condition", "metric_type", "accept_condition") %in% colnames(decisions_df))) {
+    stop("'decisions_df' is not compliant. Must contain columns: 'metric', 'decision', 'condition', 'metric_type', 'accept_condition'")
+  }
+  
+  # Use package metrics based on specified source
+  if(!inherits(source, "list")) {
+    stop("\nInvalid source specified. Must be a list")
+  } 
+  
+  # Verify we have both the 'assessed' and 'scored' data.frames
+  if(!all(c("assessed", "scored") %in% names(source))) {
+    stop("\nInvalid source specified. Must be a list with elements 'assessed' and 'scored'")
+  }
+  
+  #
+  # ---- Prepare workable fields to categorize  ----
+  #
+  assessed <- source$assessed
+  scored <- source$scored
+  
+  # names(assessed)
+  
+  # extract list values into a numeric vector
+  # covr_coverage
+  if("covr_coverage" %in% decisions_df$metric &
+     "covr_coverage" %in% names(assessed)) {
+    covr_coverage <- assessed$covr_coverage$totalcoverage
+    # filecoverage <- assessed$covr_coverage$filecoverage
+  }
+  # downloads_1yr
+  if("downloads_1yr" %in% decisions_df$metric &
+     "downloads_1yr" %in% names(assessed)) {
+    downloads_1yr <- if(is.null(assessed$downloads_1yr)) NA_real_ else as.numeric(assessed$downloads_1yr)
+  }
+  # reverse_dependencies
+  if("reverse_dependencies" %in% decisions_df$metric &
+     "reverse_dependencies" %in% names(assessed)) {
+    reverse_dependencies <- assessed$reverse_dependencies |> length()
+  }
+  # dependencies
+  if("dependencies" %in% decisions_df$metric &
+     "dependencies" %in% names(assessed)) {
+    deps <-
+          tools::package_dependencies(
+            packages = pkg,
+            db = available.packages(),
+            which = c("Depends", "Imports", "LinkingTo"),
+            recursive = FALSE
+          ) |>
+      unlist(use.names = FALSE)
+    dependencies <- deps |> length()
+  }
+  # has_vignettes
+  if("has_vignettes" %in% decisions_df$metric &
+     "has_vignettes" %in% names(assessed)) {
+    has_vignettes <- if(is.null(assessed$has_vignettes)) NA_real_ else as.numeric(assessed$has_vignettes)
+  }
+  # has_source_control
+  if("has_source_control" %in% decisions_df$metric &
+     "has_source_control" %in% names(assessed)) {
+    has_source_control <- assessed$has_source_control |> length()
+  }
+  # has_website
+  if("has_website" %in% decisions_df$metric &
+     "has_website" %in% names(assessed)) {
+    has_website <- assessed$has_website |> length()
+  }
+  # has_news
+  if("has_news" %in% decisions_df$metric &
+     "has_news" %in% names(assessed)) {
+    has_news <- if(is.null(assessed$has_news)) NA_real_ else as.numeric(assessed$has_news)
+  }
+  # news_current
+  if("news_current" %in% decisions_df$metric &
+     "news_current" %in% names(scored)) {
+    news_current <- as.numeric(scored$news_current)
+  }
+  # bugs_status
+  if("bugs_status" %in% decisions_df$metric &
+     "bugs_status" %in% names(scored)) {
+    bugs_status <- as.numeric(scored$bugs_status)
+  }
+  # remote_checks
+  if("remote_checks" %in% decisions_df$metric &
+     "remote_checks" %in% names(assessed)) {
+    remote_checks <- if(is.null(assessed$remote_checks)) NA_real_ else as.numeric(assessed$remote_checks)
+  }
+  # r_cmd_check
+  if("r_cmd_check" %in% decisions_df$metric &
+     "r_cmd_check" %in% names(assessed)) {
+    r_cmd_check <- assessed$r_cmd_check
+    r_cmd_check_errors <- r_cmd_check[[2]]
+    r_cmd_check_warnings <- r_cmd_check[[3]]
+  }
+  # exported_namespace
+  if("exported_namespace" %in% decisions_df$metric &
+     "exported_namespace" %in% names(assessed)) {
+    exported_namespace <- assessed$exported_namespace |> length()
+  }
+  # export_help
+  if("export_help" %in% decisions_df$metric &
+     "export_help" %in% names(scored)) {
+    export_help <- scored$export_help * 100
+  }
+  # has_maintainer
+  if("has_maintainer" %in% decisions_df$metric &
+     "has_maintainer" %in% names(assessed)) {
+    has_maintainer <- assessed$has_maintainer |> length()
+  }
+  # size_codebase
+  if("size_codebase" %in% decisions_df$metric &
+     "size_codebase" %in% names(assessed)) {
+    size_codebase <- as.numeric(assessed$size_codebase)
+  }
+  # has_bug_reports_url
+  if("has_bug_reports_url" %in% decisions_df$metric &
+     "has_bug_reports_url" %in% names(assessed)) {
+    has_bug_reports_url <- assessed$has_bug_reports_url
+  }
+  # has_examples
+  if("has_examples" %in% decisions_df$metric &
+     "has_examples" %in% names(scored)) {
+    has_examples <- scored$has_examples * 100
+  }
+  # license
+  if("license" %in% decisions_df$metric &
+     "license" %in% names(assessed)) {
+    license <- assessed$license
+  }
+  
+  
+  #
+  # ---- Apply Decisions ----
+  #
+  
+  # ---- 'Primary' Metrics ----
+  primary_metrics <- decisions_df |>
+    dplyr::filter(tolower(metric_type) == "primary")
+  # dplyr::filter(tolower(metric) %in% c("downloads_1yr", "reverse_dependencies"))
+  
+  # Share a note
+  prime_met_len <- primary_metrics$metric |> unique() |> length()
+  cat(glue::glue("\n\n> Applying Decisions Categories for {prime_met_len} 'Primary' risk metric(s).\n\n"))
+  
+  # Create metric-based risk categories decision columns
+  pkgs_primed <- rip_cats(
+    met_dec_df = primary_metrics,
+    pkgs_df = pkgs,
+    else_cat = else_cat
+  )
+  
+  
+  
+  # ---- 'Exceptions' ----
+  # Exceptions to this? Perhaps some 'high' risk pkgs
+  # could move to 'medium' if they have other outstanding metrics? Similarly,
+  # "Medium" could move to "Low".
+  exception_metrics <- decisions_df |>
+    dplyr::filter(tolower(metric_type) != "primary") 
+  
+  exc_met_len <- exception_metrics$metric |> unique() |> length()
+  
+  if(nrow(exception_metrics > 0)){
+    
+    cat(glue::glue("\n\n> Applying Decisions Categories to {exc_met_len} 'Exception' risk metric(s).\n\n"))
+    
+    
+    # Create metric-based risk categories decision columns
+    # rm(pkgs_final)
+    pkgs_exc_cats <- pkgs_prime_cats <- rip_cats(
+      met_dec_df = exception_metrics,
+      pkgs_df =  
+        pkgs_primed |>
+        dplyr::rename(primary_risk_category = final_risk_cat) |>
+        dplyr::select(-dplyr::ends_with("_cat")),
+      else_cat = else_cat
+    ) |>
+      dplyr::rename(exception_risk_category = final_risk_cat)
+    
+    #
+    # ---- Promote 'Exceptions' ----
+    #
+    promos <-
+      pkgs_exc_cats |>
+      
+      # create final_risk variable that reduces the decision category
+      # from primary_risk_category if exception_risk_category is the lowest risk
+      dplyr::mutate(
+        final_risk_id = 
+          ifelse(
+            as.integer(exception_risk_category) == 1 & as.integer(primary_risk_category) > 1,
+            as.integer(primary_risk_category) - 1,
+            as.integer(primary_risk_category)
+          ),
+        final_risk = final_risk_id |> factor(labels = decisions),
+      ) |>
+      dplyr::select(
+        package, version, 
+        primary_risk_category, exception_risk_category, final_risk, 
+        # final_risk_manual, 
+        dplyr::everything(),
+        -final_risk_id, # keep id?
+      ) 
+    
+    # Make note of Pkgs that shifted thanks to exceptions
+    cat("\n--> Exceptions to Primary metric decisions based on meeting ALL of the following metric criterion:\n\n")
+    diff_table <- {
+      promos$final_risk |>
+        factor(levels = levels(decisions_df$decision)) |>
+        table()
+    } - {
+      promos$primary_risk_category |>
+        factor(levels = levels(decisions_df$decision)) |>
+        table()
+    }
+    
+    # print note on promotions to console
+    cat("\n")
+    print(
+      diff_table |>
+        as.data.frame() |>
+        dplyr::rename(`Risk Shifted` = Var1, Added = Freq)
+    )
+    
+    pkgs_final <- promos |>
+      dplyr::select(-primary_risk_category, -exception_risk_category)
+    
+  } else {
+    pkgs_final <- pkgs_primed |>
+      dplyr::select(
+        package, version, final_risk = final_risk_cat,
+        dplyr::everything()
+      )
+  }
+  
+  #
+  # ---- Return data for filtering (presumably)
+  # 
+  print(
+    pkgs_final$final_risk |>
+      # factor(levels = c("Low", "Medium", "High")) |> # not needed
+      table() |>
+      as.data.frame() |>
+      dplyr::left_join(
+        {round(prop.table(table(pkgs_final$final_risk)), 3) * 100} |>
+          as.data.frame(),
+        by = "Var1"
+      ) |>
+      dplyr::rename("Final Risk" = Var1, Cnt = Freq.x, Pct = Freq.y)
+  )
+  
+  return(final = final, reason = reason)
+}
+
+
+
+
+#' Categorize A Corpus of Packages
+#'
+#' First whack at attempting to filter packages based on org-level criterion
+#' used to set thresholds (and later update final decision (if not already 'high
+#' risk')) AND filter packages before running val_build(). Note: If PACKAGES
+#' file had assessments, we'd be using that (paired with {val.filter}), but
+#' instead, we're going to use riskscore::cran_assessed_20250812 for the time
+#' being
+#'
 #' @param source character, either "riskscore" (default), "PACKAGES", or a
 #'   data.frame.
 #' @param avail_pkgs data.frame, the output of available.packages() as a data.frame
@@ -28,8 +311,7 @@
 #' @importFrom tools package_dependencies
 #' 
 #' 
-val_filter <- function(
-    pre = TRUE,
+val_categorize <- function(
     source = "riskscore",
     avail_pkgs = available.packages() |> as.data.frame(),
     decisions = c("Low", "Medium", "High"),
@@ -38,7 +320,7 @@ val_filter <- function(
 ) {
   # @importFrom riskscore cran_assessed_20250812 cran_scored_20250812
   
-  cat("\n\nFiltering available packages. Starting w/", nrow(avail_pkgs), "pkgs.\n")
+  cat("\n\nCategorizing available packages. Starting w/", nrow(avail_pkgs), "pkgs.\n")
   
   # verify decisions_df is compliant
   if(!all(c("metric", "decision", "condition", "metric_type", "accept_condition") %in% colnames(decisions_df))) {
@@ -47,7 +329,7 @@ val_filter <- function(
   
   # Use package metrics based on specified source
   if(length(source) > 1) {
-    stop("Invalid source specified. Must be one of 'riskscore', 'PACKAGES', or a data.frame")
+    stop("\nInvalid source specified. Must be one of 'riskscore', list, data.frame, or 'PACKAGES' file path.")
   } else if(source == "riskscore") {
     
     requireNamespace("riskscore", quietly = TRUE)
@@ -55,7 +337,12 @@ val_filter <- function(
     # remotes::install_github("pharmar/riskscore", force = TRUE,
     #                         ref = "main")
     pv <- packageVersion("riskscore") # verify ‘v0.0.1'
-    cat(paste0("\n--> Using {riskscore} Version: 'v", pv, "'\n"))
+    riskscore_run_date <- riskscore::cran_assessed_latest$riskmetric_run_date |> unique()
+    cat(paste0("\n--> Using {riskscore} Version: 'v", pv, "', last compiled on '",
+               riskscore_run_date,"'.\n"))
+    if(Sys.Date() - as.Date(riskscore_run_date) > 60) {
+      cat(glue::glue("\n!!! WARNING: the latest riskscore assessment date is more than 60 days old, compared to today's validation date. Consider updating {{riskscore}} w/ a fresh run.\n"))
+    }
     
     pkgs <- avail_pkgs |>
       dplyr::select(package = Package, version = Version) |>
@@ -79,9 +366,8 @@ val_filter <- function(
     # object.size(pkgs) / 1000000000
     
     #
-    # ---- Prepare workable fields to categorize & filter  ----
+    # ---- Prepare workable fields to categorize  ----
     #
-    # This will be the #1 decider for filtering packages
     # extract list values into a numeric vector
     if("downloads_1yr" %in% decisions_df$metric) {
       pkgs$dwnlds <- purrr::map_dbl(pkgs$downloads_1yr, ~ {
@@ -151,26 +437,38 @@ val_filter <- function(
         
       ))
     
+  } else if (inherits(source, "list")) {
+    stop("Not yet implemented: val_filter() using data.frame 'source'")
+    # The assessments object's default structure is a list
+    
+    
+    
+    
   } else if (is.data.frame(source)) {
-    pkgs <- avail_pkgs |>
-      dplyr::select(package = Package, version = Version) |>
-      dplyr::left_join(
-        source |>
-          dplyr::select(package, version, 
-                        downloads_1yr, reverse_dependencies,
-                        has_vignettes, has_source_control, has_website,
-                        news_current, bugs_status
-          ),
-        by = c("package", "version")
-      )
-    pkgs_scored <- 
-      avail_pkgs |>
-      dplyr::select(package = Package, version = Version) |>
-      dplyr::left_join(
-        source |>
-          dplyr::select(package, version, news_current, bugs_status),
-        by = c("package", "version")
-      )
+    stop("Not yet implemented: val_filter() using data.frame 'source'")
+    
+    # Not sure what this looks like yet, but we could assume it looks similar
+    # to the riskscore output
+    
+    # pkgs <- avail_pkgs |>
+    #   dplyr::select(package = Package, version = Version) |>
+    #   dplyr::left_join(
+    #     source |>
+    #       dplyr::select(package, version, 
+    #                     downloads_1yr, reverse_dependencies,
+    #                     has_vignettes, has_source_control, has_website,
+    #                     news_current, bugs_status
+    #       ),
+    #     by = c("package", "version")
+    #   )
+    # pkgs_scored <- 
+    #   avail_pkgs |>
+    #   dplyr::select(package = Package, version = Version) |>
+    #   dplyr::left_join(
+    #     source |>
+    #       dplyr::select(package, version, news_current, bugs_status),
+    #     by = c("package", "version")
+    #   )
   } else if(source == "PACKAGES") {
     stop("Not yet implemented: val_filter() using 'PACKAGES' file")
   } else {
@@ -203,7 +501,7 @@ val_filter <- function(
   #
   
 
-  # ---- Primary Metrics ----
+  # ---- 'Primary' Metrics ----
   primary_metrics <- decisions_df |>
     dplyr::filter(tolower(metric_type) == "primary")
     # dplyr::filter(tolower(metric) %in% c("downloads_1yr", "reverse_dependencies"))
@@ -221,7 +519,7 @@ val_filter <- function(
   
   
 
-  # ---- Exceptions ----
+  # ---- 'Exceptions' ----
   # Exceptions to this? Perhaps some 'high' risk pkgs
   # could move to 'medium' if they have other outstanding metrics? Similarly,
   # "Medium" could move to "Low".
@@ -248,7 +546,7 @@ val_filter <- function(
       dplyr::rename(exception_risk_category = final_risk_cat)
 
     #
-    # ---- Promote Exceptions ----
+    # ---- Promote 'Exceptions' ----
     #
     promos <-
       pkgs_exc_cats |>
@@ -303,14 +601,10 @@ val_filter <- function(
       )
   }
     
-  
-
-  
   #
-  # ---- Return data for filtering ----
+  # ---- Return data for filtering (presumably)
   # 
-  
- print(
+  print(
     pkgs_final$final_risk |>
       # factor(levels = c("Low", "Medium", "High")) |> # not needed
       table() |>
@@ -325,6 +619,14 @@ val_filter <- function(
   
   return(pkgs_final)
 }
+
+
+
+
+
+
+
+
 
 
 
@@ -349,7 +651,7 @@ val_filter <- function(
 #' @importFrom purrr map map_int
 #' @importFrom tools package_dependencies
 #' 
-manual_val_filter <- function(
+manual_val_categorize <- function(
     pre = TRUE,
     source = "riskscore",
     avail_pkgs = available.packages() |> as.data.frame(),
