@@ -149,7 +149,7 @@ to_the_limit <- function(condition, low = TRUE) {
 #' @export
 pull_config <- function(
     val = NULL,
-    rule_type = c("remote_reduce", "decide_remote", "decide_github", "default")[1],
+    rule_type = c("default", "remote_reduce", "decide")[1],
     config_path = system.file("config.yml", package = "val.pipeline")
 ) {
   
@@ -165,9 +165,10 @@ pull_config <- function(
   }
   
   fig_names <- names(configgy)
-  inherits_pos <- which(fig_names == "inherits")[1] # grab first time 'inherits' shows up
-  default_names <- fig_names[1:(inherits_pos - 1)] # Not being used
-  rule_names <- fig_names[(inherits_pos + 1): length(fig_names)]
+  decisions_pos <- which(fig_names == "decisions_lst")[1] # grab first time 'decisions_lst' shows up
+  default_names <- fig_names[1:decisions_pos] 
+  rule_names <- fig_names[(decisions_pos + 1): length(fig_names)]
+  rule_names <- rule_names[rule_names != "inherits"]
   
   # decision_lst <- configgy[["decisions_lst"]]
   default_lst <- configgy[default_names]
@@ -253,16 +254,16 @@ pull_config <- function(
 #'
 #' @export
 build_decisions_df <- function(
-    rule_type = c("default", "remote_reduce", "decide_remote", "decide_github")[1],
+    rule_type = c("default", "remote_reduce", "decide")[1],
     rule_lst = NULL # could input custom rules list here
   ) {
   
   if (is.null(rule_lst)) {
-    message(glue::glue("\nNo 'rule_lst' provided. Using default rules from '{rule_type}' decision type.\n"))
+    message(glue::glue("\nUsing rules from '{rule_type}' decision type.\n"))
     
-    configgy <- pull_config(rule_type = rule_type)
-    decision_lst <- configgy$default_lst$decisions_lst
-    rule_lst <- configgy$rule_lst
+    figgy <- pull_config(rule_type = rule_type)
+    decision_lst <- figgy$default_lst$decisions_lst
+    rule_lst <- figgy$rule_lst
   }
     
   #
@@ -293,16 +294,17 @@ build_decisions_df <- function(
     }) |>
     # Make sure the (factor) order is preserved
     dplyr::mutate(decision = factor(decision, levels = decision_lst)) |>
+    dplyr::mutate(decision_id = as.integer(decision)) |>
     
     # Create a numeric ID field that uniquely identifies decision within metric
     # useful when we were using more than 1 condition per decision category
     # (eg. "High" would have two conditions)... but that doesn't work well with config::get()
-    dplyr::mutate(decision_id = dplyr::row_number(), .by = c("metric", "decision")) |>
+    dplyr::mutate(met_dec_id = dplyr::row_number(), .by = c("metric", "decision")) |>
     
     # add condition from rules list into data.frame column
     dplyr::mutate(
       condition = purrr::pmap_chr(
-        list(metric, decision, decision_id), \(met, dec, did) {
+        list(metric, decision, met_dec_id), \(met, dec, did) {
           # met <- "downloads_1yr"; dec <- "High"; did <- 2 # for debugging
           met_cond <- rule_lst[[met]][["cond"]] 
           met_cond[which(names(met_cond) %in% dec)][[did]] |>
@@ -324,7 +326,7 @@ build_decisions_df <- function(
       # rationale = NA_character_,
     #   metric_type = ifelse(metric == "downloads_1yr", "Primary", "Exception")
     # ) |>
-    dplyr::select(-decision_id)
+    dplyr::select(-met_dec_id) # let's keep it
   
   
   # Add on the "accept_condition" column
@@ -375,6 +377,7 @@ build_decisions_df <- function(
 #' (e.g., "downloads_1yr", "reverse_dependencies", etc.)
 #' @param else_cat A character string indicating the default category to assign
 #' when none of the conditions are met.
+#' @param ids Logical. If TRUE, return the decision_id instead of decision category.
 #' 
 #' @importFrom purrr map_chr set_names
 #' @importFrom glue glue
@@ -390,24 +393,70 @@ build_decisions_df <- function(
 #' )
 #' 
 #' @keywords internal
-get_case_whens <- function(met_dec_df, met_names, else_cat) {
+get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE) {
   cond_exprs <- purrr::map_chr(met_names, ~ {
     # .x <- met_names[1]
     dec_df <- met_dec_df |>
       dplyr::filter(derived_col == .x)
     
+    # if else_cat is character & ids is TRUE, we need to convert else_cat to decision_id
+    if(ids & is.character(else_cat)) {
+      if(else_cat %in% met_dec_df$decision) {
+        else_cat <- met_dec_df$decision_id[which(met_dec_df$decision == else_cat)] |> unique()
+      } 
+    }
+    
     mn <- gsub('.x', .x, dec_df$condition)
     c(
-      glue::glue("{gsub('~', '', mn)} ~ '{dec_df$decision}'"),
+      glue::glue("{gsub('~', '', mn)} ~ '{if(ids) dec_df$decision_id else dec_df$decision}'"),
       glue::glue(".default = '{else_cat}'")
     ) |>
       stringr::str_flatten_comma() %>%
       stringr::str_c("dplyr::case_when(", ., ")")
   }) |>
-    purrr::set_names(paste0(met_names, "_cat")) |>
+    purrr::set_names(paste0(met_names, "_cat", if(ids) "id" else NULL)) |>
     rlang::parse_exprs()
   cond_exprs
 }
+
+#' Decision to ID
+#' 
+#' Helper function to convert decision category to decision_id or vice versa
+#' 
+#' @param decision_id_df A data.frame with columns "decision" and "decision_id"
+#' @param rev Logical. If TRUE, convert decision_id to decision category, else convert decision category to decision_id
+#' @param dec A character string (if rev = FALSE) or numeric/integer (if rev = TRUE) indicating the decision category or decision_id to convert
+#' 
+#' @examples
+#' dec_id_df <- unique(build_decisions_df()[c("decision", "decision_id")])
+#' decision_to_id(dec_id_df, FALSE, "High")
+#' 
+#' @keywords internal
+#' 
+decision_to_id <- function(decision_id_df, rev = FALSE, dec){
+  # decision_id_df <- dec_id_df
+  # dec <- "High"
+  if(rev) {
+    return(decision_id_df$decision[which(decision_id_df$decision_id == dec)])
+  } else {
+    decision_id_df$decision_id[which(decision_id_df$decision == dec)]
+  }
+}
+
+#' Vectorized Decision to ID
+#' 
+#' Vectorized version of decision_to_id()
+#' 
+#' @param decision_id_df A data.frame with columns "decision" and "decision_id"
+#' @param rev Logical. If TRUE, convert decision_id to decision category, else convert decision category to decision_id
+#' @param dec A character vector (if rev = FALSE) or numeric/integer vector (if rev = TRUE) indicating the decision categories or decision_ids to convert
+#' 
+#' @examples
+#' dec_id_df <- unique(build_decisions_df()[c("decision", "decision_id")])
+#' decision_to_id_v(dec_id_df, FALSE, c("High", "Medium", "Low"))
+#' 
+#' @keywords internal
+decision_to_id_v <- Vectorize(decision_to_id, vectorize.args = "dec")
 
 
 #' Generate Decision Category Assignments
@@ -456,11 +505,13 @@ rip_cats <- function(
     
     cat(glue::glue("\n\n--> Decisions based off '{met}' metric:\n\n"))
     cond_exprs <- get_case_whens(met_dec_df, der, else_cat)
+    cond_exprs_ids <- get_case_whens(met_dec_df, der, else_cat, ids = TRUE)
     
     # pkgs_df$dwnlds_cat <- NULL
     pkgs_df <<- pkgs_df |>
       dplyr::rowwise() |> # Boo! Rowwise is really slow. We need to find a better way eventually.
       dplyr::mutate(!!! cond_exprs) |>
+      dplyr::mutate(!!! cond_exprs_ids) |>
       dplyr::ungroup()
     
     
@@ -481,13 +532,19 @@ rip_cats <- function(
     )
   })
   # pkgs$dwnlds_cat <- NULL
+  
+  dec_id_df <- unique(met_dec_df[c("decision", "decision_id")])
+  
   return_pkgs <- pkgs_df |>
     dplyr::mutate(
-      # convert cat vars into factors so we can use pmax() on them
+      # convert cat vars into factors
       across(ends_with("_cat"), ~ factor(.x, levels = levels(met_dec_df$decision))),
       # higher risk trumps lower risk amongst all _cat vars (e.g., High > Medium > Low)
-      final_risk_cat = pmin(!!!rlang::syms(paste0(met_der$derived_col, "_cat")), na.rm = TRUE)
-    )
+      final_risk_catid = pmax(!!!rlang::syms(paste0(met_der$derived_col, "_catid")), na.rm = TRUE),
+      final_risk_cat = decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid)
+    ) |> dplyr::select(-ends_with("_catid"))
+  
+  # which(is.na(return_pkgs$final_risk_catid))
   rm(pkgs_df) # verify we don't accidentally use it later
   
   # Report of changes for primary risk alone

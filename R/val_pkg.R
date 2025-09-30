@@ -234,14 +234,14 @@ val_pkg <- function(
     ### Assessment ###
     #
     pkg_assessment0 <- pkg_ref |>
-      # dplyr::as_tibble() |> # no tibbles allowed for stip ^ or riskreports
+      # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
       riskmetric::pkg_assess()
     
     # strip assessment of '.recording' attribute:
     pkg_assessment <-  pkg_assessment0 |> 
       strip_recording()
     
-    pkg_scores <- riskmetric::pkg_score(pkg_assessment) # What should I do with this?
+    pkg_scores <- riskmetric::pkg_score(pkg_assessment)
     
     
     # check some stuff
@@ -322,15 +322,25 @@ val_pkg <- function(
   # run val_build() & re-filter.
   
   # maybe I should call it pre_filter() & post_filter()
+  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
   decision <- 
     val_decision( 
       pkg = pkg,
       source = list(assessed = pkg_assessment, scored = pkg_scores), # include both
-      decisions = c("Low", "Medium", "High"), # need to pass decisions into val_pkg()
-      else_cat = "High",
-      decisions_df = build_decisions_df()
+      metrics = c( # Subset if desired
+        "covr_coverage", "downloads_1yr", "reverse_dependencies",
+        "dependencies", "has_vignettes", "has_source_control",
+        "has_website", "has_news", "news_current", "bugs_status",
+        "remote_checks", "r_cmd_check", "exported_namespace",
+        "export_help", "has_maintainer", "size_codebase",
+        "has_bug_reports_url", "has_examples", "license"
+      ),
+      decisions = decisions,
+      else_cat = decisions[length(decisions)],
+      decisions_df = build_decisions_df(rule_type = "decide")
     )
-  # clean_install
+  # Update clean_install based on assessment
+  
   # decision <- sample(c(rep("Low Risk",6), rep("Medium Risk", 3), "High Risk"), 1)
   # decision_reason = "Decision randomly selected"
   

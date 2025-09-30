@@ -48,13 +48,13 @@ options("repos") # verify
 #
 pre_filtered_pkg_metrics <- 
   val_categorize(
-    pre = TRUE,
     source = "riskscore",
     avail_pkgs = available.packages() |> as.data.frame(),
     decisions = decisions,
     else_cat = "High",
-    decisions_df = build_decisions_df()
+    decisions_df = build_decisions_df(rule_type = "remote_reduce")
     )
+
 
 #
 # ---- Reduce pkgs ----
@@ -142,12 +142,7 @@ outtie <- val_build(
 #
 # build_decisions_df()
 #
-# This function really needs to draw out certain rules_lists by type:
-# - Pre categorization tasks
-# - Individual pkg decisions for CRAN vs GitHub vs internal?
-# Probably need to leverage a YAML config file so we can pull the correct
-# list in, and make it more agile for others to use
-#
+
 
 #
 # val_pkg():

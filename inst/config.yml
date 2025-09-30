@@ -61,31 +61,48 @@ remote_reduce:
     accept_cats: Low
 
 
-decide_remote:
-  inherits: default
+decide:
+  inherits: remote_reduce
   covr_coverage:
     cond:
-      High: ~ is.na(.x) | .x < 30
-      Medium: ~ dplyr::between(.x, 30, 60)
-      Low: ~ .x > 50
+      High: ~ is.na(.x) | .x < 35
+      Medium: ~ dplyr::between(.x, 45, 70)
+      Low: ~ .x > 70
     type: primary
     accept_cats: Low
+  r_cmd_check_errors: # Pointless as a primary check since CRAN insures no warnings / errors
+    cond:
+      High: ~ is.na(.x) | .x > 1
+      Low: ~ .x == 0
+    type: secondary
+    accept_cats: Low
+  r_cmd_check_warnings: # Pointless as a primary check since CRAN insures no warnings / errors
+    cond:
+      High: ~ is.na(.x) | .x > 1
+      Low: ~ .x == 0
+    type: secondary
+    accept_cats: Low
+  has_examples:
+    cond:
+      High: ~ is.na(.x) | .x < 1
+      Medium: ~ dplyr::between(.x, 1, 40)
+      Low: ~ .x > 40
+    type: secondary
+    accept_cats: [Low, Medium]
+  export_help:
+    cond:
+      High: ~ is.na(.x) | .x < 1
+      Medium: ~ dplyr::between(.x, 1, 40)
+      Low: ~ .x > 40
+    type: secondary
+    accept_cats: [Low, Medium]
 
 
-
-
-# Okay! Need to create the 
-# covr_coverage
-    # filecoverage <- assessed$covr_coverage$filecoverage
-  # has_news
+# Okay! Not used:
   # bugs_status
   # remote_checks
-  # r_cmd_check (errors & warnings)
-  # exported_namespace
-  # export_help
-  # has_maintainer
   # size_codebase
   # has_bug_reports_url
-  # has_examples
   # license
+  # has_news
   
