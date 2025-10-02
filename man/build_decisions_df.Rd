@@ -5,30 +5,20 @@
 \title{Build Decisions Data.Frame}
 \usage{
 build_decisions_df(
-  decision_lst = c("Low", "Medium", "High"),
-  rules_lst = list(downloads_1yr = list(cond = list(High = ~is.na(.x), High = ~.x <
-    120000, Medium = ~dplyr::between(.x, 120000, 240000), Low = ~.x > 240000), type =
-    "primary", accept_cats = c("Low"), min_value = 40000), reverse_dependencies =
-    list(cond = list(High = ~is.na(.x), High = ~.x < 2, Medium = ~dplyr::between(.x, 2,
-    7), Low = ~.x > 7), type = "exception", accept_cats = c("Low", "Medium")),
-    dependencies = list(cond = list(High = ~is.na(.x), High = ~.x > 8, Medium =
-    ~dplyr::between(.x, 4, 8), Low = ~.x < 
-     4), type = "exception", accept_cats =
-    c("Low", "Medium")), news_current = list(cond = list(High = ~is.na(.x), High = ~.x !=
-    1, Low = ~.x == 1), type = "exception", accept_cats = c("Low")), has_vignettes =
-    list(cond = list(High = ~is.na(.x), High = ~.x < 1, Medium = ~.x == 1, Low = ~.x >
-    1), type = "exception", accept_cats = c("Low")), has_source_control = list(cond =
-    list(High = ~is.na(.x), High = ~.x == 0, Low = ~.x > 0), type = "exception",
-    accept_cats = c("Low")), has_website = list(cond = list(High = ~is.na(.x), 
-     High
-    = ~.x == 0, Low = ~.x > 0), type = "exception", accept_cats = c("Low")))
+  rule_type = c("default", "remote_reduce", "decide")[1],
+  rule_lst = NULL
 )
 }
 \arguments{
-\item{decision_lst}{A character vector of decision categories, ordered from
-highest risk to lowest risk.}
+\item{rule_type}{A character string indicating whether the decision
+categories are used to "categorize" risk levels (e.g., "Low", "Medium",
+"High") via val_categorize() or val_decision(). The difference being that
+"categorize" is going to be used to filter the initial list of packages
+using a remote pkg_ref() assessment, whereas "decision" is used to filter
+the final list of packages after a 'pkg_source' pkg_ref() assessment is
+produced locally on the GxP system of interest.}
 
-\item{rules_lst}{A named list of lists, where each sub-list contains:
+\item{rule_lst}{A named list of lists, where each sub-list contains:
 \itemize{
 \item cond: A named list of formulas, where the names correspond to decision
 categories in \code{decision_lst}, and the formulas define the conditions for
@@ -40,6 +30,9 @@ that are acceptable for this metric.
 \item min_value: (Optional) A numeric value indicating the minimum acceptable
 value for the primary metric(s).
 }}
+
+\item{decision_lst}{A character vector of decision categories, ordered from
+highest risk to lowest risk.opt_repos}
 }
 \value{
 A data.frame with columns:

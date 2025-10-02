@@ -4,7 +4,13 @@
 \alias{get_case_whens}
 \title{Get Case Whens Statements}
 \usage{
-get_case_whens(met_dec_df, met_names, else_cat)
+get_case_whens(
+  met_dec_df,
+  met_names,
+  else_cat,
+  ids = FALSE,
+  auto_accept = FALSE
+)
 }
 \arguments{
 \item{met_dec_df}{A data.frame of decisions, typically created by
@@ -15,6 +21,8 @@ build_decisions_df()}
 
 \item{else_cat}{A character string indicating the default category to assign
 when none of the conditions are met.}
+
+\item{ids}{Logical. If TRUE, return the decision_id instead of decision category.}
 }
 \description{
 A helper function that builds the dplyr::case_when() statements from the
