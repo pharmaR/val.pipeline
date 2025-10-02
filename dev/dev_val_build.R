@@ -10,7 +10,7 @@ devtools::load_all()
 # Eventually, this 'dev' script will become a new function called val_pipeline()
 
 
-# filter packages > 20k here
+# filter packages > 20k here (on CRAN alone)
 # Eventually using PACKAGES file
 # For now, will use pkg_cran_remote to gain a
 # High level summary of pkgs
@@ -40,8 +40,8 @@ decisions <- pull_config(val = "decisions_lst", rule_type = "default")
 #
 old <- options()
 on.exit(function() options(old))
-options(repos = opt_repos, pkgType = "source") # , rlang_interactive = FALSE
-options("repos") # verify
+options(repos = opt_repos, pkgType = "source", scipen = 999) # , rlang_interactive = FALSE
+# options("repos") # verify
 
 #
 # ---- val_categorize() ----
@@ -54,7 +54,9 @@ pre_filtered_pkg_metrics <-
     else_cat = "High",
     decisions_df = build_decisions_df(rule_type = "remote_reduce")
     )
-
+# see <-
+#   pre_filtered_pkg_metrics |>
+#     dplyr::filter(dwnlds > 1000000) 
 
 #
 # ---- Reduce pkgs ----
@@ -62,14 +64,21 @@ pre_filtered_pkg_metrics <-
 # Note: has to be decisions[1] ("Low") only because of the way we allowed
 # 'High' risk pkgs to get promoted to "Medium" in `pre_filtered_pkg_metrics`.
 # Specifically, a 'High' Risk pkg could have a severly low annual downloads #.
-build_pkgs <-
-  pre_filtered_pkg_metrics |>
-  dplyr::filter(final_risk %in% decisions[1]) |>
-  dplyr::pull(package)
 
+# Currently, not being used
 failed_pkgs <-
   pre_filtered_pkg_metrics |>
   dplyr::filter(!final_risk %in% decisions[1])
+# dplyr::filter(rev_deps > 100) 
+# dplyr::filter(dwnlds > 120000) 
+
+passed_pkgs <-
+  pre_filtered_pkg_metrics |>
+  dplyr::filter(final_risk %in% decisions[1])
+
+  
+build_pkgs <- passed_pkgs |>
+  dplyr::pull(package)
 
 
 cat("\n--> Final Decision Category Counts for'pre' assessment risk: \n----> Returned", prettyNum(length(build_pkgs), big.mark = ","), "pkgs for build.\n")
@@ -83,18 +92,21 @@ cat("\n--> Final Decision Category Counts for'pre' assessment risk: \n----> Retu
 
 # See the full dependency tree before running val_build()
 tree <- tools::package_dependencies(
-  packages = "askpass",
-  # packages = build_pkgs,
+  # packages = "askpass",
+  packages = build_pkgs,
   db = available.packages(),
   # which = c("Suggests"),
-  # which = c("Depends", "Imports", "LinkingTo"),
-  which = c("Depends", "Imports", "LinkingTo", "Suggests"), # prod
-  # recursive = TRUE
-  recursive = FALSE
+  which = "strong", #c("Depends", "Imports", "LinkingTo"),
+  # which = c("Depends", "Imports", "LinkingTo", "Suggests"), # prod
+  recursive = TRUE
+  # recursive = FALSE
 ) |>
   unlist(use.names = FALSE) |>
   unique()
-length(tree) # total count
+# How many? # 621 pkgs -->  When recursive: 2,570. Only 744 when you don't include Suggests
+full_tree <- c(build_pkgs, tree) |> unique()
+full_tree |> length()
+
 
 # Validation build
 outtie <- val_build(
@@ -108,8 +120,9 @@ outtie <- val_build(
   
   metric_pkg = "riskmetric", # default
   
-  deps = c("depends", "suggests"), # default
-  # deps = "depends",  # this means --> c("Depends", "Imports", "LinkingTo")
+  # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+  # deps = c("depends", "suggests"), 
+  deps = "depends",  # default
   # deps = NULL,
   
   deps_recursive = FALSE,
@@ -117,10 +130,12 @@ outtie <- val_build(
   
   val_date = val_date, # Sys.Date() # is  default
   
-  replace = FALSE,# default
+  replace = FALSE, # default
   # replace = TRUE, 
   
-  out = 'dev/riskassessments'
+  out = 'dev/riskassessments',
+  
+  opt_repos = opt_repos
 )
 
 
@@ -129,6 +144,10 @@ outtie <- val_build(
 #
 # Add a logger like logRx
 #
+# Attempt to use a:
+# - GitHub pkg
+# - Bionconductor Repo / pkg
+
 
 #
 # {riskscore}
@@ -142,6 +161,7 @@ outtie <- val_build(
 #
 # build_decisions_df()
 #
+
 
 
 #
@@ -158,15 +178,13 @@ outtie <- val_build(
 # 
 # val_build():
 #
-# Re-categorizing decisions based on dependencies / rev_deps needs to be recursive
-#
+
 
 #
 # {riskreports}:
 #
 # Install latest (dev) version of quarto?
 #
-
 
 
 

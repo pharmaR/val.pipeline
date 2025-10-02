@@ -13,7 +13,8 @@ remote_reduce:
       Low: ~ .x > 240000
     type: primary
     accept_cats: Low
-    min_value: 40000
+    promote_min: ~ .x > 80000 # bare minimum needed for promo
+    auto_accept: ~ .x > 1000000 # anything above this is gold & doesn't need all the rules
   reverse_dependencies:
     cond:
       # High: ~ is.na(.x)
@@ -22,6 +23,7 @@ remote_reduce:
       Low: ~ .x > 7
     type: exception
     accept_cats: [Low, Medium]
+    auto_accept: ~ .x > 100 # anything above this is 'gold' & doesn't need to hit all the rules
   dependencies:
     cond:
       # High: ~ is.na(.x)
@@ -54,7 +56,6 @@ remote_reduce:
     accept_cats: Low
   has_website:
     cond:
-      # High: ~ is.na(.x)
       High: ~ .x == 0
       Low: ~ .x > 0
     type: exception
@@ -66,7 +67,7 @@ decide:
   covr_coverage:
     cond:
       High: ~ is.na(.x) | .x < 35
-      Medium: ~ dplyr::between(.x, 45, 70)
+      Medium: ~ dplyr::between(.x, 35, 70)
       Low: ~ .x > 70
     type: primary
     accept_cats: Low

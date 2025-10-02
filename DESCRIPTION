@@ -35,6 +35,7 @@ Imports:
     config,
     dplyr,
     glue,
+    magrittr,
     purrr,
     riskmetric (>= 0.2.5),
     riskreports (>= 0.0.0.9006),

@@ -216,7 +216,7 @@ pull_config <- function(
 #' "metric_type", and "accept_condition".
 #'
 #' @param decision_lst A character vector of decision categories, ordered from
-#'   highest risk to lowest risk.
+#'   highest risk to lowest risk.opt_repos
 #' @param rule_type A character string indicating whether the decision
 #'   categories are used to "categorize" risk levels (e.g., "Low", "Medium",
 #'   "High") via val_categorize() or val_decision(). The difference being that
@@ -326,8 +326,22 @@ build_decisions_df <- function(
       # rationale = NA_character_,
     #   metric_type = ifelse(metric == "downloads_1yr", "Primary", "Exception")
     # ) |>
-    dplyr::select(-met_dec_id) # let's keep it
-  
+    
+    # Add column for promote_min and auto_accept conditions
+    dplyr::left_join(
+      purrr::imap_dfr(rule_lst, ~ {
+        # .x <- rule_lst[[1]]; .y <- names(rule_lst)[1] # for debugging
+        dplyr::tibble(
+          metric = .y,
+          promote_min = .x[["promote_min"]] %||% NA_character_,
+          auto_accept = .x[["auto_accept"]] %||% NA_character_
+        )
+      }),
+      by = "metric"
+    ) |>
+    
+    
+    dplyr::select(-met_dec_id) # Get rid of this ID
   
   # Add on the "accept_condition" column
   if (!rlang::is_empty(rule_lst)) {
@@ -393,7 +407,13 @@ build_decisions_df <- function(
 #' )
 #' 
 #' @keywords internal
-get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE) {
+get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_accept = FALSE) {
+  
+  # If auto_accept is TRUE, Then set ids to FALSE
+  if(auto_accept) {
+    ids <- FALSE
+  }
+  
   cond_exprs <- purrr::map_chr(met_names, ~ {
     # .x <- met_names[1]
     dec_df <- met_dec_df |>
@@ -405,16 +425,32 @@ get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE) {
         else_cat <- met_dec_df$decision_id[which(met_dec_df$decision == else_cat)] |> unique()
       } 
     }
+    # if we want the "auto_accept" version of case_when()'s then we'll want to leave
+    if(auto_accept) else_cat <- FALSE else else_cat <- glue::glue("'{else_cat}'")
     
-    mn <- gsub('.x', .x, dec_df$condition)
+    conds <- gsub('.x', .x, dec_df$condition)
+    if(all(!is.na(dec_df$auto_accept))) {
+      aa_cond <- gsub('.x', .x, dec_df$auto_accept) |> unique()
+      if(auto_accept) {
+        # TRUE / FALSE condition
+        auto_accept_cond <- glue::glue("{gsub('~', '', aa_cond)} ~ TRUE")
+      } else {
+        # Decision (id) outcome:
+        auto_accept_cond <- glue::glue("{gsub('~', '', aa_cond)} ~ '{if(ids) min(dec_df$decision_id) else levels(dec_df$decision)[1]}'")
+      }
+    } else {
+      auto_accept_cond <- NULL
+    }
+    
     c(
-      glue::glue("{gsub('~', '', mn)} ~ '{if(ids) dec_df$decision_id else dec_df$decision}'"),
-      glue::glue(".default = '{else_cat}'")
+      auto_accept_cond, # include a condition for auto_accepted categories, which should be run first
+      if(auto_accept) NULL else glue::glue("{gsub('~', '', conds)} ~ '{if(ids) dec_df$decision_id else dec_df$decision}'"),
+      glue::glue(".default = {else_cat}")
     ) |>
       stringr::str_flatten_comma() %>%
       stringr::str_c("dplyr::case_when(", ., ")")
   }) |>
-    purrr::set_names(paste0(met_names, "_cat", if(ids) "id" else NULL)) |>
+    purrr::set_names(paste0(met_names, "_cat", if(ids) "id" else if(auto_accept) "aa" else NULL)) |>
     rlang::parse_exprs()
   cond_exprs
 }
@@ -500,18 +536,22 @@ rip_cats <- function(
   ), \(met, der) {
     
     # for debugging
-    # met <- met_der$metric[1] 
+    # met <- met_der$metric[1]
     # der <- met_der$derived_col[1]
     
     cat(glue::glue("\n\n--> Decisions based off '{met}' metric:\n\n"))
     cond_exprs <- get_case_whens(met_dec_df, der, else_cat)
     cond_exprs_ids <- get_case_whens(met_dec_df, der, else_cat, ids = TRUE)
+    mn <- met_dec_df |> dplyr::filter(!is.na(auto_accept)) |> distinct(derived_col) |> pull(derived_col)
+    cond_exprs_aa <- get_case_whens(met_dec_df, mn, else_cat, auto_accept = TRUE)
     
+    # else_cat <- "High" # for debugging
     # pkgs_df$dwnlds_cat <- NULL
     pkgs_df <<- pkgs_df |>
       dplyr::rowwise() |> # Boo! Rowwise is really slow. We need to find a better way eventually.
       dplyr::mutate(!!! cond_exprs) |>
-      dplyr::mutate(!!! cond_exprs_ids) |>
+      dplyr::mutate(!!! cond_exprs_ids) %>%
+      {if(length(cond_exprs_aa) > 0) dplyr::mutate(., !!! cond_exprs_aa) else .} |>
       dplyr::ungroup()
     
     
@@ -539,10 +579,20 @@ rip_cats <- function(
     dplyr::mutate(
       # convert cat vars into factors
       across(ends_with("_cat"), ~ factor(.x, levels = levels(met_dec_df$decision))),
+      
+      # if any column ending in "_cataa" is TRUE, then set final_risk_catid to 1 (Low)
+      final_risk_cataa = ifelse(rowSums(across(ends_with("_cataa"), ~ .x), na.rm = TRUE) > 0, 1, NA_integer_),
+      
       # higher risk trumps lower risk amongst all _cat vars (e.g., High > Medium > Low)
-      final_risk_catid = pmax(!!!rlang::syms(paste0(met_der$derived_col, "_catid")), na.rm = TRUE),
-      final_risk_cat = decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid)
-    ) |> dplyr::select(-ends_with("_catid"))
+      max_catid = pmax(!!!rlang::syms(paste0(met_der$derived_col, "_catid")), na.rm = TRUE) |> as.integer(),
+      final_risk_catid = dplyr::case_when(
+        !is.na(final_risk_cataa) ~ final_risk_cataa,
+        is.finite(max_catid) ~ max_catid,
+        .default = as.integer(NA) # if this happens, need to investigate!
+      ),
+      final_risk_cat = decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid) 
+    ) |>
+    dplyr::select(-c(ends_with("_catid"), "final_risk_cataa"))
   
   # which(is.na(return_pkgs$final_risk_catid))
   rm(pkgs_df) # verify we don't accidentally use it later

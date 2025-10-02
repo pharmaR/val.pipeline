@@ -74,52 +74,53 @@ val_pkg <- function(
     #
     # ---- Grab Dependencies (using archive)
     #
-    # Not being used...
-    
-    # if(file.exists(tar_file)) {
-    #   arch <- archive::archive(file.path(tarballs, glue::glue("{pkg_v}.tar.gz"))) |>
-    #     dplyr::arrange(tolower(path))
-    # }
-    
-    # if (file.exists(tar_file)) {
-    #   desc_file <- glue::glue("{pkg}/DESCRIPTION")
-    #   
-    #   tar_con <- archive::archive_read(tar_file, desc_file, format = "tar")
-    #   on.exit(close(tar_con))
-    #   
-    #   desc_con <- desc::description$new(text = readLines(tar_con))
-    #   if ('Suggests' %in% desc_con$fields()) {
-    #     sug_vctr <- desc_con$get_list(key = 'Suggests') %>% sort()
-    #   } else {
-    #     msg <- paste("Suggests not found for package", pkg)
-    #     rlang::warn(msg)
-    #     sug_vctr <- character(0)
-    #   }
-    # } else {
-    #   sug_vctr <- unlist(
-    #     tools::package_dependencies(
-    #       packages = pkg,
-    #       db = meta,
-    #       which=c("Suggests"),
-    #       recursive=FALSE)) |>
-    #     unname() |> sort()
-    # }
+      # Not being used...
+      
+      # if(file.exists(tar_file)) {
+      #   arch <- archive::archive(file.path(tarballs, glue::glue("{pkg_v}.tar.gz"))) |>
+      #     dplyr::arrange(tolower(path))
+      # }
+      
+      # if (file.exists(tar_file)) {
+      #   desc_file <- glue::glue("{pkg}/DESCRIPTION")
+      #   
+      #   tar_con <- archive::archive_read(tar_file, desc_file, format = "tar")
+      #   on.exit(close(tar_con))
+      #   
+      #   desc_con <- desc::description$new(text = readLines(tar_con))
+      #   if ('Suggests' %in% desc_con$fields()) {
+      #     sug_vctr <- desc_con$get_list(key = 'Suggests') %>% sort()
+      #   } else {
+      #     msg <- paste("Suggests not found for package", pkg)
+      #     rlang::warn(msg)
+      #     sug_vctr <- character(0)
+      #   }
+      # } else {
+      #   sug_vctr <- unlist(
+      #     tools::package_dependencies(
+      #       packages = pkg,
+      #       db = meta,
+      #       which=c("Suggests"),
+      #       recursive=FALSE)) |>
+      #     unname() |> sort()
+      # }
   }
   
   #
   # ---- Grab Dependencies ----
   #
-  # Grab deps (Depends, Imports, LinkingTo, Suggests)
+  # Grab deps: Depends, Imports, LinkingTo, Suggests
   # pkg_base <- avail_pkgs |> dplyr::filter(Package %in% pkg)
   
   # grab depends
-  # depends_base <- pkg_base |>
-  #   unite(pkg_deps, c(Depends, Imports, LinkingTo), sep = ", ", na.rm = TRUE) |>
-  #   dplyr::pull(pkg_deps)
-  # depends0 <- strsplit(depends_base, split = ", ")[[1]]
-  # depends <- avail_pkgs |>
-  #   dplyr::filter(Package %in% stringr::word(depends0, 1)) |>
-  #   dplyr::pull(Package)
+    # old way
+    # depends_base <- pkg_base |>
+    #   unite(pkg_deps, c(Depends, Imports, LinkingTo), sep = ", ", na.rm = TRUE) |>
+    #   dplyr::pull(pkg_deps)
+    # depends0 <- strsplit(depends_base, split = ", ")[[1]]
+    # depends <- avail_pkgs |>
+    #   dplyr::filter(Package %in% stringr::word(depends0, 1)) |>
+    #   dplyr::pull(Package)
   depends <- 
     tools::package_dependencies(
       packages = pkg,
@@ -130,17 +131,18 @@ val_pkg <- function(
     unlist(use.names = FALSE) 
   
   # grab suggests
-  # suggests_base <- pkg_base |> dplyr::pull(Suggests)
-  # suggests0 <- strsplit(suggests_base, split = ", ")[[1]]
-  # suggests <- avail_pkgs |>
-  #   dplyr::filter(Package %in% stringr::word(suggests0, 1)) |>
-  #   dplyr::pull(Package)
+    # old way
+    # suggests_base <- pkg_base |> dplyr::pull(Suggests)
+    # suggests0 <- strsplit(suggests_base, split = ", ")[[1]]
+    # suggests <- avail_pkgs |>
+    #   dplyr::filter(Package %in% stringr::word(suggests0, 1)) |>
+    #   dplyr::pull(Package)
   suggests <- 
     tools::package_dependencies(
       packages = pkg,
       db = available.packages(),
       which = "Suggests",
-      recursive = TRUE
+      recursive = TRUE # this really blows up for almost any pkg
     ) |>
     unlist(use.names = FALSE) 
   
@@ -170,6 +172,7 @@ val_pkg <- function(
   clean_install <- if(is.null(inst_out) &
     pkg %in% list.files(installed)) TRUE else FALSE
   
+  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
   
   if(!clean_install) {
     # save metadata
@@ -178,17 +181,19 @@ val_pkg <- function(
       ver = ver,
       r_ver = getRversion(),
       sys_info = R.Version(), 
-      repos = options("repos"),
+      repos = list(options("repos")),
       val_date = val_date,
       clean_install = clean_install,
       ref = ref,
       metric_pkg = metric_pkg,
       # metrics = pkg_assessment, # saved separately for {riskreports}
-      decision = "High Risk",
+      decision = decisions[length(decisions)],
       decision_reason = "Failed 'clean_install' step",
-      final_decision = "High Risk",
+      final_decision = decisions[length(decisions)],
+      final_decision_reason = "Failed 'clean_install' step",
       depends = if(identical(depends, character(0))) NA_character_ else depends,
       suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
+      rev_deps = NA_character_,
       assessment_runtime = list(txt = NA_character_, mins = NA)
     )
     saveRDS(meta_list, file.path(meta_list, glue::glue("{pkg_v}_meta.rds")))
@@ -311,6 +316,9 @@ val_pkg <- function(
   #
   #
   
+  
+  cat("\n--> Making a risk decision for", pkg_v,"...\n\n")
+  
   # Use org-level criterion to set thresholds and Update final decision (if not
   # already 'high risk') AND then filter packages to a final 'qualified' list
   #
@@ -321,12 +329,14 @@ val_pkg <- function(
   # the intended system (aka, {riskscore} OR the PACKAGES) file, so we have to
   # run val_build() & re-filter.
   
-  # maybe I should call it pre_filter() & post_filter()
-  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
+  # if need to read in an assessment:
+  # pkg_assessment <- readRDS(assessment_file)
+  # pkg_scores <- readRDS(scores_file)
+  
   decision <- 
     val_decision( 
       pkg = pkg,
-      source = list(assessed = pkg_assessment, scored = pkg_scores), # include both
+      source = list(assessment = pkg_assessment, scores = pkg_scores), # include both
       metrics = c( # Subset if desired
         "covr_coverage", "downloads_1yr", "reverse_dependencies",
         "dependencies", "has_vignettes", "has_source_control",
@@ -375,19 +385,23 @@ val_pkg <- function(
     ver = ver,
     r_ver = getRversion(),
     sys_info = R.Version(),
-    repos = options("repos"),
+    repos = list(options("repos")),
     val_date = val_date,
     clean_install = clean_install,
     ref = ref,
     metric_pkg = metric_pkg,
     # metrics = pkg_assessment, # saved separately for {riskreports}
-    decision = decision$final,
-    decision_reason = decision$reason,
+    decision = decision$final_risk,
+    decision_reason = "Assessment",
     final_decision = NA_character_, # Will be set later
+    final_decision_reason = NA_character_, # Will be set later
     depends = if(identical(depends, character(0))) NA_character_ else depends,
     suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
+    rev_deps = if(is.null(pkg_assessment$reverse_dependencies)) NA_character_ else pkg_assessment$reverse_dependencies |> as.vector(),
     assessment_runtime = list(txt = ass_mins_txt, mins = ass_mins)
   )
+  # meta_list <- readRDS(file.path(assessed, glue::glue("{pkg_v}_meta.rds")))
+  # meta_list$rev_deps
   saveRDS(meta_list, file.path(assessed, glue::glue("{pkg_v}_meta.rds")))
   cat("\n-->", pkg_v,"meta bundle saved.\n")
   

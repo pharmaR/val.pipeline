@@ -53,7 +53,7 @@ val_build <- function(
     pkg_names = NULL, #
     ref = "source", 
     metric_pkg = "riskmetric",
-    deps = c("depends", "suggests"), # deps = c("depends"), deps = NULL
+    deps = c("depends", "suggests")[1], # deps = c("depends"), deps = NULL
     deps_recursive = TRUE,
     val_date = Sys.Date(),
     out = 'riskassessment',
@@ -109,13 +109,6 @@ val_build <- function(
       # If deps are provided, then we need to get the dependencies
       # and add them to the list of pkgs to assess
       
-      # params for debugging:
-      # deps = NULL
-      # deps = "depends"
-      # deps = "suggests"
-      # deps = c("depends", "suggests")
-      # deps_recursive = TRUE
-      
       deps_low <- tolower(deps)
       which_deps <- dplyr::case_when(
         all(c("depends", "suggests") %in% deps_low) ~ "most",
@@ -128,10 +121,27 @@ val_build <- function(
       
       dep_tree <- tools::package_dependencies(
         packages = pkg_names,
-        db = available.packages(),
+        # db = available.packages(),
         which = which_deps,
+        # recursive = TRUE) # For debugging
         recursive = deps_recursive)
        
+      # sort avail_pkgs based on how often a pkg appears in the dep_tree
+      # if a pkgs is observed as a dependency often, we'd want to run an
+      # assessment on those pkgs first! Why? Because if it fails, then we
+      # can avoid running assessments on pkgs that depend on it.
+      pkg_freqs <- dep_tree |> unlist(use.names = FALSE) |> table()
+        # pkg_freqs |> min()
+        # pkg_freqs |> max()
+        # pkg_freqs[pkg_freqs >= 15] |> sort()
+        # pkg_freqs |> sort()
+      
+      avail_pkgs <- avail_pkgs |>
+        dplyr::mutate(dep_freq = pkg_freqs[Package]) |>
+        dplyr::mutate(dep_freq = ifelse(is.na(dep_freq), 0, dep_freq)) |>
+        dplyr::arrange(dplyr::desc(dep_freq), Package) #|>
+        # dplyr::select(-dep_freq) # keep it
+      
       full_dep_tree <- dep_tree |>
         unlist(use.names = FALSE) |> 
         c(names(dep_tree)) |>
@@ -160,7 +170,7 @@ val_build <- function(
   }
   
   #
-  # ---- Define dirs for processing ----
+  # ---- Define dirs ----
   #
   r_dir <- file.path(out, glue::glue('R_{r_ver}'))
   val_dir <- file.path(r_dir, val_date_txt)
@@ -173,106 +183,276 @@ val_build <- function(
   if(!dir.exists(assessed)) dir.create(assessed) # needed
   
   #
-  # ---- Run through the list of packages ----
+  # ---- Build pkg bundles ----
   #
+  
+  # Pull in the decisions list
+  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
+  
+  # Initiate a list to store pkgs that include the reverse dependencies of pkgs
+  # that have failed
+  dont_run <- character(0)
+  
+  # Start bundling
   pkg_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
     # i <- 1 # for debugging
     # pkg <- pkgs[i] # for debugging
     # ver <- vers[i] # for debugging
-    
-    # check to make sure the pkg bundle doesn't already exist. If so, we can
-    # skip building the bundle, but we still need to assess it's dependencies
     pkg_v <- paste(pkg, ver, sep = "_")
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
-    if(!file.exists(pkg_meta_file) | replace) {
-      pkg_meta <- val_pkg(
+    
+    # prevent running pkgs that depend on pkgs that have already failed
+    if(!(pkg %in% dont_run)) {
+    
+      # check to make sure the pkg bundle doesn't already exist. If so, we can
+      # skip building the bundle, but we still need to assess it's dependencies
+      if(!file.exists(pkg_meta_file) | replace) {
+        pkg_meta <- val_pkg(
+          pkg = pkg,
+          ver = ver,
+          avail_pkgs = avail_pkgs,
+          ref = ref,
+          metric_pkg = metric_pkg,
+          out_dir = val_dir,
+          val_date = val_date)
+      } else {
+        cat(paste0("\n\n\nAttempted New Package: ", pkg, " v", ver,", but already assessed.\n\n"))
+        pkg_meta <- readRDS(pkg_meta_file)
+        
+        cat("\n-->", pkg_v,"Using assessment previously stored.\n")
+      }
+      
+      # if a pkg fails, make sure it's reverse dependencies don't run an assessment
+      # if(pkg == "sys") pkg_meta$decision = "Medium" # for debugging
+      if(pkg_meta$decision != decisions[1]) {
+        cat(paste0("\n\n-->", pkg, " v", ver," was assessed with a '", pkg_meta$decision,"' risk. All packages that depend on it will also be marked as '", decisions[length(decisions)],"' risk.\n\n"))
+        dont_run <<- c(dont_run, pkg_meta$rev_deps) |> unique()
+      }
+      
+    } else {
+      # ---- Pkg is in 'dont_run'! ----
+      cat(paste0("\n\n\nAttempted New Package: ", pkg, " v", ver,", but one of it's dependencies already failed so skipping assessment and marking risk as '", decisions[length(decisions)], "'.\n\n"))
+      
+      # grab depends
+      depends <- 
+        tools::package_dependencies(
+          packages = pkg,
+          db = available.packages(),
+          which = c("Depends", "Imports", "LinkingTo"),
+          recursive = TRUE
+        ) |>
+        unlist(use.names = FALSE) 
+      
+      # grab suggests
+      suggests <- 
+        tools::package_dependencies(
+          packages = pkg,
+          db = available.packages(),
+          which = "Suggests",
+          recursive = TRUE # this really blows up for almost any pkg
+        ) |>
+        unlist(use.names = FALSE) 
+      
+      pkg_meta <- list(
         pkg = pkg,
         ver = ver,
-        avail_pkgs = avail_pkgs,
-        ref = ref,
-        metric_pkg = metric_pkg,
-        out_dir = val_dir,
-        val_date = val_date)
-    } else {
-      cat(paste0("\n\n\nAttempted New Package: ", pkg, " v", ver,", but already assessed.\n\n"))
-      pkg_meta <- readRDS(pkg_meta_file)
-      
-      cat("\n-->", pkg_v,"Using assessment previously stored.\n")
-      
+        r_ver = getRversion(),
+        sys_info = R.Version(),
+        repos = list(options("repos")),
+        val_date = val_date,
+        clean_install = as.logical(NA),
+        ref = NA_character_,
+        metric_pkg = NA_character_,
+        # metrics = pkg_assessment, # saved separately for {riskreports}
+        decision = decisions[length(decisions)],
+        decision_reason = "Dependency",
+        final_decision = decisions[length(decisions)],
+        final_decision_reason = "Dependency",
+        depends = if(identical(depends, character(0))) NA_character_ else depends,
+        suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
+        rev_deps = NA_character_,
+        assessment_runtime = list(txt = NA_character_, mins = NA)
+      )
+      saveRDS(pkg_meta, pkg_meta_file)
+      cat("\n-->", pkg_v,"meta bundle saved.\n")
     }
     
-    # ---- Rinse & Repeat on deps & suggests 
-    # old... trying to do some recursive stuff, but it was a bad idea.
-    # maybe_new <- c(pkg_meta$dependencies, pkg_meta$suggests)
-    # dep_files <- file.path(assessed, glue::glue("{maybe_new}_meta.rds"))
-    # new_pkgs_files <- dep_files[!file.exists(dep_files)]
-    # # split into pkg & ver here
-    # new_pkgs <- basename(new_pkgs_files) |> tools::file_path_sans_ext()
-    # new_vers <- basename(new_pkgs_files) |> tools::file_path_sans_ext()
-    # purrr::map2(new_pkgs, new_vers, function(pkg, ver){
-    #   pkg_bundle <- val_pkg(pkg = pkg, ver = ver)
-    # })
-    
-    # return
+    # return!
     pkg_meta
-  }) |> purrr::set_names(nm = pkgs)
+    
+  }) |>
+    purrr::set_names(nm = pkgs)
   
-  cat("\n--> All packages processed.\n")
+  # Message
+  # dont_run |> length()
+  skipped_pkgs <- pkgs[pkgs %in% dont_run]
+  cat("\n--> All", pkgs_length, "packages processed;", skipped_pkgs |> length(),"of which were avoided due to a dependency failing it's risk assessment.\n")
+
+  
+  
+  
+  
   
   #
   # ---- Convert to DF ----
   #
+  
   # Reduce package bundles down into a data.frame containing specific info
   # names(pkg_bundles)
-  # pkg_bundles$zoo |> dplyr::as_tibble()
-  # pkg_bundles$zoo$suggests
-  # pkg_bundles$lattice$suggests
-  # rm(.x)
-  # dput(pkg_bundles)
-  pkgs_df0 <- purrr::map( pkg_bundles,
-    ~ {
-      # .x <- pkg_bundles$zoo
+  pkgs_df0 <- purrr::map( pkg_bundles, ~ {
+      # .x <- pkg_bundles$askpass
       x <- purrr::list_flatten(.x)
       # x$depends  <- if(all(is.na(x$depends)))  NA_character_ else paste(x$depends, collapse = ", ")
       # x$suggests <- if(all(is.na(x$suggests))) NA_character_ else paste(x$suggests, collapse = ", ")
       x$depends <- list(x$depends)
       x$suggests <- list(x$suggests)
+      x$rev_deps <- list(x$rev_deps)
       dplyr::as_tibble(x)
     }) |> 
     purrr::reduce(dplyr::bind_rows)
-  # pkgs_df$suggests
+  
   
   cat("\n--> Collated pkg metadata.\n")
+  
+  
+  
+  
   
   
   #
   # ---- Update final decisions ----
   #
-  # So, after working through all those packages, we need to be able to
-  # change 'final' decisions if a package's dependency doesn't pass
-  #
   
-  # pkgs_df0$decision[1] <- "Low Risk"
-  # pkgs_df0$decision[2] <- "High Risk"
-  pkgs_df <- pkgs_df0 |>
-    dplyr::mutate(
-      final_decision = dplyr::case_when(
-        # if the pkg itself is a fail, then final is fail
-        decision == 'High Risk' ~ 'High Risk',
-        
-        # if any dependencies are High Risk, then final is High Risk
-        # (need to unnest the depends & suggests columns first)
-        purrr::map_lgl(depends, ~ any(.x %in% pkgs_df0$pkg[pkgs_df0$decision == 'High Risk'])) ~ 'High Risk',
-        purrr::map_lgl(suggests, ~ any(.x %in% pkgs_df0$pkg[pkgs_df0$decision == 'High Risk'])) ~ 'High Risk',
-        
-        # otherwise, leave the decision alone
-        .default = decision
+  # We need to be able to change 'final' decisions (recursively) if a package's
+  # dependency doesn't pass. That means, All the packages where decision is NOT
+  # marked "Low" need to have their decision matriculate up through their
+  # reverse dependencies (rev_deps).
+  
+  # Steps:
+  # 1. identify all packages that are NOT "Low Risk"
+  # 2. identify all packages that depend on those packages
+  # 3. change their decision the decision of their dependency
+  
+  # pkgs_df0$decision[1] <- "High" # for debugging
+  # NOTE: deps is from the args to val_build()... will need to be added
+  reject_iteration <- function(pkg_dat, dec_reject = "High", failed_pkgs = NULL){
+    
+    # 1. identify all packages that are NOT "Low Risk"
+    if(is.null(failed_pkgs)) {
+      failed_pkgs <- pkg_dat$pkg[pkg_dat$final_decision != decisions[1]]
+    }
+    
+    # Process the data.frame
+    pkg_dat <- pkg_dat |>
+      
+      # 2. identify all packages that depend on those packages
+      dplyr::mutate(dep_failed = purrr::map_lgl(depends, ~ any(.x %in% failed_pkgs)),
+                    sug_failed = purrr::map_lgl(suggests, ~ any(.x %in% failed_pkgs))) |>
+      
+      # 3. change their decision the decision of their dependency
+      dplyr::mutate(
+        final_decision = dplyr::case_when(
+          dep_failed ~ dec_reject, # if any of the dependencies failed, then mark as 'High'
+          sug_failed & ("Suggests" %in% deps) ~ dec_reject, # if any of the suggests failed, then mark as 'High'
+          .default = decision
+        ),
+        final_decision_reason = dplyr::case_when(
+          dep_failed ~ "Dependency",
+          sug_failed & ("Suggests" %in% deps) ~ "Dependency",
+          .default = decision_reason
+        )
       )
-    )
-    # pkgs_df0$depends[2] |> unlist()
+    
+    return(pkg_dat)
+  }
   
+  # First iteration:
+  # Based off of 'decision', not 'final_decision'
+  dec_reject <- decisions(length(decision))
+  failed <- pkgs_df0$pkg[pkgs_df0$decision != decisions[1]] # start w/ 'decision'
+  pkgs_df <- reject_iteration(pkgs_df0, dec_reject, failed)
+  
+  # All remaining iterations!
+  while(!identical(pkgs_df$pkg[pkgs_df$final_decision != decisions[1]], failed)) {
+    # if the list of failed pkgs has changed, then we need to iterate again
+    failed <<- pkgs_df$pkg[pkgs_df$final_decision != decisions[1]]
+    pkgs_df <<- reject_iteration(pkgs_df, dec_reject, failed)
+  }
+  
+  # Old co-pilot solution... doesn't seem to work
+  #
+  # # pkgs_df0$decision[1] <- "High"
+  # # pkgs_df0$decision[2] <- "High"
+  # pkgs_df <- pkgs_df0 |>
+  #   dplyr::mutate(
+  #     
+  #     final_decision = dplyr::case_when(
+  #       decision != decisions[1] ~ decision, # if not "Low", then keep the decision
+  #       purrr::map_lgl(depends, ~ any(.x %in% pkgs_df0$pkg[pkgs_df0$decision != decisions[1]])) ~ 
+  #         # if any of the dependencies are NOT "Low", then change to the highest risk of those dependencies
+  #         pkgs_df0$decision[match(
+  #           purrr::map(depends, ~ .x[.x %in% pkgs_df0$pkg[pkgs_df0$decision != decisions[1]]]) |> 
+  #             purrr::list_flatten() |> unique(),
+  #           pkgs_df0$pkg
+  #         )] |> 
+  #           unique() |> 
+  #           # get the highest risk (last in decisions list)
+  #           decisions[max(match(., decisions))],
+  #       purrr::map_lgl(suggests, ~ any(.x %in% pkgs_df0$pkg[pkgs_df0$decision != decisions[1]])) ~ 
+  #         # if any of the suggests are NOT "Low", then change to the highest risk of those suggests
+  #         pkgs_df0$decision[match(
+  #           purrr::map(suggests, ~ .x[.x %in% pkgs_df0$pkg[pkgs_df0$decision != decisions[1]]]) |> 
+  #             purrr::list_flatten() |> unique(),
+  #           pkgs_df0$pkg
+  #         )] |> 
+  #           unique() |> 
+  #           # get the highest risk (last in decisions list)
+  #           decisions[max(match(., decisions))],
+  #       .default = decision # otherwise, keep the original decision
+  #       
+  #     ),
+  #     # if final_decision is different than decision, then mark decision reason as "Dependency"
+  #     decision_reason = dplyr::case_when(
+  #       final_decision != decision ~ "Dependency",
+  #       .default = decision_reason
+  #     )
+  #   )
+  #   # pkgs_df0$depends[2] |> unlist()
   
   cat("\n--> Assigned 'final' decisions.\n")
+  
+  
+  
+  
+  
+  #
+  # ---- Update pkg_meta RDS file ----
+  #
+  # Which packges had a decision change?
+  changed_pkgs <-
+    pkgs_df |>
+    dplyr::filter(final_decision != decision)
+
+  purrr::walk2(changed_pkgs$pkg, changed_pkgs$ver, function(pkg, ver){
+    # i <- 1 # for debugging
+    # pkg <- changed_pkgs$pkg[i] # for debugging
+    # ver <- changed_pkgs$ver[i] # for debugging
+    pkg_v <- paste(pkg, ver, sep = "_")
+    pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
+    pkg_meta_file <- pkg_meta_file[file.exists(pkg_meta_file)]
+    if(length(pkg_meta_file) > 0) {
+      # update the decision of each reverse dependency pkg
+      purrr::walk(pkg_meta_file, function(f){
+        dep_meta <- readRDS(f)
+        dep_meta$final_decision_reason <- "Dependency"
+        dep_meta$final_decision <- decisions[length(decisions)]
+        saveRDS(dep_meta, f)
+        cat(paste0("\n\n--> Updated ", dep_meta$pkg, " v", dep_meta$ver," from '", dep_meta$decision,"' to '", dep_meta$final_decision,"' in meta bundle .rds.\n"))
+      })
+    }
+  })
+  
+  cat("\n--> Updated", nrow(changed_pkgs),"pkg metadata files.\n")
   
   val_end <- Sys.time()
   val_end_txt <- capture.output(val_end - val_start)
