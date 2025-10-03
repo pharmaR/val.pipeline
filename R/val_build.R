@@ -361,14 +361,15 @@ val_build <- function(
           sug_failed & ("Suggests" %in% deps) ~ "Dependency",
           .default = decision_reason
         )
-      )
+      ) |>
+      dplyr::select(-dep_failed, -sug_failed)
     
     return(pkg_dat)
   }
   
   # First iteration:
   # Based off of 'decision', not 'final_decision'
-  dec_reject <- decisions(length(decision))
+  dec_reject <- decisions[length(decisions)]
   failed <- pkgs_df0$pkg[pkgs_df0$decision != decisions[1]] # start w/ 'decision'
   pkgs_df <- reject_iteration(pkgs_df0, dec_reject, failed)
   
@@ -457,6 +458,9 @@ val_build <- function(
   val_end <- Sys.time()
   val_end_txt <- capture.output(val_end - val_start)
   cat("\n--> Build", val_end_txt,"\n")
+  
+  saveRDS(pkgs_df, file.path(val_dir, "qual_evidence.rds"))
+  cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
   
   # Return object 
   return(list(

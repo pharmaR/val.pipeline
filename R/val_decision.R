@@ -406,10 +406,10 @@ val_categorize <- function(
   } else if(source == "riskscore") {
     
     requireNamespace("riskscore", quietly = TRUE)
-    # Use "pkg_cran_remote" data from riskscore::cran_assessed_20250812
+    # Use "pkg_cran_remote" data from riskscore::cran_assessed_latest
     # remotes::install_github("pharmar/riskscore", force = TRUE,
-    #                         ref = "main")
-    pv <- packageVersion("riskscore") # verify ‘v0.0.1'
+    #                         ref = "dev")
+    pv <- packageVersion("riskscore") # verify ‘v0.0.2'
     riskscore_run_date <- riskscore::cran_assessed_latest$riskmetric_run_date |> unique()
     cat(paste0("\n--> Using {riskscore} Version: 'v", pv, "', last compiled on '",
                riskscore_run_date,"'.\n"))
@@ -417,17 +417,65 @@ val_categorize <- function(
       cat(glue::glue("\n!!! WARNING: the latest riskscore assessment date is more than 60 days old, compared to today's validation date. Consider updating {{riskscore}} w/ a fresh run.\n"))
     }
     
+
+    # Sometimes, the package field is a list() in the 2025-10-01 riskscore
+    # build. So, we need to unlist it first
+    if(inherits(riskscore::cran_assessed_latest$package, "list")){
+      package_col <- riskscore::cran_assessed_latest$package |> unlist()
+      ver_col <- riskscore::cran_assessed_latest$version |> unlist()
+    } else {
+      # package_col <- riskscore::cran_assessed_20250812$package
+      # ver_col <- riskscore::cran_assessed_20250812$version
+      package_col <- riskscore::cran_assessed_latest$package
+      ver_col <- riskscore::cran_assessed_latest$version
+    }
+    
+    # How many pkgs are in the riskscore data vs available.packages()?
+    cat(glue::glue("\n--> There are {prettyNum(nrow(riskscore::cran_assessed_latest), big.mark = ',')} packages with assessments in the latest riskscore data & {prettyNum(nrow(avail_pkgs), big.mark = ',')} packages available on CRAN.\n"))
+
+    # Pkgs not in available.packages()
+    missing_ap <- package_col[!(package_col %in% avail_pkgs$Package)]
+    if(length(missing_ap) > 0) {
+      cat(glue::glue("\nNote: There are {length(missing_ap)} packages in the riskscore data that are NOT in available.packages(). These will be marked ignored, because they have likely been removed from CRAN since the last riskscore build.\n\n"))
+      print(head(missing_ap, 20))
+      if(length(missing_ap) > 20) cat("...\n")
+    }
+    
+    # Pkgs not in riskscore data
+    # These are a little more problematic because we don't have assessments for them
+    # So by default, do we need to mark them as "low" so that they are evaluated by
+    # val_build() using pkg_sources? Yes!
+    missing_rs <- avail_pkgs$Package[!(avail_pkgs$Package %in% package_col)]
+    if(length(missing_rs) > 0) {
+      cat(glue::glue("\n!!! WARNING: There are {length(missing_rs)} packages in available.packages() that are NOT in the riskscore data.\n"))
+      print(head(missing_rs, 20))
+      if(length(missing_rs) > 20) cat("...\n")
+    }
+    # options("repos")
+    # dput(missing_rs)
+    # avail_pkgs$Repository |> table()
+    
     pkgs <- avail_pkgs |>
       dplyr::select(package = Package, version = Version) |>
       dplyr::left_join(
         riskscore::cran_assessed_latest |>
-          dplyr::select(package, version, 
+          # if the package field is a list(), the convert it to character
+          dplyr::mutate(auto_pass = FALSE, package = package_col, version = ver_col) |>
+          dplyr::select(package, #version, 
+                        auto_pass,
                         downloads_1yr, reverse_dependencies,
                         has_vignettes, has_source_control, has_website,
                         news_current, bugs_status
           ),
-        by = c("package", "version")
-      )
+        # do not want to join on "version"  because it may not match what's
+        # available in the riskscore data, since it can be up to 2 months old
+        by = c("package") # No 'version'
+      ) |>
+      dplyr::mutate(auto_pass = ifelse(is.na(auto_pass), TRUE, auto_pass))
+      
+    # table(pkgs$auto_pass) # should be all false. If not, those pkgs will be passed
+    # so that they can be evaluated using pkg sources
+    
     pkgs_scored <- 
       avail_pkgs |>
       dplyr::select(package = Package, version = Version) |>
@@ -513,9 +561,7 @@ val_categorize <- function(
   } else if (inherits(source, "list")) {
     stop("Not yet implemented: val_filter() using data.frame 'source'")
     # The assessments object's default structure is a list
-    
-    
-    
+
     
   } else if (is.data.frame(source)) {
     stop("Not yet implemented: val_filter() using data.frame 'source'")
@@ -523,25 +569,6 @@ val_categorize <- function(
     # Not sure what this looks like yet, but we could assume it looks similar
     # to the riskscore output
     
-    # pkgs <- avail_pkgs |>
-    #   dplyr::select(package = Package, version = Version) |>
-    #   dplyr::left_join(
-    #     source |>
-    #       dplyr::select(package, version, 
-    #                     downloads_1yr, reverse_dependencies,
-    #                     has_vignettes, has_source_control, has_website,
-    #                     news_current, bugs_status
-    #       ),
-    #     by = c("package", "version")
-    #   )
-    # pkgs_scored <- 
-    #   avail_pkgs |>
-    #   dplyr::select(package = Package, version = Version) |>
-    #   dplyr::left_join(
-    #     source |>
-    #       dplyr::select(package, version, news_current, bugs_status),
-    #     by = c("package", "version")
-    #   )
   } else if(source == "PACKAGES") {
     stop("Not yet implemented: val_filter() using 'PACKAGES' file")
   } else {
@@ -637,6 +664,10 @@ val_categorize <- function(
           ),
         final_risk = final_risk_id |> factor(labels = decisions),
       ) |>
+      # if auto_pass is TRUE, then set final_risk to "Low"
+      dplyr::mutate(
+        final_risk = ifelse(auto_pass, decisions[1], as.character(final_risk)) |> factor(levels = decisions)
+      ) |>
       dplyr::select(
         package, version, 
         primary_risk_category, exception_risk_category, final_risk, 
@@ -670,8 +701,12 @@ val_categorize <- function(
     
   } else {
     pkgs_final <- pkgs_primed |>
+      # if auto_pass is TRUE, then set final_risk to "Low"
+      dplyr::mutate(
+        final_risk = ifelse(auto_pass, decisions[1], as.character(final_risk_cat)) |> factor(levels = decisions)
+      ) |>
       dplyr::select(
-        package, version, final_risk = final_risk_cat,
+        package, version, final_risk,
         dplyr::everything()
       )
   }

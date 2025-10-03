@@ -32,15 +32,16 @@ cat(paste0("\n\n\nValidation pipeline initiated: R v", r_ver, " @ ", val_start_t
 # For now, let's just filter using cranlogs to determine downloaded pkgs
 # opt_repos = c(val_build_repo = "https://cran.r-project.org") # put in config
 opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
+opt_repos_rr <- pull_config(val = "opt_repos_remote_reduce", rule_type = "default") |> unlist()
 decisions <- pull_config(val = "decisions_lst", rule_type = "default")
 
 
 #
-# ---- Set repos option ----
+# ---- Set repos option to risk scores date ----
 #
 old <- options()
 on.exit(function() options(old))
-options(repos = opt_repos, pkgType = "source", scipen = 999) # , rlang_interactive = FALSE
+options(repos = opt_repos_rr, pkgType = "source", scipen = 999) # , rlang_interactive = FALSE
 # options("repos") # verify
 
 #
@@ -51,12 +52,20 @@ pre_filtered_pkg_metrics <-
     source = "riskscore",
     avail_pkgs = available.packages() |> as.data.frame(),
     decisions = decisions,
-    else_cat = "High",
+    else_cat = decisions[length(decisions)],
     decisions_df = build_decisions_df(rule_type = "remote_reduce")
     )
 # see <-
 #   pre_filtered_pkg_metrics |>
 #     dplyr::filter(dwnlds > 1000000) 
+
+
+#
+# ---- Set repos option to today's date ----
+#
+options(repos = opt_repos, pkgType = "source", scipen = 999) # , rlang_interactive = FALSE
+# options("repos") # verify
+
 
 #
 # ---- Reduce pkgs ----
@@ -111,9 +120,8 @@ full_tree |> length()
 # Validation build
 outtie <- val_build(
   
-  # pkg_names = 'zoo',   # has a prompt, plus depends on lattice which takes a while
-  pkg_names = 'askpass', # 2.5 - 3 mins when deps
-  # pkg_names = build_pkgs,
+  # pkg_names = 'askpass', # 2.5 - 3 mins when deps, 2 pkgs, no prompts
+  pkg_names = build_pkgs,
   
   ref = "source", # default
   # ref = "remote",
@@ -125,13 +133,13 @@ outtie <- val_build(
   deps = "depends",  # default
   # deps = NULL,
   
-  deps_recursive = FALSE,
-  # deps_recursive = TRUE, # default
+  # deps_recursive = FALSE,
+  deps_recursive = TRUE, # default
   
   val_date = val_date, # Sys.Date() # is  default
   
   replace = FALSE, # default
-  # replace = TRUE, 
+  # replace = TRUE,
   
   out = 'dev/riskassessments',
   
@@ -146,15 +154,13 @@ outtie <- val_build(
 #
 # Attempt to use a:
 # - GitHub pkg
-# - Bionconductor Repo / pkg
+# - Bionconductor Repo / pkg... waiting on {riskscore}... almost there
 
 
 #
 # {riskscore}
 #
-# - Rebuild CRAN pkg metrics for the latest month
 # - Build Bioc output for the first time
-# - Save as .parquet instead of .rda (pkg feels bloated with firsttime use)
 # - Set this up on a schedule on Posit Connect
 #
 
@@ -192,7 +198,9 @@ outtie <- val_build(
 # ---- Inspect outputs ----
 #
 outtie$val_dir
-assessed <- outtie$pkgs_df
+qual <- outtie$pkgs_df
+# nrow(qual)
+# saveRDS(qual, file.path(outtie$val_dir, paste0("qual_evidence_", val_date_txt, ".rds")))
 
 # # Inspect the assessment dir
 # # valdate <- gsub("-", "", Sys.Date())
@@ -230,7 +238,7 @@ assessed <- outtie$pkgs_df
 #
 # determine qualified pkgs to provision for PPM
 qualified <- assessed |>
-  dplyr::filter(decision == "Low")
+  dplyr::filter(final_decision == decisions[1])
 
 # Store as pins board?
 # How to Provision PPM metadata for all pkgs
