@@ -7,11 +7,7 @@
 val_decision(
   pkg = NULL,
   source = NULL,
-  metrics = c("covr_coverage", "downloads_1yr", "reverse_dependencies", "dependencies",
-    "has_vignettes", "has_source_control", "has_website", "has_news", "news_current",
-    "bugs_status", "remote_checks", "r_cmd_check", "r_cmd_check_warnings",
-    "r_cmd_check_errors", "exported_namespace", "export_help", "has_maintainer",
-    "size_codebase", "has_bug_reports_url", "has_examples", "license"),
+  excl_metrics = NULL,
   decisions = c("Low", "Medium", "High"),
   else_cat = "High",
   decisions_df = build_decisions_df(rule_type = "decide")
@@ -23,7 +19,7 @@ val_decision(
 \item{source}{character, either "riskscore" (default), "PACKAGES", or a
 data.frame.}
 
-\item{metrics}{character vector, allow users to subset metrics as needed
+\item{excl_metrics}{character vector, allow users to subset metrics as needed
 without changing the config}
 
 \item{decisions}{character vector, the risk categories to use.}

@@ -77,7 +77,7 @@ val_build <- function(
   cat(paste0("\n\n\nNew Validation build: R v", r_ver, " @ ", val_start_txt,"\n\n"))
   
   #
-  # ---- Set repos option ----
+  # ---- Setup ----
   #
   old <- options()
   on.exit(function() options(old))
@@ -87,9 +87,12 @@ val_build <- function(
     options(repos = opt_repos) # , rlang_interactive = FALSE
   }
   
+  # Pull in the decisions list
+  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
+  
   
   #
-  # ---- Determine the list of pkgs to evaluate ----
+  # ---- Which pkgs ----
   #
   # Make available.packages into a data.frame
   avail_pkgs <- available.packages() |> as.data.frame()
@@ -154,6 +157,7 @@ val_build <- function(
     pkgs <-
       avail_pkgs |>
       dplyr::filter(Package %in% full_dep_tree) |>
+      dplyr::filter(Package != "withr") |>
       dplyr::pull(Package)
   }
   vers <- avail_pkgs |>
@@ -182,22 +186,25 @@ val_build <- function(
   if(!dir.exists(val_dir)) dir.create(val_dir)
   if(!dir.exists(assessed)) dir.create(assessed) # needed
   
+  
+  
   #
   # ---- Build pkg bundles ----
   #
   
-  # Pull in the decisions list
-  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
-  
   # Initiate a list to store pkgs that include the reverse dependencies of pkgs
   # that have failed
   dont_run <- character(0)
+  # pkgs[1:9] # for debugging
   
   # Start bundling
   pkg_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
-    # i <- 1 # for debugging
+    
+    # i <- 2 # for debugging
     # pkg <- pkgs[i] # for debugging
     # ver <- vers[i] # for debugging
+    # pkg <- "withr" # for debugging
+    # ver <- "3.0.2" # for debugging
     pkg_v <- paste(pkg, ver, sep = "_")
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
     

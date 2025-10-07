@@ -22,6 +22,7 @@ r_ver = getRversion()
 # Grab val date, output messaging
 val_start <- Sys.time()
 val_start_txt <- format(val_start, '%Y-%m-%d %H:%M:%S', tz = 'US/Eastern', usetz = TRUE)
+# val_date <-as.Date("2025-10-03")
 val_date <- as.Date(val_start)
 val_date_txt <- gsub("-", "", val_date)
 cat(paste0("\n\n\nValidation pipeline initiated: R v", r_ver, " @ ", val_start_txt,"\n\n"))
@@ -100,9 +101,12 @@ cat("\n--> Final Decision Category Counts for'pre' assessment risk: \n----> Retu
 #
 
 # See the full dependency tree before running val_build()
+# these_pkgs <- "withr"
+# these_pkgs <- "matrix"
+# these_pkgs <- "askpass"
+these_pkgs <- build_pkgs
 tree <- tools::package_dependencies(
-  # packages = "askpass",
-  packages = build_pkgs,
+  packages = these_pkgs,
   db = available.packages(),
   # which = c("Suggests"),
   which = "strong", #c("Depends", "Imports", "LinkingTo"),
@@ -113,14 +117,18 @@ tree <- tools::package_dependencies(
   unlist(use.names = FALSE) |>
   unique()
 # How many? # 621 pkgs -->  When recursive: 2,570. Only 744 when you don't include Suggests
-full_tree <- c(build_pkgs, tree) |> unique()
+full_tree <- c(these_pkgs, tree) |> unique()
 full_tree |> length()
 
+# temporary until we can figure out what's gone haywire with this pkg
+# build_pkgs <- build_pkgs[build_pkgs != "withr"]
 
 # Validation build
 outtie <- val_build(
   
+  # pkg_names = 'rlang',
   # pkg_names = 'askpass', # 2.5 - 3 mins when deps, 2 pkgs, no prompts
+  # pkg_names = 'withr', 
   pkg_names = build_pkgs,
   
   ref = "source", # default
@@ -155,7 +163,9 @@ outtie <- val_build(
 # Attempt to use a:
 # - GitHub pkg
 # - Bionconductor Repo / pkg... waiting on {riskscore}... almost there
-
+#
+# There is a problem installing {withr}
+#
 
 #
 # {riskscore}
@@ -169,6 +179,13 @@ outtie <- val_build(
 #
 
 
+#
+# val_decision()
+#
+# Need to work out secondary logic for github packages
+#
+# Should I also consider an auto_fail threshold?
+# 
 
 #
 # val_pkg():
@@ -179,7 +196,10 @@ outtie <- val_build(
 # --> opened issue on 'riskmetric' repo
 # --> basically un-avoidable - would have to mimic pak::pkg_install()
 #
-
+# Run with source = "pkg_cran_remote" first to see downloads & if we need to 
+# even gather covr_coverage. Note: we'll still want to run "pkg_source", but
+# just remove the covr_coverage component if downloads are high.
+#
 
 # 
 # val_build():

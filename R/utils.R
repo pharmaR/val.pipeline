@@ -259,7 +259,7 @@ build_decisions_df <- function(
   ) {
   
   if (is.null(rule_lst)) {
-    message(glue::glue("\nUsing rules from '{rule_type}' decision type.\n"))
+    cat(glue::glue("\n\nBuilding decision data.frame using rules from '{rule_type}' decision type.\n"))
     
     figgy <- pull_config(rule_type = rule_type)
     decision_lst <- figgy$default_lst$decisions_lst
@@ -276,8 +276,8 @@ build_decisions_df <- function(
     
   
   # Inform the user of which rules can & will be evaluated
-  message("\n--> Building decision data.frame using the 'rule sets' for the following metrics:\n")
-  cat("\n---->", paste(rule_metric_nm, collapse = '\n----> '), "\n")
+  # message("\n--> Building decision data.frame using the 'rule sets' for the following metrics:\n")
+  # cat("\n---->", paste(rule_metric_nm, collapse = '\n----> '), "\n")
 
   
   # Build exceptions data.frame
@@ -339,9 +339,9 @@ build_decisions_df <- function(
       }),
       by = "metric"
     ) |>
-    
-    
     dplyr::select(-met_dec_id) # Get rid of this ID
+  
+  
   
   # Add on the "accept_condition" column
   if (!rlang::is_empty(rule_lst)) {

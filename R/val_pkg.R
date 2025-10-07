@@ -149,28 +149,41 @@ val_pkg <- function(
   
   # ---- Can Install? ----
   # Make sure we can install cleanly first, else don't with assessment, return meta
-  inst_out <- tryCatch({
-    if(ref == "source"){
-      utils::install.packages(
-        file.path(sourced, pkg),
-        lib = installed,
-        repos = NULL
-      )
-    } else { # ref == 'remote'
-      utils::install.packages(
-        pkg,
-        lib = installed
-      )
-    }
-  },
-  warning = function(w) return(paste("Warning:", w$message)),
-  error = function(e) return(paste("Error:", e$message))
-  )
-  # inst_out
+  # if(pkg != "withr") {
+  #   inst_out <- tryCatch({
+  #     if(ref == "source"){
+  #       utils::install.packages(
+  #         file.path(sourced, pkg),
+  #         lib = installed,
+  #         repos = NULL
+  #       )
+  #     } else { # ref == 'remote'
+  #       utils::install.packages(
+  #         pkg,
+  #         lib = installed
+  #       )
+  #     }
+  #   },
+  #   warning = function(w) return(paste("Warning:", w$message)),
+  #   error = function(e) return(paste("Error:", e$message))
+  #   )
+  # } else {
+    inst_out <- NULL
+  # }
   
+  # Looks like installing pkgs may prove tricky for us... because of {withr}.
+  # And since we are only doing this to see if there are any warnings or notes,
+  # we could potentially skip it, since we get that info directly from the
+  # assessment step anyhow. Also, some packages take a really long time to
+  # install like Matrix & arrow, so this could really slow us down
+  # unnecessarily.
+  #
+  # Note: It was initially set up to help us skip assessing that package if it
+  # didn't install cleanly, but I shouldn't assume I'm doing this better than
+  # the {riskmetric} team, and would rather rely on their logic
   
-  clean_install <- if(is.null(inst_out) &
-    pkg %in% list.files(installed)) TRUE else FALSE
+  clean_install <- if(is.null(inst_out) # & pkg %in% list.files(installed)
+    ) TRUE else FALSE
   
   decisions <- pull_config(val = "decisions_lst", rule_type = "default")
   
@@ -213,8 +226,10 @@ val_pkg <- function(
   #
   if(metric_pkg == "riskmetric"){
     
+    #
     # Update: can't remove these - will ruin some metrics like
     # code coverage & R CMD Check
+    #
     # Remove original docs, if they exist, because they force a
     # user prompt when run interactively
     # inst_doc <- file.path(sourced, pkg, "inst", "doc")
@@ -224,23 +239,92 @@ val_pkg <- function(
     # }
     
     #
-    ### Create pkg ref ###
+    ### Initial Assessment ###
     #
-    src_ref <- if(ref == "source") 'pkg_source' else 'pkg_cran_remote'
-    if(ref == "source") {
-      pkg_ref <- riskmetric::pkg_ref(file.path(sourced, pkg), source = src_ref)
-    } else { # ref == "remote"
-      # remote has no 'prompt' issue when building assessment, but no code covr either
-      pkg_ref <- riskmetric::pkg_ref(pkg, source = src_ref)
-    } 
-    cat("\n-->", pkg_v,"referrenced.\n")
     
-    #
-    ### Assessment ###
-    #
-    pkg_assessment0 <- pkg_ref |>
+    # We will ALWAYS perform a "pkg_cran_remote" assessment first, because it is
+    # WAY faster (even faster than a "pkg_source" while excluding
+    # "covr_coverage") so that if any primary metrics have an auto_accept
+    # condition, we can then run again with a "pkg_source" ref while excluding
+    # "covr_coverage" for final output. However, 
+    init_pkg_ref <- riskmetric::pkg_ref(pkg, source = "pkg_cran_remote")
+    cat("\n-->", pkg_v, "initial reference complete.\n")
+    
+    # rm(pkg_assessment0)
+    init_pkg_assessment0 <-
+      init_pkg_ref |>
       # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
       riskmetric::pkg_assess()
+    
+    # strip assessment of '.recording' attribute:
+    init_pkg_assessment <-
+      init_pkg_assessment0 |> 
+      strip_recording()
+    
+    init_pkg_scores <- riskmetric::pkg_score(init_pkg_assessment)
+    
+    init_assessed_end <- Sys.time()
+    init_ass_mins <- difftime(init_assessed_end, start, units = "mins")
+    init_ass_mins_txt <- capture.output(init_assessed_end - start)
+    cat("\n-->", pkg_v,"initial assessment complete.\n")
+    cat("--> (", init_ass_mins_txt, ")\n")
+    
+    # 
+    #### Initial Decision
+    #
+    # pkg_assessment$downloads_1yr |> prettyNum(big.mark = ",")
+    init_decision <- 
+      val_decision( 
+        pkg = pkg,
+        source = list(assessment = init_pkg_assessment, scores = init_pkg_scores), # include both
+        excl_metrics = NULL, # "covr_coverage", # Subset not really necessary
+        decisions = decisions,
+        else_cat = decisions[length(decisions)],
+        decisions_df = build_decisions_df(rule_type = "decide")
+      )
+    
+    auto_accepted <-
+      init_decision |> 
+      # dplyr::select(package, final_risk, dplyr::ends_with("cataa"))
+      dplyr::select(dplyr::ends_with("cataa")) |>
+      as.vector() |> unlist() |> any()
+
+    # Should I also consider an auto_fail threshold?
+    
+    #
+    #### Final Assessment ###
+    #
+    src_ref <- if(ref == "source") 'pkg_source' else 'pkg_cran_remote'
+    if(src_ref == "pkg_cran_remote") {
+      pkg_assessment <- init_pkg_assessment
+      pkg_scores <- init_pkg_scores
+      cat("\n-->", pkg_v, "used initial 'pkg_cran_remote' assessment.\n")
+      exclude_met <- NULL
+    } else {
+      
+      # Setup 'pkg_source' reference
+      pkg_ref <- riskmetric::pkg_ref(file.path(sourced, pkg), source = "pkg_source")
+      cat("\n-->", pkg_v,"referrenced w/ 'pkg_source'.\n")
+      
+      # Pull available {riskmetric} assessments
+      assess_metrics <- riskmetric::all_assessments()
+      
+      if (auto_accepted) {
+        # Run assessment WITHOUT "covr_coverage"!
+        cat("\n-->", pkg_v, "auto-accepted. Will compile final 'pkg_source' assessment w/o 'covr_coverage' metric to save compute time.\n")
+        assess_metrics$assess_covr_coverage <- NULL
+        exclude_met <- "covr_coverage"
+        
+      } else {
+        # Run assessment WITH "covr_coverage"
+        cat("\n-->", pkg_v, "was NOT auto-accepted. Will compile final 'pkg_source' assessment, including 'covr_coverage' metric.\n")
+        exclude_met <- NULL
+      }
+    }
+    
+    pkg_assessment0 <- pkg_ref |>
+      # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
+      riskmetric::pkg_assess(assessments = assess_metrics)
     
     # strip assessment of '.recording' attribute:
     pkg_assessment <-  pkg_assessment0 |> 
@@ -248,6 +332,12 @@ val_pkg <- function(
     
     pkg_scores <- riskmetric::pkg_score(pkg_assessment)
     
+    # Clean up any new folders created in the working directory that end in '-tests'
+    # this is an unfortunate by-produce of riskmetric's processes
+    wd_dirs <- list.dirs(getwd(),recursive = FALSE)
+    # Find which dirs end in "-test"
+    pkg_test_dir <- wd_dirs[grepl("-tests$", wd_dirs)]
+    unlink(pkg_test_dir, recursive = TRUE, force = TRUE)
     
     # check some stuff
     # object.size(pkg_assessment0) # 'askpass' 136,744 bytes
@@ -304,11 +394,15 @@ val_pkg <- function(
   #
   # ---- Save Assessment---- 
   #
+  
   assessment_file <- file.path(assessed, glue::glue("{pkg_v}_assessments.rds"))
   scores_file <- file.path(assessed, glue::glue("{pkg_v}_scores.rds"))
+  # pkg_assessment <- readRDS(assessment_file) # for debugging
+  # pkg_scores <- readRDS(scores_file) # for debugging
   saveRDS(pkg_assessment, assessment_file)
   saveRDS(pkg_scores, scores_file)
   cat("\n-->", pkg_v,"assessments & scores saved.\n")
+  
   
   
   #
@@ -337,14 +431,7 @@ val_pkg <- function(
     val_decision( 
       pkg = pkg,
       source = list(assessment = pkg_assessment, scores = pkg_scores), # include both
-      metrics = c( # Subset if desired
-        "covr_coverage", "downloads_1yr", "reverse_dependencies",
-        "dependencies", "has_vignettes", "has_source_control",
-        "has_website", "has_news", "news_current", "bugs_status",
-        "remote_checks", "r_cmd_check", "exported_namespace",
-        "export_help", "has_maintainer", "size_codebase",
-        "has_bug_reports_url", "has_examples", "license"
-      ),
+      excl_metrics = exclude_met, # Subset if desired
       decisions = decisions,
       else_cat = decisions[length(decisions)],
       decisions_df = build_decisions_df(rule_type = "decide")
