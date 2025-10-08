@@ -2,7 +2,7 @@
 % Please edit documentation in R/val_pkg.R
 \name{val_pkg}
 \alias{val_pkg}
-\title{Package Validation}
+\title{Validation: Assess a Package}
 \usage{
 val_pkg(
   pkg,
@@ -14,6 +14,30 @@ val_pkg(
   val_date = Sys.Date()
 )
 }
+\arguments{
+\item{pkg}{Character(1). Name of package to validate.}
+
+\item{ver}{Character(1). Version of package to validate.}
+
+\item{avail_pkgs}{Data frame. Output of \code{available.packages()}.}
+
+\item{ref}{Character(1). Either "source" or "remote". Indicates whether to
+download the package source from CRAN (or other repo) or to install the
+package directly from the repo.}
+
+\item{metric_pkg}{Character(1). Either "riskmetric", "val.meter", or
+"risk.assessr" indicating which package to use for the assessment.}
+
+\item{out_dir}{Character(1). Directory to store outputs.}
+
+\item{val_date}{Date. Date of validation. Default is current date.}
+}
+\value{
+A list containing package metadata, assessment results, and
+decisions.
+}
 \description{
-Validation process at the package level. Includes steps...
+Validation process at the package level. Includes steps to download the
+package source (if desired), install the package, assess the package using
+the specified metric package, apply risk decisions, and build a report.
 }

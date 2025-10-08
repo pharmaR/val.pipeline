@@ -2,7 +2,7 @@
 % Please edit documentation in R/val_build.R
 \name{val_build}
 \alias{val_build}
-\title{Build Validation}
+\title{Validation: Build an Assessment Co-hort}
 \usage{
 val_build(
   pkg_names = NULL,
@@ -13,7 +13,7 @@ val_build(
   val_date = Sys.Date(),
   out = "riskassessment",
   replace = FALSE,
-  opt_repos = c(val_build_repo = "https://cran.r-project.org")
+  opt_repos = c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()))
 )
 }
 \arguments{
@@ -64,5 +64,9 @@ sources (CRAN / Bioconductor / GitHub), with the ability to include
 structured directory. The cherry on top is that this build will use logic
 from val_filter() to not only apply risk decisions too all packages assessed,
 but goes back around and will re-categorize (invalidated) decisions based on
-whether any dependencies were categorized as "High Risk" / "Rejected".
+whether any dependencies were categorized as "High Risk" / "Rejected". After
+the pipeline applies a decision onto each package using criteria provided in
+a config file, it even generates a report detailing specifics of the
+assessment as supporting evidence. The end result is a directory containing
+the assessment results and reports for each package evaluated.
 }

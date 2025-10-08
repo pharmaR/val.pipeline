@@ -1,5 +1,5 @@
 
-#' Build Validation
+#' Validation: Build an Assessment Co-hort
 #'
 #' Build a risk assessment validation for a set of R packages from various
 #' sources (CRAN / Bioconductor / GitHub), with the ability to include
@@ -7,7 +7,11 @@
 #' structured directory. The cherry on top is that this build will use logic
 #' from val_filter() to not only apply risk decisions too all packages assessed,
 #' but goes back around and will re-categorize (invalidated) decisions based on
-#' whether any dependencies were categorized as "High Risk" / "Rejected".
+#' whether any dependencies were categorized as "High Risk" / "Rejected". After
+#' the pipeline applies a decision onto each package using criteria provided in
+#' a config file, it even generates a report detailing specifics of the
+#' assessment as supporting evidence. The end result is a directory containing
+#' the assessment results and reports for each package evaluated.
 #'
 #' @param pkg_names Character vector of package names to assess. If NULL
 #'   (default), all packages available from the specified repository will be
@@ -47,7 +51,6 @@
 #'   including their dependencies and final risk decisions.
 #'
 #' @export
-#'
 #' 
 val_build <- function(
     pkg_names = NULL, #
@@ -58,8 +61,26 @@ val_build <- function(
     val_date = Sys.Date(),
     out = 'riskassessment',
     replace = FALSE,
-    opt_repos = c(val_build_repo = "https://cran.r-project.org")
+    opt_repos = c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()))
     ){
+  
+  #
+  # Quick Param Run
+  #
+  # ref = "source" # default
+  # # ref = "remote",
+  # metric_pkg = "riskmetric" # default
+  # # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+  # # deps = c("depends", "suggests")
+  # deps = "depends"  # default
+  # # deps = NULL
+  # # deps_recursive = FALSE
+  # deps_recursive = TRUE # default
+  # val_date = Sys.Date() # Sys.Date() # is  default
+  # replace = FALSE # default
+  # # replace = TRUE
+  # out = 'dev/riskassessments'
+  # opt_repos = opt_repos
   
   # Assess args
   if(!metric_pkg %in% c('risk.assessr', 'riskmetric')) stop("'metric_pkg' arg must be either 'riskmetric' or 'risk.assessr' but '", metric_pkg, "' was given.")
@@ -93,7 +114,7 @@ val_build <- function(
   
   
   #
-  # ---- Which pkgs ----
+  # ---- Which pkgs, ordered ----
   #
   # Make available.packages into a data.frame
   avail_pkgs <- available.packages() |> as.data.frame()
@@ -135,10 +156,6 @@ val_build <- function(
       # assessment on those pkgs first! Why? Because if it fails, then we
       # can avoid running assessments on pkgs that depend on it.
       pkg_freqs <- dep_tree |> unlist(use.names = FALSE) |> table()
-        # pkg_freqs |> min()
-        # pkg_freqs |> max()
-        # pkg_freqs[pkg_freqs >= 15] |> sort()
-        # pkg_freqs |> sort()
       
       avail_pkgs <- avail_pkgs |>
         dplyr::mutate(dep_freq = pkg_freqs[Package]) |>
@@ -158,7 +175,6 @@ val_build <- function(
     pkgs <-
       avail_pkgs |>
       dplyr::filter(Package %in% full_dep_tree) |>
-      # dplyr::filter(Package != "withr") |>
       dplyr::pull(Package)
   }
   vers <- avail_pkgs |>
@@ -166,6 +182,7 @@ val_build <- function(
     dplyr::pull(Version)
   pkgs_length <- length(pkgs)
   cat("\n-->", pkgs_length, "package(s) to process.\n\n")
+  
   
   # Prompt the user to confirm they want to continue when assessing a lot of pkgs
   if(interactive() & pkgs_length >= 10) {
@@ -390,46 +407,6 @@ val_build <- function(
     pkgs_df <<- reject_iteration(pkgs_df, dec_reject, failed)
   }
   
-  # Old co-pilot solution... doesn't seem to work
-  #
-  # # pkgs_df0$decision[1] <- "High"
-  # # pkgs_df0$decision[2] <- "High"
-  # pkgs_df <- pkgs_df0 |>
-  #   dplyr::mutate(
-  #     
-  #     final_decision = dplyr::case_when(
-  #       decision != decisions[1] ~ decision, # if not "Low", then keep the decision
-  #       purrr::map_lgl(depends, ~ any(.x %in% pkgs_df0$pkg[pkgs_df0$decision != decisions[1]])) ~ 
-  #         # if any of the dependencies are NOT "Low", then change to the highest risk of those dependencies
-  #         pkgs_df0$decision[match(
-  #           purrr::map(depends, ~ .x[.x %in% pkgs_df0$pkg[pkgs_df0$decision != decisions[1]]]) |> 
-  #             purrr::list_flatten() |> unique(),
-  #           pkgs_df0$pkg
-  #         )] |> 
-  #           unique() |> 
-  #           # get the highest risk (last in decisions list)
-  #           decisions[max(match(., decisions))],
-  #       purrr::map_lgl(suggests, ~ any(.x %in% pkgs_df0$pkg[pkgs_df0$decision != decisions[1]])) ~ 
-  #         # if any of the suggests are NOT "Low", then change to the highest risk of those suggests
-  #         pkgs_df0$decision[match(
-  #           purrr::map(suggests, ~ .x[.x %in% pkgs_df0$pkg[pkgs_df0$decision != decisions[1]]]) |> 
-  #             purrr::list_flatten() |> unique(),
-  #           pkgs_df0$pkg
-  #         )] |> 
-  #           unique() |> 
-  #           # get the highest risk (last in decisions list)
-  #           decisions[max(match(., decisions))],
-  #       .default = decision # otherwise, keep the original decision
-  #       
-  #     ),
-  #     # if final_decision is different than decision, then mark decision reason as "Dependency"
-  #     decision_reason = dplyr::case_when(
-  #       final_decision != decision ~ "Dependency",
-  #       .default = decision_reason
-  #     )
-  #   )
-  #   # pkgs_df0$depends[2] |> unlist()
-  
   cat("\n--> Assigned 'final' decisions.\n")
   
   
@@ -479,6 +456,5 @@ val_build <- function(
   ))
 }
 
-# val_build(pkg_names = c('aamatch'), deps = NULL)
-# val_build(pkg_names = c('zoo'), deps = NULL)
-# val_build('zoo')
+
+

@@ -1,11 +1,31 @@
-#' Package Validation
+
+#' Validation: Assess a Package
 #'
-#' Validation process at the package level. Includes steps...
-#' 
+#' Validation process at the package level. Includes steps to download the
+#' package source (if desired), install the package, assess the package using
+#' the specified metric package, apply risk decisions, and build a report.
+#'
+#' @param pkg Character(1). Name of package to validate.
+#' @param ver Character(1). Version of package to validate.
+#' @param avail_pkgs Data frame. Output of `available.packages()`.
+#' @param ref Character(1). Either "source" or "remote". Indicates whether to
+#'   download the package source from CRAN (or other repo) or to install the
+#'   package directly from the repo.
+#' @param metric_pkg Character(1). Either "riskmetric", "val.meter", or
+#'   "risk.assessr" indicating which package to use for the assessment.
+#' @param out_dir Character(1). Directory to store outputs.
+#' @param val_date Date. Date of validation. Default is current date.
+#'
 #' @importFrom glue glue
 #' @importFrom utils download.file untar
-#' @importFrom riskmetric pkg_ref pkg_assess
-#' @importFrom riskreports package_report
+#' @importFrom riskmetric pkg_ref pkg_assess pkg_score all_assessments
+#' @importFrom riskreports package_report 
+#' @importFrom dplyr filter pull select arrange as_tibble
+#' @importFrom tools package_dependencies
+#'
+#' @return A list containing package metadata, assessment results, and
+#'   decisions.
+#' @export
 #' 
 val_pkg <- function(
     pkg,
@@ -70,40 +90,6 @@ val_pkg <- function(
     tar_file <- file.path(tarballs, glue::glue("{pkg_v}.tar.gz"))
     utils::untar(tar_file, exdir = sourced)
     cat("\n-->", pkg_v,"untarred.\n")
-    
-    #
-    # ---- Grab Dependencies (using archive)
-    #
-      # Not being used...
-      
-      # if(file.exists(tar_file)) {
-      #   arch <- archive::archive(file.path(tarballs, glue::glue("{pkg_v}.tar.gz"))) |>
-      #     dplyr::arrange(tolower(path))
-      # }
-      
-      # if (file.exists(tar_file)) {
-      #   desc_file <- glue::glue("{pkg}/DESCRIPTION")
-      #   
-      #   tar_con <- archive::archive_read(tar_file, desc_file, format = "tar")
-      #   on.exit(close(tar_con))
-      #   
-      #   desc_con <- desc::description$new(text = readLines(tar_con))
-      #   if ('Suggests' %in% desc_con$fields()) {
-      #     sug_vctr <- desc_con$get_list(key = 'Suggests') %>% sort()
-      #   } else {
-      #     msg <- paste("Suggests not found for package", pkg)
-      #     rlang::warn(msg)
-      #     sug_vctr <- character(0)
-      #   }
-      # } else {
-      #   sug_vctr <- unlist(
-      #     tools::package_dependencies(
-      #       packages = pkg,
-      #       db = meta,
-      #       which=c("Suggests"),
-      #       recursive=FALSE)) |>
-      #     unname() |> sort()
-      # }
   }
   
   #
@@ -113,14 +99,6 @@ val_pkg <- function(
   # pkg_base <- avail_pkgs |> dplyr::filter(Package %in% pkg)
   
   # grab depends
-    # old way
-    # depends_base <- pkg_base |>
-    #   unite(pkg_deps, c(Depends, Imports, LinkingTo), sep = ", ", na.rm = TRUE) |>
-    #   dplyr::pull(pkg_deps)
-    # depends0 <- strsplit(depends_base, split = ", ")[[1]]
-    # depends <- avail_pkgs |>
-    #   dplyr::filter(Package %in% stringr::word(depends0, 1)) |>
-    #   dplyr::pull(Package)
   depends <- 
     tools::package_dependencies(
       packages = pkg,
@@ -131,12 +109,6 @@ val_pkg <- function(
     unlist(use.names = FALSE) 
   
   # grab suggests
-    # old way
-    # suggests_base <- pkg_base |> dplyr::pull(Suggests)
-    # suggests0 <- strsplit(suggests_base, split = ", ")[[1]]
-    # suggests <- avail_pkgs |>
-    #   dplyr::filter(Package %in% stringr::word(suggests0, 1)) |>
-    #   dplyr::pull(Package)
   suggests <- 
     tools::package_dependencies(
       packages = pkg,
@@ -356,16 +328,6 @@ val_pkg <- function(
       unlink(pkg_test_dir, recursive = TRUE, force = TRUE)
     }
     
-
-    # check some stuff
-    # object.size(pkg_assessment0) # 'askpass' 136,744 bytes
-    # object.size(pkg_assessment) # 'askpass' 20,896 bytes
-    # inherits(pkg_assessment, "list_of_pkg_metric") # works
-    # class(pkg_assessment)
-    # names(pkg_assessment)
-    # attr(pkg_assessment$covr_coverage, "label")
-    # pkg_assessment$covr_coverage |> names()
-    # pkg_assessment$covr_coverage$totalcoverage
   
   #
   #### risk.assessr ####
@@ -426,8 +388,6 @@ val_pkg <- function(
   #
   # ---- Apply Decisions ----
   #
-  #
-  
   
   cat("\n--> Making a risk decision for", pkg_v,"...\n\n")
   
@@ -454,10 +414,7 @@ val_pkg <- function(
       else_cat = decisions[length(decisions)],
       decisions_df = build_decisions_df(rule_type = "decide")
     )
-  # Update clean_install based on assessment
-  
-  # decision <- sample(c(rep("Low Risk",6), rep("Medium Risk", 3), "High Risk"), 1)
-  # decision_reason = "Decision randomly selected"
+
   
   #
   # ---- Build Report ----
