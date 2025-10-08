@@ -87,8 +87,9 @@ val_build <- function(
     options(repos = opt_repos) # , rlang_interactive = FALSE
   }
   
-  # Pull in the decisions list
+  # Pull in some config variables
   decisions <- pull_config(val = "decisions_lst", rule_type = "default")
+  remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
   
   
   #
@@ -157,7 +158,7 @@ val_build <- function(
     pkgs <-
       avail_pkgs |>
       dplyr::filter(Package %in% full_dep_tree) |>
-      dplyr::filter(Package != "withr") |>
+      # dplyr::filter(Package != "withr") |>
       dplyr::pull(Package)
   }
   vers <- avail_pkgs |>
@@ -195,16 +196,18 @@ val_build <- function(
   # Initiate a list to store pkgs that include the reverse dependencies of pkgs
   # that have failed
   dont_run <- character(0)
-  # pkgs[1:9] # for debugging
+  
   
   # Start bundling
   pkg_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
     
-    # i <- 2 # for debugging
-    # pkg <- pkgs[i] # for debugging
-    # ver <- vers[i] # for debugging
-    # pkg <- "withr" # for debugging
-    # ver <- "3.0.2" # for debugging
+    # i <- 1 # for debugging
+    # i <- which(pkgs == "class")
+    # pkg <- pkgs[i + 1] # for debugging
+    # ver <- vers[i + 1] # for debugging
+    # pkg <- "class" # for debugging
+    # ver <- "7.3-23" # for debugging
+    
     pkg_v <- paste(pkg, ver, sep = "_")
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
     
@@ -218,7 +221,7 @@ val_build <- function(
           pkg = pkg,
           ver = ver,
           avail_pkgs = avail_pkgs,
-          ref = ref,
+          ref = if(pkg %in% remote_pkgs) 'remote' else ref,
           metric_pkg = metric_pkg,
           out_dir = val_dir,
           val_date = val_date)

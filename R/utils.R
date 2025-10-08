@@ -164,6 +164,9 @@ pull_config <- function(
     return(configgy)
   }
   
+  # 
+  # ---- Pull ----
+  #
   fig_names <- names(configgy)
   decisions_pos <- which(fig_names == "decisions_lst")[1] # grab first time 'decisions_lst' shows up
   default_names <- fig_names[1:decisions_pos] 
@@ -175,6 +178,9 @@ pull_config <- function(
   decision_lst <- default_lst[["decisions_lst"]]
   rule_lst <- configgy[rule_names]
   
+  # 
+  # ---- Verify ----
+  #
   # Verify that conditions (conds) are valid - aka, they only declared
   # decision categories (in `decision_list`). Else, we have to drop that rule
   rule_metric_nm <- names(rule_lst)
@@ -259,7 +265,7 @@ build_decisions_df <- function(
   ) {
   
   if (is.null(rule_lst)) {
-    cat(glue::glue("\n\nBuilding decision data.frame using rules from '{rule_type}' decision type.\n"))
+    cat(glue::glue("-->\n\nBuilding decision data.frame using rules from '{rule_type}' decision type.\n"))
     
     figgy <- pull_config(rule_type = rule_type)
     decision_lst <- figgy$default_lst$decisions_lst

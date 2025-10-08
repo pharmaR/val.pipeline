@@ -72,7 +72,7 @@ val_decision <- function(
   # covr_coverage
   if("covr_coverage" %in% decisions_df$metric &
      "covr_coverage" %in% names(assessment)) {
-    if(!is.na(assessment$covr_coverage)) {
+    if(!any(is.na(assessment$covr_coverage))) {
       pkgs_df$covr_coverage <- if(is.null(assessment$covr_coverage$totalcoverage)) NA_real_ else as.numeric(assessment$covr_coverage$totalcoverage)
     } else {
       decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "covr_coverage"))
@@ -251,10 +251,7 @@ val_decision <- function(
   } else {
     decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "license"))
   }
-  
-  cat("\n\n--> Using the 'rule sets' for the following metrics:\n")
-  cat("\n---->", paste(decisions_df$metric |> unique(), collapse = '\n----> '), "\n")
-  
+
   
   #
   # ---- Apply Decisions ----
@@ -269,7 +266,8 @@ val_decision <- function(
   
   # Share a note
   prime_met_len <- primary_metrics$metric |> unique() |> length()
-  cat(glue::glue("\n\n> Applying Decisions Categories for {prime_met_len} 'Primary' risk metric(s).\n\n"))
+  cat(glue::glue("\n\n--> Applying Decisions Categories for {prime_met_len} 'Primary' risk metric(s).\n\n"))
+  cat("\n---->", paste(primary_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
   
   # else_cat <- "High" # for debugging
   
@@ -334,7 +332,8 @@ val_decision <- function(
     
     if(nrow(secondary_metrics > 0)){
       
-      cat(glue::glue("\n\n> Applying Decisions Categories to {sec_met_len} 'Exception' risk metric(s).\n\n"))
+      cat(glue::glue("\n\n--> Applying Decisions Categories to {sec_met_len} 'Exception' risk metric(s).\n\n"))
+      cat("\n---->", paste(secondary_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
       
       
       # Create metric-based risk categories decision columns
@@ -655,9 +654,7 @@ val_categorize <- function(
   # In the future, we'd like to use {val.filter} here to get our subset.
   # We'd also like to be able to extract the filtering logic as needed
   
-  
-  cat("\n\n--> Building decision data.frame using the 'rule sets' for the following metrics:\n")
-  cat("\n---->", paste(decisions_df$metric |> unique(), collapse = '\n----> '), "\n")
+
   
   
   #
@@ -673,7 +670,8 @@ val_categorize <- function(
   
   # Share a note
   prime_met_len <- primary_metrics$metric |> unique() |> length()
-  cat(glue::glue("\n\n> Applying Decisions Categories for {prime_met_len} 'Primary' risk metric(s).\n\n"))
+  cat(glue::glue("\n\n--> Applying Decisions Categories for {prime_met_len} 'Primary' risk metric(s).\n\n"))
+  cat("\n---->", paste(primary_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
   
   # Create metric-based risk categories decision columns
   pkgs_primed <- rip_cats(
@@ -697,7 +695,7 @@ val_categorize <- function(
   if(nrow(exception_metrics > 0)){
     
     cat(glue::glue("\n\n> Applying Decisions Categories to {exc_met_len} 'Exception' risk metric(s).\n\n"))
-    
+    cat("\n---->", paste(exception_metrics$metric |> unique(), collapse = '\n----> '), "\n")
     
     # Create metric-based risk categories decision columns
     # rm(pkgs_final)

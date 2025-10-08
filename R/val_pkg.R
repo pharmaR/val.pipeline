@@ -250,11 +250,28 @@ val_pkg <- function(
     init_pkg_ref <- riskmetric::pkg_ref(pkg, source = "pkg_cran_remote")
     cat("\n-->", pkg_v, "initial reference complete.\n")
     
+    # Pull available {riskmetric} assessments
+    init_metrics <- riskmetric::all_assessments()
+    
+    # if it's a 'remote_only' pkg, and we only want to assess primary metrics,
+    # then we could do that here (below). For now, we'll leave it all since
+    # we'll want a report that is the most populated as possible
+    # remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
+    # if(pkg %in% remote_pkgs) {
+    #   # pull primary metrics only
+    #   prime_metrics <- build_decisions_df(rule_type = "decide") |>
+    #     dplyr::filter(tolower(metric_type) == "primary") |>
+    #     dplyr::pull(metric) |>
+    #     unique() %>%
+    #     paste("assess", ., sep = "_")
+    #   init_metrics <- init_metrics[names(init_metrics) %in% prime_metrics] 
+    # }
+    
     # rm(pkg_assessment0)
     init_pkg_assessment0 <-
       init_pkg_ref |>
       # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
-      riskmetric::pkg_assess()
+      riskmetric::pkg_assess(assessments = init_metrics)
     
     # strip assessment of '.recording' attribute:
     init_pkg_assessment <-
@@ -266,8 +283,8 @@ val_pkg <- function(
     init_assessed_end <- Sys.time()
     init_ass_mins <- difftime(init_assessed_end, start, units = "mins")
     init_ass_mins_txt <- capture.output(init_assessed_end - start)
-    cat("\n-->", pkg_v,"initial assessment complete.\n")
-    cat("--> (", init_ass_mins_txt, ")\n")
+    cat("\n-->", pkg_v, "initial assessment complete.\n")
+    cat("----> (", init_ass_mins_txt, ")\n")
     
     # 
     #### Initial Decision
@@ -320,25 +337,26 @@ val_pkg <- function(
         cat("\n-->", pkg_v, "was NOT auto-accepted. Will compile final 'pkg_source' assessment, including 'covr_coverage' metric.\n")
         exclude_met <- NULL
       }
+      
+      pkg_assessment0 <- pkg_ref |>
+        # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
+        riskmetric::pkg_assess(assessments = assess_metrics)
+      
+      # strip assessment of '.recording' attribute:
+      pkg_assessment <-  pkg_assessment0 |> 
+        strip_recording()
+      
+      pkg_scores <- riskmetric::pkg_score(pkg_assessment)
+      
+      # Clean up any new folders created in the working directory that end in '-tests'
+      # this is an unfortunate by-produce of riskmetric's processes
+      wd_dirs <- list.dirs(getwd(),recursive = FALSE)
+      # Find which dirs end in "-test"
+      pkg_test_dir <- wd_dirs[grepl("-tests$", wd_dirs)]
+      unlink(pkg_test_dir, recursive = TRUE, force = TRUE)
     }
     
-    pkg_assessment0 <- pkg_ref |>
-      # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
-      riskmetric::pkg_assess(assessments = assess_metrics)
-    
-    # strip assessment of '.recording' attribute:
-    pkg_assessment <-  pkg_assessment0 |> 
-      strip_recording()
-    
-    pkg_scores <- riskmetric::pkg_score(pkg_assessment)
-    
-    # Clean up any new folders created in the working directory that end in '-tests'
-    # this is an unfortunate by-produce of riskmetric's processes
-    wd_dirs <- list.dirs(getwd(),recursive = FALSE)
-    # Find which dirs end in "-test"
-    pkg_test_dir <- wd_dirs[grepl("-tests$", wd_dirs)]
-    unlink(pkg_test_dir, recursive = TRUE, force = TRUE)
-    
+
     # check some stuff
     # object.size(pkg_assessment0) # 'askpass' 136,744 bytes
     # object.size(pkg_assessment) # 'askpass' 20,896 bytes
@@ -386,7 +404,7 @@ val_pkg <- function(
   ass_mins <- difftime(assessed_end, start, units = "mins")
   ass_mins_txt <- capture.output(assessed_end - start)
   cat("\n-->", pkg_v,"assessed.\n")
-  cat("--> (", ass_mins_txt, ")\n")
+  cat("----> (", ass_mins_txt, ")\n")
   
   
   
