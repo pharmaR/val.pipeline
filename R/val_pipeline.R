@@ -203,7 +203,8 @@ val_pipeline <- function(
   qual <- outtie$pkgs_df
   
   # nrow(qual)
-  # saveRDS(qual, file.path(outtie$val_dir, paste0("qual_evidence_", val_date_txt, ".rds")))
+  saveRDS(qual, file.path(outtie$val_dir, paste0("qual_evidence_", val_date_txt, ".rds")))
+  
   
   # # Inspect the assessment dir
   # # valdate <- gsub("-", "", Sys.Date())
@@ -240,13 +241,13 @@ val_pipeline <- function(
   # ---- Wrap up ----
   #
   # determine qualified pkgs to provision for PPM
-  qualified <- assessed |>
-    dplyr::filter(final_decision == decisions[1])
+  # qualified <- assessed |>
+  #   dplyr::filter(final_decision == decisions[1])
   
   # Store as pins board?
   # How to Provision PPM metadata for all pkgs
 
- return(qualified)
+ return(qual)
 }
 
 

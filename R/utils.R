@@ -265,7 +265,7 @@ build_decisions_df <- function(
   ) {
   
   if (is.null(rule_lst)) {
-    cat(glue::glue("-->\n\nBuilding decision data.frame using rules from '{rule_type}' decision type.\n"))
+    cat(glue::glue("\n\n--> Building decision data.frame using rules from '{rule_type}' decision type.\n"))
     
     figgy <- pull_config(rule_type = rule_type)
     decision_lst <- figgy$default_lst$decisions_lst

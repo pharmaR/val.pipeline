@@ -252,7 +252,7 @@ val_build <- function(
       # if a pkg fails, make sure it's reverse dependencies don't run an assessment
       # if(pkg == "sys") pkg_meta$decision = "Medium" # for debugging
       if(pkg_meta$decision != decisions[1]) {
-        cat(paste0("\n\n-->", pkg, " v", ver," was assessed with a '", pkg_meta$decision,"' risk. All packages that depend on it will also be marked as '", decisions[length(decisions)],"' risk.\n\n"))
+        cat(paste0("\n\n--> ", pkg, " v", ver," was assessed with a '", pkg_meta$decision,"' risk. All packages that depend on it will also be marked as '", decisions[length(decisions)],"' risk.\n\n"))
         dont_run <<- c(dont_run, pkg_meta$rev_deps) |> unique()
       }
       
