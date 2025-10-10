@@ -1,7 +1,7 @@
 # val.pipeline
 
-<!-- badges: start --> [![Lifecycle:
-experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+<!-- badges: start -->
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 <!-- badges: end -->
 
 ## Purpose
@@ -58,7 +58,7 @@ config <- system.file("config.yml", package = "val.pipeline")
 qualification_results <- val_pipeline(
   ref = "source",
   metric_pkg = "riskmetric", 
-  deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+  deps = "depends", # Note: this means --> c("Depends", "Imports", "LinkingTo")
   deps_recursive = TRUE,
   val_date = Sys.Date(),
   replace = FALSE, 
