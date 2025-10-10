@@ -8,7 +8,11 @@
 
 This is an experimental repository with the goal of bringing together a lot of
 the R Val Hub's tools under a single workflow to produce the outputs necessary
-to qualify R packages for a GxP system.
+to qualify R packages for a GxP system. Note: this repository exists to showcase
+"a way" to perform package validation. It is certainty not the only way, or
+even the recommended way. Every organization must perform their own due
+diligence to meet the documentation requirements imposed by regulatory
+authorities within their risk tolerances.
 
 ## Installation
 
@@ -45,6 +49,14 @@ onto each package using criteria provided in the config file, it generates a
 report detailing specifics of the assessment as supporting evidence. The end
 result is a directory containing the assessment results and reports for each
 package evaluated.
+
+The assessment process at the package level includes steps to download the
+package source (preferred), install the package, assess the package using the
+user-specified metric package (only `riskmetric` is supported currently),
+apply risk decisions, and build a report. Note: to save time during, every
+package will be assessed using a "pkg_cran_remote" reference initially to see if
+any primary metrics met the"auto-accept" threshold(s), if applicable. If they 
+did, then the running then computing 'covr_coverage' will be skipped.
 
 ## Usage
 

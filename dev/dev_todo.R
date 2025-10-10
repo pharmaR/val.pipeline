@@ -103,26 +103,41 @@
 # w_AA:         1:46;   57 pkgs --> 1:46; 57 pkgs
 # codetools-on: 0:51;   25 pkgs --> 2:37; 82 pkgs
 # after_bit:    14:40; 433 pkgs --> 17:17; 640 / 827 (77.4%); avg 1.6 mpp
+# remove_VGAM  
+# remove_shinyBS
 # 
+# All 828 packages processed; 345 of which were avoided due to a dependency failing it's risk assessment.
+
+
+
+#
+# ---- Dev ----
+#
+val_date <- "2025-10-07"
 val_dir <- file.path('dev/riskassessments', paste0("R_", getRversion()), gsub("-","",val_date))
 reports <- list.files(file.path(val_dir, "reports"))
 reports |> length()
-any(stringr::str_detect(reports, "bit"))
+# any(stringr::str_detect(reports, "bit"))
+
+
 
 source("dev/pkg_lists.R")
-which(pkgs == "codetools")
-which(pkgs == "bit")
+# which(pkgs == "codetools")
+# which(pkgs == "bit")
 
-# last left off:
+# chk_pkg <- "VGAM"
+chk_pkg <- "xlsx"
+which(pkgs == chk_pkg)
 assessed <- list.files(file.path(val_dir, "assessed"))
-any(stringr::str_detect(assessed, "VGAM")) # not there
+any(stringr::str_detect(assessed, chk_pkg)) # not there
 
-pack <- pkgs[which(pkgs == "VGAM") + 1]
+# What's next?
+pack <- pkgs[which(pkgs == chk_pkg) + 1]
 pack
 
 
 #
-# val_pipeline()
+# ---- val_pipeline() ----
 #
 qual <- val_pipeline(
     ref = "source",
@@ -137,8 +152,9 @@ qual <- val_pipeline(
   
 
 #
-# val_build()
+# ---- val_build()----
 #
+
 # See the full dependency tree before running val_build()
 # these_pkgs <- "withr"  # messes with the entire process
 # these_pkgs <- "matrix" # takes 5 mins to install
@@ -185,9 +201,13 @@ outtie <- val_build(
   out = 'dev/riskassessments'
 ) 
 
+
+
+
 #
-# val_pkg()
+# ---- val_pkg() ----
 #
+
 remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
 avail_pkgs <- available.packages() |> as.data.frame()
 val_date <- Sys.Date()
@@ -198,9 +218,9 @@ reports |> length()
 any(stringr::str_detect(reports, "spacesXYZ"))
 
 
-#
-# Select one package
-#
+source("dev/pkg_lists.R")
+
+
 # pack = 'rlang'
 # pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
 # pack = 'withr'

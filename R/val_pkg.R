@@ -2,8 +2,12 @@
 #' Validation: Assess a Package
 #'
 #' Validation process at the package level. Includes steps to download the
-#' package source (if desired), install the package, assess the package using
-#' the specified metric package, apply risk decisions, and build a report.
+#' package source (preferred), install the package, assess the package using the
+#' user-specified metric package (only `riskmetric` is supported currently),
+#' apply risk decisions, and build a report. Note: to save time during, every
+#' package will be assessed using a "pkg_cran_remote" reference initially to see
+#' if any primary metrics met the "auto-accept" threshold(s), if applicable. If
+#' they did, then the running then computing 'covr_coverage' will be skipped.
 #'
 #' @param pkg Character(1). Name of package to validate.
 #' @param ver Character(1). Version of package to validate.
@@ -19,7 +23,7 @@
 #' @importFrom glue glue
 #' @importFrom utils download.file untar
 #' @importFrom riskmetric pkg_ref pkg_assess pkg_score all_assessments
-#' @importFrom riskreports package_report 
+#' @importFrom riskreports package_report
 #' @importFrom dplyr filter pull select arrange as_tibble
 #' @importFrom tools package_dependencies
 #'
