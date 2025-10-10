@@ -31,10 +31,10 @@
 #' @export
 #' 
 val_pipeline <- function(
-  ref = c("source", "remote")[1],
+  ref = c("source", "remote"),
   metric_pkg = "riskmetric", 
   # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
-  deps = c("depends", "suggests")[1], 
+  deps = c("depends", "suggests"), 
   deps_recursive = TRUE,
   val_date = Sys.Date(),
   replace = FALSE, 
@@ -46,7 +46,8 @@ val_pipeline <- function(
 
   # Assess args
   if(!metric_pkg %in% c('risk.assessr', 'riskmetric')) stop("'metric_pkg' arg must be either 'riskmetric' or 'risk.assessr' but '", metric_pkg, "' was given.")
-  if(!ref %in% c('source', 'remote')) stop("'ref' arg must be either 'source' or 'remote' but '", ref, "' was given.")
+  ref <- match.arg(ref)
+  deps <- match.arg(deps)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
 
   # Since running this script is such a computationally intensive process, the

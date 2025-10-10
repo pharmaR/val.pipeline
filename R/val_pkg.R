@@ -35,7 +35,7 @@ val_pkg <- function(
     pkg,
     ver,
     avail_pkgs,
-    ref = "source",
+    ref = c("source", "remote"),
     metric_pkg = "riskmetric",
     out_dir,
     val_date = Sys.Date()
@@ -46,7 +46,7 @@ val_pkg <- function(
   
   # assess args
   if(!metric_pkg %in% c('risk.assessr', 'riskmetric', 'val.meter')) stop("'metric_pkg' arg must be either 'riskmetric', 'val.meter', or 'risk.assessr' but '", metric_pkg, "' was given.")
-  if(!ref %in% c('source', 'remote')) stop("'ref' arg must be either 'source' or 'remote' but '", ref, "' was given.")
+  ref <- match.arg(ref)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
   
   pkg_v <- paste(pkg, ver, sep = "_")
