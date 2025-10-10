@@ -77,6 +77,7 @@ val_pkg <- function(
     # ---- Download Tarball ----
     #
     # JT: This is problematic because it ignore the repos set by the user. Maybe try using `remotes::download_version()`?
+    # JT: Actually since it is pulling current version, the base URL can be grabbed from available.packages()
     tarball_url <- paste0("https://cran.r-project.org/src/contrib/", pkg_v,".tar.gz")
     dwn_ld <- try(utils::download.file(tarball_url,
                                        file.path(tarballs, basename(tarball_url)), 
@@ -109,6 +110,7 @@ val_pkg <- function(
   depends <- 
     tools::package_dependencies(
       packages = pkg,
+      # JT: what about avail_pkgs
       db = available.packages(),
       which = c("Depends", "Imports", "LinkingTo"),
       recursive = TRUE
@@ -119,6 +121,7 @@ val_pkg <- function(
   suggests <- 
     tools::package_dependencies(
       packages = pkg,
+      # JT: what about avail_pkgs
       db = available.packages(),
       which = "Suggests",
       recursive = TRUE # this really blows up for almost any pkg
@@ -161,6 +164,7 @@ val_pkg <- function(
   # didn't install cleanly, but I shouldn't assume I'm doing this better than
   # the {riskmetric} team, and would rather rely on their logic
   
+  # JT: This is so gross
   clean_install <- if(is.null(inst_out) # & pkg %in% list.files(installed)
     ) TRUE else FALSE
   
