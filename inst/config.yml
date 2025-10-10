@@ -1,13 +1,14 @@
 default:
-  remote_only: [withr, VGAM]
+  remote_only: [withr, VGAM, shinyBS] # withr - crashes, VGAM took 10 hrs, shinyBS 5 hrs
   approved_pkgs: [dplyr] # packages that have been approved manually
   decisions_lst: [Low, Medium, High]
   opt_repos: 
-    CRAN: # !expr paste0("https://packagemanager.posit.co/cran/", Sys.Date())
-    BioC: https://bioconductor.org/packages/3.21/bioc
+    CRAN: !expr paste0("https://packagemanager.posit.co/cran/", Sys.Date())
+    BioC: # https://bioconductor.org/packages/3.21/bioc
   opt_repos_remote_reduce: 
-    CRAN: # !expr paste0("https://packagemanager.posit.co/cran/", "2025-10-01")
-    BioC: https://bioconductor.org/packages/3.21/bioc
+    CRAN: !expr paste0("https://packagemanager.posit.co/cran/", "2025-10-01") # Consult {riskscore}
+    BioC: # https://bioconductor.org/packages/3.21/bioc
+    
 remote_reduce:
   inherits: default
   downloads_1yr:
@@ -104,7 +105,7 @@ decide:
     accept_cats: [Low, Medium]
 
 
-# Okay! Not used:
+# Not used:
   # bugs_status
   # remote_checks
   # size_codebase

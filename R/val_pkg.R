@@ -92,9 +92,11 @@ val_pkg <- function(
     cat("\n-->", pkg_v,"untarred.\n")
   }
   
+  
   #
   # ---- Grab Dependencies ----
   #
+  
   # Grab deps: Depends, Imports, LinkingTo, Suggests
   # pkg_base <- avail_pkgs |> dplyr::filter(Package %in% pkg)
   
@@ -194,6 +196,8 @@ val_pkg <- function(
   #
   # ---- Assess ---- 
   #
+  
+  #
   #### riskmetric ####
   #
   if(metric_pkg == "riskmetric"){
@@ -258,9 +262,11 @@ val_pkg <- function(
     cat("\n-->", pkg_v, "initial assessment complete.\n")
     cat("----> (", init_ass_mins_txt, ")\n")
     
+    
     # 
     #### Initial Decision
     #
+    
     # pkg_assessment$downloads_1yr |> prettyNum(big.mark = ",")
     init_decision <- 
       val_decision( 
@@ -279,6 +285,7 @@ val_pkg <- function(
       as.vector() |> unlist() |> any()
 
     # Should I also consider an auto_fail threshold?
+    
     
     #
     #### Final Assessment ###
@@ -416,9 +423,11 @@ val_pkg <- function(
     )
 
   
+  
   #
   # ---- Build Report ----
   #
+  
   # file.edit(system.file("report/package/pkg_template.qmd", package = "riskreports"))
   options(riskreports_output_dir = reports)
   pr <- riskreports::package_report(
@@ -438,9 +447,11 @@ val_pkg <- function(
   
   cat("\n-->", pkg_v,"Report built.\n")
   
+  
   #
   # ---- Save Pkg Meta Bundle ---- 
   #
+  
   # Save a list of items beyond the assessment values
   meta_list <- list(
     pkg = pkg,
@@ -469,3 +480,5 @@ val_pkg <- function(
   
   return(meta_list)
 }
+
+

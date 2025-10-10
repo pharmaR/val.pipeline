@@ -39,7 +39,9 @@ val_pipeline <- function(
   val_date = Sys.Date(),
   replace = FALSE, 
   out = 'dev/riskassessments',
-  opt_repos = c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()))
+  opt_repos = 
+    c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()),
+      BioC = 'https://bioconductor.org/packages/3.21/bioc')
   ){
 
   # Assess args
@@ -54,11 +56,6 @@ val_pipeline <- function(
   
   
   
-  # filter packages > 20k here (on CRAN alone)
-  # Eventually using PACKAGES file
-  # For now, will use pkg_cran_remote to gain a
-  # High level summary of pkgs
-  # --> riskscore PR/ workbench job in progress
   
   # 
   # ---- Set System variables ----
@@ -86,18 +83,28 @@ val_pipeline <- function(
   decisions <- pull_config(val = "decisions_lst", rule_type = "default")
   
   
+  
   #
   # ---- Set repos option to risk scores date ----
   #
+  
+  # TO-DO: this should be moved inside val_categorize()
   old <- options()
   on.exit(function() options(old))
   options(repos = opt_repos_rr, pkgType = "source", scipen = 999) # , rlang_interactive = FALSE
   # options("repos") # verify
   
   
+  
   #
   # ---- val_categorize() ----
   #
+  
+  # filter packages 
+  # > 22k here (on CRAN alone). Eventually, want to use PACKAGES file here For
+  # now, will use pkg_cran_remote via {riskscore} to gain a  High level summary
+  # of pkgs
+  
   pre_filtered_pkg_metrics <- 
     val_categorize(
       source = "riskscore",
@@ -113,14 +120,16 @@ val_pipeline <- function(
   
   
   #
-  # ---- Set repos option to today's date ----
+  # ---- Set repos option to val_date date ----
   #
-  options(repos = opt_repos, pkgType = "source", scipen = 999) # , rlang_interactive = FALSE
+  
+  # to-do: right now it's pointing to Sys.Date() - need to point to val_date
+  options(repos = opt_repos, pkgType = "source", scipen = 999)
   # options("repos") # verify
   
   
   #
-  # ---- Reduce pkgs ----
+  # ---- Filter / Reduce pkgs ----
   #
   # Note: has to be decisions[1] ("Low") only because of the way we allowed
   # 'High' risk pkgs to get promoted to "Medium" in `pre_filtered_pkg_metrics`.
@@ -199,7 +208,7 @@ val_pipeline <- function(
   #
   # ---- Inspect outputs ----
   #
-  outtie$val_dir
+  
   qual <- outtie$pkgs_df
   
   # nrow(qual)

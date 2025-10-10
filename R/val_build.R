@@ -61,12 +61,15 @@ val_build <- function(
     val_date = Sys.Date(),
     out = 'riskassessment',
     replace = FALSE,
-    opt_repos = c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()))
+    opt_repos = 
+    c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()),
+      BioC = 'https://bioconductor.org/packages/3.21/bioc')
     ){
   
   #
   # Quick Param Run
   #
+  
   # ref = "source" # default
   # # ref = "remote",
   # metric_pkg = "riskmetric" # default
@@ -97,9 +100,11 @@ val_build <- function(
   val_date_txt <- gsub("-", "", val_date)
   cat(paste0("\n\n\nNew Validation build: R v", r_ver, " @ ", val_start_txt,"\n\n"))
   
+  
   #
   # ---- Setup ----
   #
+  
   old <- options()
   on.exit(function() options(old))
   if(ref == 'source') {
@@ -116,6 +121,7 @@ val_build <- function(
   #
   # ---- Which pkgs, ordered ----
   #
+  
   # Make available.packages into a data.frame
   avail_pkgs <- available.packages() |> as.data.frame()
   
@@ -191,9 +197,11 @@ val_build <- function(
     if(tolower(continue) == 'n') stop("User chose to stop the validation build.")
   }
   
+  
   #
   # ---- Define dirs ----
   #
+  
   r_dir <- file.path(out, glue::glue('R_{r_ver}'))
   val_dir <- file.path(r_dir, val_date_txt)
   assessed <- file.path(val_dir, 'assessed') # needed
@@ -222,8 +230,6 @@ val_build <- function(
     # i <- which(pkgs == "class")
     # pkg <- pkgs[i + 1] # for debugging
     # ver <- vers[i + 1] # for debugging
-    # pkg <- "class" # for debugging
-    # ver <- "7.3-23" # for debugging
     
     pkg_v <- paste(pkg, ver, sep = "_")
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
@@ -290,7 +296,6 @@ val_build <- function(
         clean_install = as.logical(NA),
         ref = NA_character_,
         metric_pkg = NA_character_,
-        # metrics = pkg_assessment, # saved separately for {riskreports}
         decision = decisions[length(decisions)],
         decision_reason = "Dependency",
         final_decision = decisions[length(decisions)],
