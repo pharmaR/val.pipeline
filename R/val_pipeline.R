@@ -67,7 +67,7 @@ val_pipeline <- function(
   val_start <- Sys.time()
   val_start_txt <- format(val_start, '%Y-%m-%d %H:%M:%S', tz = 'US/Eastern', usetz = TRUE)
   
-  val_date <-as.Date("2025-10-07") # hardcode for testing
+  # val_date <-as.Date("2025-10-07") # hardcode for testing
   # val_date <- as.Date(val_start)
   val_date_txt <- gsub("-", "", val_date)
   cat(paste0("\n\n\nValidation pipeline initiated: R v", r_ver, " @ ", val_start_txt,"\n\n"))

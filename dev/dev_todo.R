@@ -3,6 +3,14 @@
 # ---- TODO: ----
 #
 
+
+#
+# Notes to help onboard Jeff
+# 
+# - save assessments in a shared storage location
+#
+
+
 #
 # General tasks:
 #
