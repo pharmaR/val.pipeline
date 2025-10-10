@@ -34,6 +34,13 @@
 #   riskscore date differ
 # 
 # - opt_repos_remote_reduce should just be moved under the 'remote_reduce' config
+#
+# - isolate env that run's pkg-level assessment.
+#   - might slow down the process, but would avoid weirdness like with 'withr'
+#
+# - Create functionality to re-assess pkgs based on a final decision change for
+#   one or more pkgs
+
 
 
 #
@@ -96,6 +103,7 @@
 #
 # - Install latest (dev) version of quarto? Warning being thrown.
 # - Clean up the reports
+
 
 #
 # Tasks for some day, but not right now:
