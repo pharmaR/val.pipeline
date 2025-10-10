@@ -76,6 +76,7 @@ val_pkg <- function(
     #
     # ---- Download Tarball ----
     #
+    # JT: This is problematic because it ignore the repos set by the user. Maybe try using `remotes::download_version()`?
     tarball_url <- paste0("https://cran.r-project.org/src/contrib/", pkg_v,".tar.gz")
     dwn_ld <- try(utils::download.file(tarball_url,
                                        file.path(tarballs, basename(tarball_url)), 
