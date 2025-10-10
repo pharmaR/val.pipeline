@@ -3,8 +3,8 @@
     "Version": "4.5.1",
     "Repositories": [
       {
-        "Name": "CRAN",
-        "URL": "https://packagemanager.posit.co/cran/2025-10-07"
+        "Name": "BioC",
+        "URL": "https://bioconductor.org/packages/3.21/bioc"
       }
     ]
   },
@@ -376,7 +376,7 @@
       "Collate": "'AssertCollection.R' 'allMissing.R' 'anyInfinite.R' 'anyMissing.R' 'anyNaN.R' 'asInteger.R' 'assert.R' 'helper.R' 'makeExpectation.R' 'makeTest.R' 'makeAssertion.R' 'checkAccess.R' 'checkArray.R' 'checkAtomic.R' 'checkAtomicVector.R' 'checkCharacter.R' 'checkChoice.R' 'checkClass.R' 'checkComplex.R' 'checkCount.R' 'checkDataFrame.R' 'checkDataTable.R' 'checkDate.R' 'checkDirectoryExists.R' 'checkDisjunct.R' 'checkDouble.R' 'checkEnvironment.R' 'checkFALSE.R' 'checkFactor.R' 'checkFileExists.R' 'checkFlag.R' 'checkFormula.R' 'checkFunction.R' 'checkInt.R' 'checkInteger.R' 'checkIntegerish.R' 'checkList.R' 'checkLogical.R' 'checkMatrix.R' 'checkMultiClass.R' 'checkNamed.R' 'checkNames.R' 'checkNull.R' 'checkNumber.R' 'checkNumeric.R' 'checkOS.R' 'checkPOSIXct.R' 'checkPathForOutput.R' 'checkPermutation.R' 'checkR6.R' 'checkRaw.R' 'checkScalar.R' 'checkScalarNA.R' 'checkSetEqual.R' 'checkString.R' 'checkSubset.R' 'checkTRUE.R' 'checkTibble.R' 'checkVector.R' 'coalesce.R' 'isIntegerish.R' 'matchArg.R' 'qassert.R' 'qassertr.R' 'vname.R' 'wfwl.R' 'zzz.R'",
       "Author": "Michel Lang [cre, aut] (<https://orcid.org/0000-0001-9754-0393>), Bernd Bischl [ctb], Dénes Tóth [ctb] (<https://orcid.org/0000-0003-4262-3217>)",
       "Maintainer": "Michel Lang <michellang@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://cran.r-project.org"
     },
     "cli": {
       "Package": "cli",
@@ -2062,7 +2062,7 @@
       "NeedsCompilation": "yes",
       "Author": "Gábor Csárdi [aut, cre], Jim Hester [aut], Posit Software, PBC [cph, fnd] (ROR: <https://ror.org/03wc8by49>), Winston Chang [ctb] (R6, callr, processx), Ascent Digital Services [cph, fnd] (callr, processx), Hadley Wickham [ctb, cph] (cli, curl, pkgbuild, yaml), Jeroen Ooms [ctb] (curl, jsonlite), Maëlle Salmon [ctb] (desc, pkgsearch), Duncan Temple Lang [ctb] (jsonlite), Lloyd Hilaiel [cph] (jsonlite), Alec Wong [ctb] (keyring), Michel Berkelaar and lpSolve authors [ctb] (lpSolve), R Consortium [fnd] (pkgsearch), Jay Loden [ctb] (ps), Dave Daeschler [ctb] (ps), Giampaolo Rodola [ctb] (ps), Shawn Garbett [ctb] (yaml), Jeremy Stephens [ctb] (yaml), Kirill Simonov [ctb] (yaml), Yihui Xie [ctb] (yaml), Zhuoer Dong [ctb] (yaml), Jeffrey Horner [ctb] (yaml), Will Beasley [ctb] (yaml), Brendan O'Connor [ctb] (yaml), Gregory Warnes [ctb] (yaml), Michael Quinn [ctb] (yaml), Zhian Kamvar [ctb] (yaml), Charlie Gao [ctb] (yaml), Kuba Podgórski [ctb] (zip), Rich Geldreich [ctb] (zip)",
       "Maintainer": "Gábor Csárdi <csardi.gabor@gmail.com>",
-      "Repository": "CRAN"
+      "Repository": "https://cran.r-project.org"
     },
     "pillar": {
       "Package": "pillar",
@@ -3104,7 +3104,7 @@
     },
     "riskscore": {
       "Package": "riskscore",
-      "Version": "0.0.2",
+      "Version": "0.0.3",
       "Source": "GitHub",
       "Title": "A Catalog for `riskmetric` Results Across Public Repositories",
       "Authors@R": "c(  person(\"Aaron\", \"Clark\", , \"clark.aaronchris@gmail.com\", role = c(\"cre\", \"aut\"), comment = c(ORCID = \"0000-0002-0123-0970\")), person(family = \"R Validation Hub\", role = c(\"cph\", \"fnd\")) )",
@@ -3128,8 +3128,8 @@
       "RemoteHost": "api.github.com",
       "RemoteRepo": "riskscore",
       "RemoteUsername": "pharmar",
-      "RemoteRef": "dev",
-      "RemoteSha": "39727d21ade8d161109cb50d31536ff900873c19",
+      "RemoteRef": "main",
+      "RemoteSha": "f495f133d75af14a3180b21ca3ff8cf72f24a6cd",
       "NeedsCompilation": "no",
       "Author": "Aaron Clark [cre, aut] (ORCID: <https://orcid.org/0000-0002-0123-0970>), R Validation Hub [cph, fnd]",
       "Maintainer": "Aaron Clark <clark.aaronchris@gmail.com>"
