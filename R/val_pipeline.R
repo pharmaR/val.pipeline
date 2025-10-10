@@ -58,7 +58,7 @@ val_pipeline <- function(
   
   
   # 
-  # ---- Set System variables ----
+  # ---- Set time variables ----
   #
   # store R Version
   r_ver = getRversion()
@@ -85,7 +85,7 @@ val_pipeline <- function(
   
   
   #
-  # ---- Set repos option to risk scores date ----
+  # ---- Set "repos" option to riskscore run date ----
   #
   
   # TO-DO: this should be moved inside val_categorize()
@@ -100,7 +100,7 @@ val_pipeline <- function(
   # ---- val_categorize() ----
   #
   
-  # filter packages 
+  # "filter" packages 
   # > 22k here (on CRAN alone). Eventually, want to use PACKAGES file here For
   # now, will use pkg_cran_remote via {riskscore} to gain a  High level summary
   # of pkgs
@@ -250,7 +250,7 @@ val_pipeline <- function(
   # ---- Wrap up ----
   #
   # determine qualified pkgs to provision for PPM
-  # qualified <- assessed |>
+  # qualified <- qual |>
   #   dplyr::filter(final_decision == decisions[1])
   
   # Store as pins board?
