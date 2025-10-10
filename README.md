@@ -44,7 +44,12 @@ structured directory. The cherry on top is that this build will use logic
 from another exported function, `val_decision()` to not only apply org-specific 
 risk decisions too all packages assessed, but goes back around and will
 re-categorize (invalidated) decisions based on whether any dependencies were
-categorized as "High Risk" / "Rejected". After the pipeline applies a decision
+categorized as "High Risk" / "Rejected". It 
+also is intelligent enough to sort the list of packages to run those with the 
+most dependencies first, so that if a package fails, it doesn't waste anytime
+running it's reverse dependence. 
+
+After the pipeline applies a decision
 onto each package using criteria provided in the config file, it generates a
 report detailing specifics of the assessment as supporting evidence. The end
 result is a directory containing the assessment results and reports for each
