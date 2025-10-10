@@ -79,7 +79,6 @@ val_pipeline <- function(
   # For now, let's just filter using cranlogs to determine downloaded pkgs
   # opt_repos = c(val_build_repo = "https://cran.r-project.org") # put in config
   opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
-  # opt_repos_rr <- pull_config(val = "opt_repos_remote_reduce", rule_type = "default") |> unlist()
   decisions <- pull_config(val = "decisions_lst", rule_type = "default")
   
   
