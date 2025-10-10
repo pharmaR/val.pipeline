@@ -475,8 +475,8 @@ val_categorize <- function(
     requireNamespace("riskscore", quietly = TRUE)
     # Use "pkg_cran_remote" data from riskscore::cran_assessed_latest
     # remotes::install_github("pharmar/riskscore", force = TRUE,
-    #                         ref = "dev")
-    pv <- packageVersion("riskscore") # verify ‘v0.0.2.9001'
+    #                         ref = "main")
+    pv <- packageVersion("riskscore") # verify ‘v0.0.3'
     riskscore_run_date <- riskscore::assessed_latest$riskmetric_run_date |> unique()
     cat(paste0("\n--> Using {riskscore} Version: 'v", pv, "', last compiled on '",
                riskscore_run_date,"'.\n"))

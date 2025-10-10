@@ -1,23 +1,4 @@
 
-#
-# ---- TODO: ----
-#
-
-
-#
-# General tasks:
-#
-#
-# Attempt to use a:
-# - Bionconductor Repo / pkg...
-#   - Bioc pkgs need to be on a different scale for risk assessments. Or we need to switch
-#     our CRAN scale to be based on percentiles instead of fixed values.
-#   - Bioc needs to be run w/ CRAN pkgs because the Bioc can depend on CRAN pkgs
-# val_decision()
-#   - final_risk = final_risk_id |> factor(labels = decisions), # TODO: doesn't work if final_risk_id is only a few levels
-#
-
-
 
 
 # 
