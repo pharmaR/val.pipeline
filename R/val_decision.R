@@ -362,8 +362,14 @@ val_decision <- function(
               as.integer(exception_risk_category) == 1 & as.integer(primary_risk_category) > 1,
               as.integer(primary_risk_category) - 1,
               as.integer(primary_risk_category)
-            ),
-          final_risk = final_risk_id |> factor(labels = decisions), # TODO: doesn't work if final_risk_id is only a few levels
+            )
+        ) |>
+        dplyr::left_join(
+          dec_id_df |> dplyr::rename(final_risk = decision),
+          by = c("final_risk_id" = "decision_id")
+        ) |>
+        dplyr::mutate(
+          final_risk = factor(final_risk, levels = decisions),
         ) |>
         dplyr::select(
           package, version, 
@@ -729,8 +735,14 @@ val_categorize <- function(
             as.integer(exception_risk_category) == 1 & as.integer(primary_risk_category) > 1,
             as.integer(primary_risk_category) - 1,
             as.integer(primary_risk_category)
-          ),
-        final_risk = final_risk_id |> factor(labels = decisions), # TODO: doesn't work if final_risk_id is only a few levels
+          )
+      ) |>
+      dplyr::left_join(
+        dec_id_df |> dplyr::rename(final_risk = decision),
+        by = c("final_risk_id" = "decision_id")
+      ) |>
+      dplyr::mutate(
+        final_risk = factor(final_risk, levels = decisions),
       ) |>
       # if auto_pass is TRUE, then set final_risk to "Low"
       dplyr::mutate(

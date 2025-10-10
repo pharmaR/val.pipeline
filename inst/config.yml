@@ -3,11 +3,11 @@ default:
   approved_pkgs: [] # packages that have been approved manually outside of {val.pipeline} workflow
   decisions_lst: [Low, Medium, High]
   opt_repos: 
-    CRAN: !expr paste0("https://packagemanager.posit.co/cran/", Sys.Date())
-    BioC: # https://bioconductor.org/packages/3.21/bioc
+    CRAN: # !expr paste0("https://packagemanager.posit.co/cran/", Sys.Date())
+    BioC: https://bioconductor.org/packages/3.21/bioc
   opt_repos_remote_reduce: 
-    CRAN: !expr paste0("https://packagemanager.posit.co/cran/", "2025-10-01") # Consult {riskscore}
-    BioC: # https://bioconductor.org/packages/3.21/bioc
+    CRAN: # !expr paste0("https://packagemanager.posit.co/cran/", "2025-10-01") # Consult {riskscore}
+    BioC: https://bioconductor.org/packages/3.21/bioc
     
 remote_reduce:
   inherits: default

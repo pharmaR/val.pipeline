@@ -18,6 +18,7 @@ qual <- val_pipeline(
 # 
 # Quick run
 # 
+
 # ref = "source"
 # metric_pkg = "riskmetric"
 # deps = "depends" # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")

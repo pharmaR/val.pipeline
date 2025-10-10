@@ -5,111 +5,18 @@
 
 
 #
-# Notes to help onboard Jeff
-# 
-# - save assessments in a shared storage location
-#
-
-
-#
 # General tasks:
 #
-# Add a logger like logRx
 #
 # Attempt to use a:
-# - GitHub pkg... waiting on PPM to be stood up, but can start to build scaffolding for package source based on options('repos') (or pkg_ref())
 # - Bionconductor Repo / pkg...
 #   - Bioc pkgs need to be on a different scale for risk assessments. Or we need to switch
 #     our CRAN scale to be based on percentiles instead of fixed values.
 #   - Bioc needs to be run w/ CRAN pkgs because the Bioc can depend on CRAN pkgs
+# val_decision()
 #   - final_risk = final_risk_id |> factor(labels = decisions), # TODO: doesn't work if final_risk_id is only a few levels
 #
-#
-# - Work out concept of having some packages previously approved via manual
-#   unit test intervention: add 'approved_pkgs' in default config
-#
-# - Technically, val_date & opt_repos PPM date are not sync'd up yet. Same with
-#   opt_repos_remote_reduce. Both should probably default to Sys.date() in config,
-#   but be changed in the val_pipeline() & val_categorize() call if val_date & 
-#   riskscore date differ
-# 
-# - opt_repos_remote_reduce should just be moved under the 'remote_reduce' config
-#
-# - isolate env that run's pkg-level assessment.
-#   - might slow down the process, but would avoid weirdness like with 'withr'
-#
-# - Create functionality to re-assess pkgs based on a final decision change for
-#   one or more pkgs
 
-
-
-#
-# {riskscore}
-#
-# - Build Bioc output for the first time
-# - Set this up on a schedule on Posit Connect
-#    - updating the github pkg?
-#    - updating a Pins Board?
-#
-
-
-
-#
-# build_decisions_df()
-#
-
-
-#
-# val_decision()
-#
-# - Need to work out 'secondary' logic for github/ internal packages
-#
-# - Should I also consider an auto_fail threshold?
-# 
-# - final_risk = final_risk_id |> factor(labels = decisions), # TODO: doesn't work if final_risk_id is only a few levels
-#
-
-#
-# val_pkg():
-#
-# Old: Figure out how to deal with pkg_assess() prompt Doesn't happen during
-# background job
-# --> opened issue on 'riskmetric' repo
-# --> basically un-avoidable - would have to mimic pak::pkg_install()
-# For now, just run as background or workbench job
-#
-#
-# - Update clean_install based on assessment. Or maybe not since I'll likely be
-#   getting rid of the clean_install measure.
-# 
-
-# 
-# val_build():
-#
-
-
-#
-# val_pipeline():
-#
-# - Need to be able to specify non-cran sources... like GitHub pkgs. Preferably
-#   by adding another repos URL pointing to package manager.
-#
-# - What is this going to return? a CSV of the val_build() df?
-#
-
-
-#
-# {riskreports}:
-#
-# - Install latest (dev) version of quarto? Warning being thrown.
-# - Clean up the reports
-
-
-#
-# Tasks for some day, but not right now:
-#
-# - Be able to export / store work done here into the {riskassessment} app
-#
 
 
 
