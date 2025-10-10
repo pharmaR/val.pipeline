@@ -79,23 +79,19 @@ val_pipeline <- function(
   # For now, let's just filter using cranlogs to determine downloaded pkgs
   # opt_repos = c(val_build_repo = "https://cran.r-project.org") # put in config
   opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
-  opt_repos_rr <- pull_config(val = "opt_repos_remote_reduce", rule_type = "default") |> unlist()
+  # opt_repos_rr <- pull_config(val = "opt_repos_remote_reduce", rule_type = "default") |> unlist()
   decisions <- pull_config(val = "decisions_lst", rule_type = "default")
   
   
   
   #
-  # ---- Set "repos" option to riskscore run date ----
+  # ---- Set capture 'old' options ----
   #
   
   # TO-DO: this should be moved inside val_categorize()
   old <- options()
   on.exit(function() options(old))
-  options(repos = opt_repos_rr, pkgType = "source", scipen = 999) # , rlang_interactive = FALSE
-  # options("repos") # verify
-  
-  
-  
+
   #
   # ---- val_categorize() ----
   #
@@ -108,7 +104,7 @@ val_pipeline <- function(
   pre_filtered_pkg_metrics <- 
     val_categorize(
       source = "riskscore",
-      avail_pkgs = available.packages() |> as.data.frame(),
+      # avail_pkgs = available.packages() |> as.data.frame(),
       decisions = decisions,
       else_cat = decisions[length(decisions)],
       decisions_df = build_decisions_df(rule_type = "remote_reduce")
@@ -120,11 +116,10 @@ val_pipeline <- function(
   
   
   #
-  # ---- Set repos option to val_date date ----
+  # ---- Set repos option to val_date date if needed ----
   #
   
-  # to-do: right now it's pointing to Sys.Date() - need to point to val_date
-  options(repos = opt_repos, pkgType = "source", scipen = 999)
+  opt_repos <- update_opt_repos(val_date = val_date, opt_repos = opt_repos)
   # options("repos") # verify
   
   

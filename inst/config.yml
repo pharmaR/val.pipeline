@@ -5,9 +5,6 @@ default:
   opt_repos: 
     CRAN: !expr paste0("https://packagemanager.posit.co/cran/", Sys.Date())
     BioC: https://bioconductor.org/packages/3.21/bioc
-  opt_repos_remote_reduce: 
-    CRAN: !expr paste0("https://packagemanager.posit.co/cran/", "2025-10-01") # Consult {riskscore}
-    BioC: https://bioconductor.org/packages/3.21/bioc
     
 remote_reduce:
   inherits: default

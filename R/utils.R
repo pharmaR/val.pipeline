@@ -122,6 +122,53 @@ to_the_limit <- function(condition, low = TRUE) {
   })
 }
 
+#' Update Repos Option
+#'
+#' Helper function to update the "CRAN" repo in options("repos") to use the
+#' specified validation date.
+#'
+#' @param val_date A Date object indicating the validation date to use in the
+#'   CRAN repo URL.
+#' @param opt_repos A named character vector of repositories, typically obtained
+#'   from getOption("repos").
+#'
+#' @importFrom stringr str_detect str_extract str_replace
+#'
+#' @return A named character vector of repositories with the updated "CRAN"
+#'   repo.
+update_opt_repos <- function(
+    val_date = Sys.Date(),
+    opt_repos = getOption("repos")
+) {
+  if("CRAN" %in% toupper(names(opt_repos))) {
+    cran_pos <- which("CRAN" %in% toupper(names(opt_repos)))
+    curr_cran <- opt_repos[[cran_pos]]
+    
+    # is val_date not being used? If not, update it
+    if(!stringr::str_detect(curr_cran, as.character(val_date))) {
+      
+      cat(paste0("--> Updating 'CRAN' repo to use validation date: ", val_date))
+      
+      # replace the date at the end of curr_cran with val_date
+      # is curr_cran a packagemanager url?
+      if(stringr::str_detect(curr_cran, "packagemanager.posit.co")) {
+        old_date <- stringr::str_extract(curr_cran, "\\d{4}-\\d{2}-\\d{2}")
+        new_cran <- stringr::str_replace(curr_cran, old_date, as.character(val_date))
+      } else {
+        new_cran <- paste0("https://packagemanager.posit.co/cran/", as.character(val_date))
+      }
+      
+      opt_repos[[cran_pos]] <- new_cran
+    }
+    
+    # grab the date at the end of curr_cran
+    cran_date <- stringr::str_extract(curr_cran, "\\d{4}-\\d{2}-\\d{2}")
+  }
+  options(repos = opt_repos, pkgType = "source", scipen = 999)
+  return(opt_repos)
+}
+  
+
 #' Pull Config
 #'
 #' Pull in relevant rules defined in confg.yml. Also verifies that the
