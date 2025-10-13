@@ -127,19 +127,23 @@ source("dev/pkg_lists.R")
 
 # pack = 'rlang'
 # pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
-# pack = 'withr'
+pack = 'withr'
 # pack = 'SuppDists'
-
-pack <- pkgs[which(pkgs == "SuppDists") + 1] # last left off:
-pack
+# pack <- pkgs[which(pkgs == "SuppDists") + 1] # last left off:
+# pack
 
 pkg_meta <- val_pkg(
   pkg = pack,
   ver = avail_pkgs$Version[avail_pkgs$Package == pack],
   avail_pkgs = avail_pkgs,
-  ref = if(pkg %in% remote_pkgs) 'remote' else 'source',
+  ref = if(pack %in% remote_pkgs) 'remote' else 'source',
   metric_pkg = "riskmetric", 
   out_dir = val_dir,
   val_date = val_date
   )
-  
+pkg_meta[!names(pkg_meta )%in% c("rev_deps","depends","suggests")]  
+assessed <- file.path(val_dir, "assessed")
+ass_files <- list.files(assessed, pattern = "_assessments.rds$")
+ass_pkg <- ass_files[stringr::str_detect(ass_files, pack)]
+ass <- readRDS(file.path(assessed, ass_pkg))
+ass$r_cmd_check

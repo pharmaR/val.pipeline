@@ -344,14 +344,33 @@ val_pkg <- function(
   # pkg_assessment <- readRDS(assessment_file)
   # pkg_scores <- readRDS(scores_file)
   
+  # riskmetric doesn't pick up certain metrics for pkg_ref(source = "pkg_cran_remote")
+  # What metrics do we need to remove for the decisioning process?
+  viable_metrics <- pkg_scores |>
+    dplyr::as_tibble() |>
+    t() |>
+    as.data.frame() |>
+    dplyr::filter(!is.na(V1)) |>
+    # make rownames a column
+    tibble::rownames_to_column(var = "metric") |>
+    dplyr::pull(metric)
+  
+  if("r_cmd_check" %in% viable_metrics){
+    vm <- viable_metrics[which(viable_metrics != "r_cmd_check")]
+    viable_metrics <- c(vm, "r_cmd_check_warnings", "r_cmd_check_errors")
+  }
+  
   decision <- 
     val_decision( 
       pkg = pkg,
-      source = list(assessment = pkg_assessment, scores = pkg_scores), # include both
+      source = list(assessment = pkg_assessment, scores = pkg_scores), 
       excl_metrics = exclude_met, # Subset if desired
       decisions = decisions,
       else_cat = decisions[length(decisions)],
-      decisions_df = build_decisions_df(rule_type = "decide")
+      decisions_df = build_decisions_df(
+        rule_type = "decide",
+        metrics = viable_metrics
+        )
     )
 
   

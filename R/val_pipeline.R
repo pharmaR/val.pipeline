@@ -98,7 +98,26 @@ val_pipeline <- function(
   
   #
   # ---- val_categorize() ----
-  #
+  #.
+  
+  # Assess the 'dplyr' pkg to identify which metrics are available for 'pkg_cran_remote'
+  viable_metrics <- c("dplyr") |>
+    riskmetric::pkg_ref(source = "pkg_cran_remote") |>
+    dplyr::as_tibble() |>
+    riskmetric::pkg_assess() |>
+    riskmetric::pkg_score() |>
+    dplyr::select(-c(package, version, pkg_ref, pkg_score)) |>
+    t() |>
+    as.data.frame() |>
+    dplyr::filter(!is.na(V1)) |>
+    # make rownames a column
+    tibble::rownames_to_column(var = "metric") |>
+    dplyr::pull(metric)
+  
+  if("r_cmd_check" %in% viable_metrics){
+    vm <- viable_metrics[which(viable_metrics != "r_cmd_check")]
+    viable_metrics <- c(vm, "r_cmd_check_warnings", "r_cmd_check_errors")
+  }
   
   # "filter" packages 
   # > 22k here (on CRAN alone). Eventually, want to use PACKAGES file here For
@@ -111,7 +130,10 @@ val_pipeline <- function(
       avail_pkgs = available.packages() |> as.data.frame(),
       decisions = decisions,
       else_cat = decisions[length(decisions)],
-      decisions_df = build_decisions_df(rule_type = "remote_reduce")
+      decisions_df = build_decisions_df(
+        rule_type = "remote_reduce",
+        metrics = viable_metrics
+        )
       )
   # see <-
   #   pre_filtered_pkg_metrics |>
