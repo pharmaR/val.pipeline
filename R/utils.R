@@ -506,7 +506,7 @@ get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_ac
     }
     
     # if pkg was accepted outside of val.pipeline, we'll need to accept it here:
-    if(!is.null(approved_pkgs) & length(approved_pkgs) > 0) {
+    if(length(approved_pkgs) > 0) {
       approved_pkgs_cond <- glue::glue("package %in% c('{paste(approved_pkgs, collapse = \"', '\")}') ~ {then}")
     } else {
       approved_pkgs_cond <- NULL

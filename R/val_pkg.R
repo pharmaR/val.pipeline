@@ -435,19 +435,17 @@ val_pkg <- function(
       dplyr::select(dplyr::ends_with("cataa")) |>
       names() %>%
       gsub("_cataa", "", .)
-    aa_mets <- aa_metrics |>
-      paste(collapse = ", ") %>%
-      paste("Auto-accepted metrics:", .)
+
     decision_reason <- dplyr::case_when(
       pkg %in% approved_pkgs ~ "Pre-Approved package",
-      length(aa_metrics) > 0 ~ paste0("Met 'Auto-accepted' threshold for '", aa_mets, "' metric(s)"),
+      length(aa_metrics) > 0 ~ paste("Met auto-accepted metric threshold(s) for:", paste(aa_metrics, collapse = ", ")),
       TRUE ~ "Risk Assessment"
     ) 
   } else {
     decision_reason <- "Risk Assessment"
   }
   
-  cat("\n-->", pkg_v,"decision reason:", decision_reason, "\n")
+  cat("\n-->", pkg_v,"decision reason:\n---->", decision_reason, "\n")
   
   #
   # ---- Build Report ----

@@ -1,6 +1,6 @@
 default:
   remote_only: [withr, VGAM, shinyBS] # withr - crashes, VGAM ran 10 hrs, shinyBS 5 hrs
-  approved_pkgs: [dplyr] # packages that have been approved manually outside of {val.pipeline} workflow
+  approved_pkgs: [] # packages that have been approved manually outside of {val.pipeline} workflow
   decisions_lst: [Low, Medium, High]
   opt_repos: 
     CRAN: !expr paste0("https://packagemanager.posit.co/cran/", Sys.Date())
