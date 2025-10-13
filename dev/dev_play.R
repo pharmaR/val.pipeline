@@ -59,6 +59,7 @@ qual <- val_pipeline(
 # ---- val_build()----
 #
 
+source("dev/pkg_lists.R") # # build_pkgs & pkgs
 # See the full dependency tree before running val_build()
 # these_pkgs <- "withr"  # messes with the entire process
 # these_pkgs <- "matrix" # takes 5 mins to install
@@ -122,24 +123,25 @@ reports |> length()
 any(stringr::str_detect(reports, "spacesXYZ"))
 
 
-source("dev/pkg_lists.R")
+source("dev/pkg_lists.R") # build_pkgs & pkgs
 
 
-# pack = 'rlang'
+pack = 'dplyr'
 # pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
 # pack = 'withr'
 # pack = 'SuppDists'
 
-pack <- pkgs[which(pkgs == "SuppDists") + 1] # last left off:
-pack
+# pack <- pkgs[which(pkgs == "SuppDists") + 1] # last left off:
+# pack
 
 pkg_meta <- val_pkg(
   pkg = pack,
   ver = avail_pkgs$Version[avail_pkgs$Package == pack],
   avail_pkgs = avail_pkgs,
-  ref = if(pkg %in% remote_pkgs) 'remote' else 'source',
+  ref = if(pack %in% remote_pkgs) 'remote' else 'source',
   metric_pkg = "riskmetric", 
   out_dir = val_dir,
   val_date = val_date
   )
-  
+# names(pkg_meta)
+pkg_meta[!names(pkg_meta) %in% c("rev_deps", "depends", "suggests")]
