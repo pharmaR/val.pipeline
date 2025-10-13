@@ -39,6 +39,7 @@ val_pipeline <- function(
   val_date = Sys.Date(),
   replace = FALSE, 
   out = 'dev/riskassessments',
+  # JT: looks like this should be removed since it gets overwritten
   opt_repos = 
     c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()),
       BioC = 'https://bioconductor.org/packages/3.21/bioc')
@@ -125,6 +126,7 @@ val_pipeline <- function(
   #
   
   # to-do: right now it's pointing to Sys.Date() - need to point to val_date
+  # JT: duplicate options() call
   options(repos = opt_repos, pkgType = "source", scipen = 999)
   # options("repos") # verify
   

@@ -145,6 +145,7 @@ val_build <- function(
       # and add them to the list of pkgs to assess
       
       deps_low <- tolower(deps)
+      # JT: seems like this should be an if () {} elseif {}
       which_deps <- dplyr::case_when(
         all(c("depends", "suggests") %in% deps_low) ~ "most",
         deps_low == "depends" ~ "strong",
@@ -262,6 +263,7 @@ val_build <- function(
       # if a pkg fails, make sure it's reverse dependencies don't run an assessment
       # if(pkg == "sys") pkg_meta$decision = "Medium" # for debugging
       if(pkg_meta$decision != decisions[1]) {
+        # JT: while I understand the idea in general as marking it with the worst decision, wouldn't it make more sense to mark it as Not Assessed or N/A
         cat(paste0("\n\n--> ", pkg, " v", ver," was assessed with a '", pkg_meta$decision,"' risk. All packages that depend on it will also be marked as '", decisions[length(decisions)],"' risk.\n\n"))
         dont_run <<- c(dont_run, pkg_meta$rev_deps) |> unique()
       }
