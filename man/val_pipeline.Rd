@@ -12,7 +12,8 @@ val_pipeline(
   val_date = Sys.Date(),
   replace = FALSE,
   out = "dev/riskassessments",
-  opt_repos = c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()))
+  opt_repos = c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()), BioC
+    = "https://bioconductor.org/packages/3.21/bioc")
 )
 }
 \arguments{

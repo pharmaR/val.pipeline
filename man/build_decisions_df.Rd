@@ -6,7 +6,8 @@
 \usage{
 build_decisions_df(
   rule_type = c("default", "remote_reduce", "decide")[1],
-  rule_lst = NULL
+  rule_lst = NULL,
+  viable_metrics = NULL
 )
 }
 \arguments{
@@ -29,7 +30,13 @@ each category.
 that are acceptable for this metric.
 \item min_value: (Optional) A numeric value indicating the minimum acceptable
 value for the primary metric(s).
+\item auto_accept: (Optional) A formula that defines a condition under which the
+package can be automatically accepted, regardless of other conditions.
 }}
+
+\item{viable_metrics}{An optional character vector of metric names that are
+considered viable for the chosen pkg_source. If provided, any metrics in
+\code{rule_lst} that are not in \code{viable_metrics} will be dropped.}
 
 \item{decision_lst}{A character vector of decision categories, ordered from
 highest risk to lowest risk.opt_repos}
