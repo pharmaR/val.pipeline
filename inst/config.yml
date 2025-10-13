@@ -81,13 +81,13 @@ decide:
     cond:
       High: ~ is.na(.x) | .x > 1
       Low: ~ .x == 0
-    type: secondary
+    type: primary
     accept_cats: Low
   r_cmd_check_warnings: # Pointless as a primary check since CRAN insures no warnings / errors
     cond:
       High: ~ is.na(.x) | .x > 1
       Low: ~ .x == 0
-    type: secondary
+    type: primary
     accept_cats: Low
   has_examples:
     cond:

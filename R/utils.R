@@ -321,7 +321,9 @@ build_decisions_df <- function(
     ) |> 
     # Add in column for metric_type
     dplyr::mutate(
-      metric_type = purrr::map_chr(metric, ~ rule_lst[[.x]][["type"]] %||% "Exception")
+      metric_type = purrr::map_chr(metric, ~
+        rule_lst[[.x]][["type"]] %||% {if(rule_type == "remote_reduce") "exception" else "secondary"}) |>
+        factor(levels = c("primary", {if(rule_type == "remote_reduce") "exception" else "Secondary"}))
     ) |>
     # dplyr::mutate(
       # extract lower & Upper limit of the condition
@@ -345,7 +347,8 @@ build_decisions_df <- function(
       }),
       by = "metric"
     ) |>
-    dplyr::select(-met_dec_id) # Get rid of this ID
+    dplyr::select(-met_dec_id) |> # Get rid of this ID
+    dplyr::arrange(metric_type)
   
   
   

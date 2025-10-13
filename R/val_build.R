@@ -296,7 +296,6 @@ val_build <- function(
         sys_info = R.Version(),
         repos = list(options("repos")),
         val_date = val_date,
-        clean_install = as.logical(NA),
         ref = NA_character_,
         metric_pkg = NA_character_,
         decision = decisions[length(decisions)],
