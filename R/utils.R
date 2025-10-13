@@ -124,8 +124,8 @@ to_the_limit <- function(condition, low = TRUE) {
 
 #' Update Repos Option
 #'
-#' Helper function to update the "CRAN" repo in options("repos") to use the
-#' specified validation date.
+#' Helper function to update the "CRAN" repo from `options("repos")` to use the
+#' user-specified validation date.
 #'
 #' @param val_date A Date object indicating the validation date to use in the
 #'   CRAN repo URL.

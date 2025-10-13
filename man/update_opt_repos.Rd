@@ -18,6 +18,6 @@ A named character vector of repositories with the updated "CRAN"
 repo.
 }
 \description{
-Helper function to update the "CRAN" repo in options("repos") to use the
-specified validation date.
+Helper function to update the "CRAN" repo from \code{options("repos")} to use the
+user-specified validation date.
 }
