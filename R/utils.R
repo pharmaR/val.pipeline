@@ -353,7 +353,7 @@ build_decisions_df <- function(
     keep_rules <- names(rule_lst) %in% viable_metrics
     if(any(!keep_rules)) {
       dropped_rules <- names(rule_lst)[which(!keep_rules)]
-      cat(glue::glue("\n--> Dropping rules for non-viable metrics for chosen pkg_source:\n"))
+      cat(glue::glue("\n\n--> Dropping rules for non-viable metrics for chosen pkg_source:\n"))
       cat("\n---->", paste(dropped_rules, collapse = '\n----> '), "\n")
     }
     # drop 'em

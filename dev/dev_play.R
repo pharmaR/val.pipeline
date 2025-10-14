@@ -126,8 +126,8 @@ source("dev/pkg_lists.R")
 
 
 # pack = 'rlang'
-# pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
-pack = 'withr'
+pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
+# pack = 'withr'
 # pack = 'SuppDists'
 # pack <- pkgs[which(pkgs == "SuppDists") + 1] # last left off:
 # pack

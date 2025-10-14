@@ -198,6 +198,19 @@ val_pkg <- function(
     # 
     #### Initial Decision
     #
+    init_viable_metrics <- init_pkg_scores |>
+      dplyr::as_tibble() |>
+      t() |>
+      as.data.frame() |>
+      dplyr::filter(!is.na(V1)) |>
+      # make rownames a column
+      tibble::rownames_to_column(var = "metric") |>
+      dplyr::pull(metric)
+    
+    if("r_cmd_check" %in% viable_metrics){
+      init_vm <- init_viable_metrics[which(init_viable_metrics != "r_cmd_check")]
+      init_viable_metrics <- c(init_vm, "r_cmd_check_warnings", "r_cmd_check_errors")
+    }
     
     # pkg_assessment$downloads_1yr |> prettyNum(big.mark = ",")
     init_decision <- 
@@ -207,7 +220,9 @@ val_pkg <- function(
         excl_metrics = NULL, # "covr_coverage", # Subset not really necessary
         decisions = decisions,
         else_cat = decisions[length(decisions)],
-        decisions_df = build_decisions_df(rule_type = "decide")
+        decisions_df = build_decisions_df(
+          rule_type = "decide",
+          viable_metrics = init_viable_metrics)
       )
     
     auto_accepted <-
@@ -369,7 +384,7 @@ val_pkg <- function(
       else_cat = decisions[length(decisions)],
       decisions_df = build_decisions_df(
         rule_type = "decide",
-        metrics = viable_metrics
+        viable_metrics = viable_metrics
         )
     )
 

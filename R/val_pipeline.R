@@ -127,7 +127,7 @@ val_pipeline <- function(
       else_cat = decisions[length(decisions)],
       decisions_df = build_decisions_df(
         rule_type = "remote_reduce",
-        metrics = viable_metrics
+        viable_metrics = viable_metrics
         )
       )
   # see <-
