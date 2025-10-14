@@ -141,7 +141,7 @@ update_opt_repos <- function(
     opt_repos = getOption("repos")
 ) {
   if("CRAN" %in% toupper(names(opt_repos))) {
-    cran_pos <- which("CRAN" %in% toupper(names(opt_repos)))
+    cran_pos <- which("CRAN" == toupper(names(opt_repos)))
     curr_cran <- opt_repos[[cran_pos]]
     
     # is val_date not being used? If not, update it
