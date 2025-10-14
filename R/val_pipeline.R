@@ -119,6 +119,7 @@ val_pipeline <- function(
   #
   
   opt_repos <- update_opt_repos(val_date = val_date, opt_repos = opt_repos)
+  options(repos = opt_repos, pkgType = "source", scipen = 999)
   # options("repos") # verify
   
   

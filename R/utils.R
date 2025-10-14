@@ -164,7 +164,6 @@ update_opt_repos <- function(
     # grab the date at the end of curr_cran
     cran_date <- stringr::str_extract(curr_cran, "\\d{4}-\\d{2}-\\d{2}")
   }
-  options(repos = opt_repos, pkgType = "source", scipen = 999)
   return(opt_repos)
 }
   
