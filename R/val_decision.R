@@ -487,7 +487,7 @@ val_categorize <- function(
       cat(glue::glue("\n!!! WARNING: the latest riskscore assessment date is more than 60 days old, compared to today's validation date. Consider updating {{riskscore}} w/ a fresh run.\n"))
     }
     
-  
+    opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
     opt_repos <- update_opt_repos(val_date = riskscore_run_date, opt_repos = opt_repos)
     options(repos = opt_repos, pkgType = "source", scipen = 999)
     # options("repos") # verify

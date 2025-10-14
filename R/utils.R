@@ -125,7 +125,9 @@ to_the_limit <- function(condition, low = TRUE) {
 #' Update Repos Option
 #'
 #' Helper function to update the "CRAN" repo from `options("repos")` to use the
-#' user-specified validation date.
+#' user-specified validation date. Two big assumptions with this function at the
+#' moment: (1) that the "CRAN" repo is a Posit Package Manager URL, and (2) that
+#' the date is at the end of the URL in "YYYY-MM-DD" format.
 #'
 #' @param val_date A Date object indicating the validation date to use in the
 #'   CRAN repo URL.
@@ -140,31 +142,53 @@ update_opt_repos <- function(
     val_date = Sys.Date(),
     opt_repos = getOption("repos")
 ) {
+  
   if("CRAN" %in% toupper(names(opt_repos))) {
     cran_pos <- which("CRAN" == toupper(names(opt_repos)))
     curr_cran <- opt_repos[[cran_pos]]
+    # Grab the "base url", which will be the entire text string up till the last "/"
+    base_url <- substr(curr_cran, 1, max(unlist(gregexpr("/", curr_cran))))
     
-    # is val_date not being used? If not, update it
-    if(!stringr::str_detect(curr_cran, as.character(val_date))) {
-      
-      cat(paste0("--> Updating 'CRAN' repo to use validation date: ", val_date))
-      
-      # replace the date at the end of curr_cran with val_date
-      # is curr_cran a packagemanager url?
-      if(stringr::str_detect(curr_cran, "packagemanager.posit.co")) {
-        old_date <- stringr::str_extract(curr_cran, "\\d{4}-\\d{2}-\\d{2}")
-        new_cran <- stringr::str_replace(curr_cran, old_date, as.character(val_date))
+    # if val_date is today & curr_cran is already "latest" or ends in today's date, then don't update
+    if(val_date == Sys.Date()) {
+      if(stringr::str_detect(curr_cran, "latest") |
+         stringr::str_detect(curr_cran, as.character(Sys.Date()))
+      ) {
+        cat(paste0("--> 'CRAN' repo is already set to latest snapshot. No update needed.\n"))
+        return(opt_repos)
       } else {
-        new_cran <- paste0("https://packagemanager.posit.co/cran/", as.character(val_date))
+        cat(paste0("--> Updating 'CRAN' repo to use latest snapshot.\n"))
+        new_cran <- paste0(base_url, "latest")
+        opt_repos[[cran_pos]] <- new_cran
+        return(opt_repos)
       }
-      
-      opt_repos[[cran_pos]] <- new_cran
+    } else {
+      # if val_date is not today, then check"
+      # is val_date not being used at all?
+      if(!stringr::str_detect(curr_cran, as.character(val_date))) {
+        if(stringr::str_detect(curr_cran, "latest") |
+           stringr::str_detect(curr_cran, as.character(Sys.Date()))
+        ) {
+          cat(paste0("--> Updating 'CRAN' repo to use validation date: ", val_date, "\n"))
+          new_cran <- gsub("latest", as.character(val_date), 
+              gsub("\\d{4}-\\d{2}-\\d{2}", as.character(val_date), curr_cran)
+          )
+        } else {
+          cat(paste0("\n--> 'CRAN' repo is currently set to use date: ", stringr::str_extract(curr_cran, "\\d{4}-\\d{2}-\\d{2}"), "\n"))
+          old_date <- stringr::str_extract(curr_cran, "\\d{4}-\\d{2}-\\d{2}")
+          if(!is.na(old_date)) {
+            new_cran <- gsub(old_date, as.character(val_date), curr_cran)
+          } else {
+            new_cran <- paste0(base_url, as.character(val_date))
+          }
+        }
+        
+        opt_repos[[cran_pos]] <- new_cran
+
+      } # else val_date was found
     }
-    
-    # grab the date at the end of curr_cran
-    cran_date <- stringr::str_extract(curr_cran, "\\d{4}-\\d{2}-\\d{2}")
+    return(opt_repos)
   }
-  return(opt_repos)
 }
   
 

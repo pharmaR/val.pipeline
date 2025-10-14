@@ -3,7 +3,7 @@ default:
   approved_pkgs: [] # packages that have been approved manually outside of {val.pipeline} workflow
   decisions_lst: [Low, Medium, High]
   opt_repos: 
-    CRAN: !expr paste0("https://packagemanager.posit.co/cran/", Sys.Date())
+    CRAN: https://packagemanager.posit.co/cran/latest
     BioC: https://bioconductor.org/packages/3.21/bioc
     
 remote_reduce:
