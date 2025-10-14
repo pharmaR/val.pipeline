@@ -6,7 +6,6 @@
 \usage{
 val_categorize(
   source = "riskscore",
-  avail_pkgs = as.data.frame(available.packages()),
   decisions = c("Low", "Medium", "High"),
   else_cat = "High",
   decisions_df = build_decisions_df(rule_type = "remote_reduce")
@@ -15,8 +14,6 @@ val_categorize(
 \arguments{
 \item{source}{character, either "riskscore" (default), "PACKAGES", or a
 data.frame.}
-
-\item{avail_pkgs}{data.frame, the output of available.packages() as a data.frame}
 
 \item{decisions}{character vector, the risk categories to use.}
 

@@ -442,7 +442,6 @@ val_decision <- function(
 #'
 #' @param source character, either "riskscore" (default), "PACKAGES", or a
 #'   data.frame.
-#' @param avail_pkgs data.frame, the output of available.packages() as a data.frame
 #' @param decisions character vector, the risk categories to use.
 #' @param else_cat character, the default risk category if no conditions are met.
 #' @param decisions_df data.frame, the output of build_decisions_df()
@@ -455,19 +454,23 @@ val_decision <- function(
 #' 
 val_categorize <- function(
     source = "riskscore",
-    avail_pkgs = available.packages() |> as.data.frame(),
     decisions = c("Low", "Medium", "High"),
     else_cat = "High",
     decisions_df = build_decisions_df(rule_type = "remote_reduce")
 ) {
   # @importFrom riskscore cran_assessed_20250812 cran_scored_20250812
   
-  cat("\n\nCategorizing available packages. Starting w/", nrow(avail_pkgs), "pkgs.\n")
+  
+  
   
   # verify decisions_df is compliant
   if(!all(c("metric", "decision", "condition", "metric_type", "accept_condition") %in% colnames(decisions_df))) {
     stop("'decisions_df' is not compliant. Must contain columns: 'metric', 'decision', 'condition', 'metric_type', 'accept_condition'")
   }
+  
+  
+  
+  
   
   # Use package metrics based on specified source
   if(length(source) > 1) {
@@ -486,6 +489,14 @@ val_categorize <- function(
       cat(glue::glue("\n!!! WARNING: the latest riskscore assessment date is more than 60 days old, compared to today's validation date. Consider updating {{riskscore}} w/ a fresh run.\n"))
     }
     
+    opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
+    opt_repos <- update_opt_repos(val_date = riskscore_run_date, opt_repos = opt_repos)
+    options(repos = opt_repos, pkgType = "source", scipen = 999)
+    # options("repos") # verify
+    
+    avail_pkgs <- available.packages() |> as.data.frame()
+    
+    cat("\n\nCategorizing available packages. Starting w/", nrow(avail_pkgs), "pkgs.\n")
 
     # Sometimes, the package field is a list() in the 2025-10-01 riskscore
     # build. So, we need to unlist it first

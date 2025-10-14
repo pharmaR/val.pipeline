@@ -67,8 +67,8 @@ from val_decision() to not only apply risk decisions too all packages
 assessed, but goes back around and will re-categorize decisions based on
 whether any dependencies were categorized as "High Risk" / "Rejected". It
 also is intelligent enough to sort the list of packages to run those with the
-most dependencies first, so that if a package fails, it doesn't waste anytime
-running it's reverse dependence.
+most dependencies first, so that if a package fails, it doesn't waste any
+time running it's reverse dependence.
 After the pipeline applies a decision onto each package using criteria
 provided in a config file, it even generates a report detailing specifics of
 the assessment as supporting evidence. The end result is a directory
