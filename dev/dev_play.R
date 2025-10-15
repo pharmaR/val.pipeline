@@ -126,6 +126,10 @@ any(stringr::str_detect(reports, "spacesXYZ"))
 source("dev/pkg_lists.R") # build_pkgs & pkgs
 
 
+# pack = 'rlang'
+pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
+# pack = 'withr'
+# pack = 'SuppDists'
 pack = 'dplyr'
 # pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
 # pack = 'withr'
@@ -143,5 +147,12 @@ pkg_meta <- val_pkg(
   out_dir = val_dir,
   val_date = val_date
   )
-# names(pkg_meta)
-pkg_meta[!names(pkg_meta) %in% c("rev_deps", "depends", "suggests")]
+
+pkg_meta[!names(pkg_meta )%in% c("rev_deps","depends","suggests")]  
+assessed <- file.path(val_dir, "assessed")
+ass_files <- list.files(assessed, pattern = "_assessments.rds$")
+ass_pkg <- ass_files[stringr::str_detect(ass_files, pack)]
+ass <- readRDS(file.path(assessed, ass_pkg))
+ass$r_cmd_check
+
+

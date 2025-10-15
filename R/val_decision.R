@@ -69,6 +69,14 @@ val_decision <- function(
   # names(assessment)
   
   # extract list values into a numeric vector
+  
+  # downloads_1yr
+  if("downloads_1yr" %in% decisions_df$metric &
+     "downloads_1yr" %in% names(assessment)) {
+    pkgs_df$downloads_1yr <- if(is.null(assessment$downloads_1yr)) NA_real_ else as.numeric(assessment$downloads_1yr)
+  } else {
+    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "downloads_1yr"))
+  }
   # covr_coverage
   if("covr_coverage" %in% decisions_df$metric &
      "covr_coverage" %in% names(assessment)) {
@@ -81,12 +89,41 @@ val_decision <- function(
   } else {
     decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "covr_coverage"))
   }
-  # downloads_1yr
-  if("downloads_1yr" %in% decisions_df$metric &
-     "downloads_1yr" %in% names(assessment)) {
-    pkgs_df$downloads_1yr <- if(is.null(assessment$downloads_1yr)) NA_real_ else as.numeric(assessment$downloads_1yr)
+  # r_cmd_check
+  if("r_cmd_check_errors" %in% decisions_df$metric &
+     "r_cmd_check" %in% names(assessment)) {
+    r_cmd_check <- assessment$r_cmd_check
+    # r_cmd_check[[2]]
+    if("pkg_metric_error" %in% class(assessment$r_cmd_check)) {
+      pkgs_df$r_cmd_check_errors <- NA_real_
+    } else {
+      # logic when not an error
+      pkgs_df$r_cmd_check_errors <- if(length(r_cmd_check) > 1){
+        if(is.null(r_cmd_check[[2]])) NA_real_ else r_cmd_check[[2]]
+      } else {
+        if(is.na(r_cmd_check)) NA_real_ else r_cmd_check
+      }
+      
+    }
   } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "downloads_1yr"))
+    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "r_cmd_check_errors"))
+  }
+  # r_cmd_check
+  if("r_cmd_check_warnings" %in% decisions_df$metric &
+     "r_cmd_check" %in% names(assessment)) {
+    r_cmd_check <- assessment$r_cmd_check
+    if("pkg_metric_error" %in% class(assessment$r_cmd_check)) {
+      pkgs_df$r_cmd_check_warnings <- NA_real_
+    } else {
+      # logic when not an error
+      pkgs_df$r_cmd_check_warnings <-  if(length(r_cmd_check) > 1){
+        if(is.null(r_cmd_check[[3]])) NA_real_ else r_cmd_check[[3]]
+      } else {
+        if(is.na(r_cmd_check)) NA_real_ else r_cmd_check
+      }
+    }
+  } else {
+    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "r_cmd_check_warnings"))
   }
   # reverse_dependencies
   if("reverse_dependencies" %in% decisions_df$metric &
@@ -166,42 +203,7 @@ val_decision <- function(
   } else {
     decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "remote_checks"))
   }
-  # r_cmd_check
-  if("r_cmd_check_errors" %in% decisions_df$metric &
-     "r_cmd_check" %in% names(assessment)) {
-    r_cmd_check <- assessment$r_cmd_check
-    # r_cmd_check[[2]]
-    if("pkg_metric_error" %in% class(assessment$r_cmd_check)) {
-      pkgs_df$r_cmd_check_errors <- NA_real_
-    } else {
-      # logic when not an error
-      pkgs_df$r_cmd_check_errors <- if(length(r_cmd_check) > 1){
-        if(is.null(r_cmd_check[[2]])) NA_real_ else r_cmd_check[[2]]
-      } else {
-        if(is.na(r_cmd_check)) NA_real_ else r_cmd_check
-      }
-      
-    }
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "r_cmd_check_errors"))
-  }
-  # r_cmd_check
-  if("r_cmd_check_warnings" %in% decisions_df$metric &
-     "r_cmd_check" %in% names(assessment)) {
-    r_cmd_check <- assessment$r_cmd_check
-    if("pkg_metric_error" %in% class(assessment$r_cmd_check)) {
-      pkgs_df$r_cmd_check_warnings <- NA_real_
-    } else {
-      # logic when not an error
-      pkgs_df$r_cmd_check_warnings <-  if(length(r_cmd_check) > 1){
-        if(is.null(r_cmd_check[[3]])) NA_real_ else r_cmd_check[[3]]
-      } else {
-        if(is.na(r_cmd_check)) NA_real_ else r_cmd_check
-      }
-    }
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "r_cmd_check_warnings"))
-  }
+  
   # exported_namespace
   if("exported_namespace" %in% decisions_df$metric &
      "exported_namespace" %in% names(assessment)) {

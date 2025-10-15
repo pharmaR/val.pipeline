@@ -125,78 +125,6 @@ val_pkg <- function(
     unlist(use.names = FALSE) 
   
   
-  # ---- Can Install? ----
-  # Make sure we can install cleanly first, else don't with assessment, return meta
-  # if(pkg != "withr") {
-  #   inst_out <- tryCatch({
-  #     if(ref == "source"){
-  #       utils::install.packages(
-  #         file.path(sourced, pkg),
-  #         lib = installed,
-  #         repos = NULL
-  #       )
-  #     } else { # ref == 'remote'
-  #       utils::install.packages(
-  #         pkg,
-  #         lib = installed
-  #       )
-  #     }
-  #   },
-  #   warning = function(w) return(paste("Warning:", w$message)),
-  #   error = function(e) return(paste("Error:", e$message))
-  #   )
-  # } else {
-    inst_out <- NULL
-  # }
-  
-  # Looks like installing pkgs may prove tricky for us... because of {withr}.
-  # And since we are only doing this to see if there are any warnings or notes,
-  # we could potentially skip it, since we get that info directly from the
-  # assessment step anyhow. Also, some packages take a really long time to
-  # install like Matrix & arrow, so this could really slow us down
-  # unnecessarily.
-  #
-  # Note: It was initially set up to help us skip assessing that package if it
-  # didn't install cleanly, but I shouldn't assume I'm doing this better than
-  # the {riskmetric} team, and would rather rely on their logic
-  
-  clean_install <- if(is.null(inst_out) # & pkg %in% list.files(installed)
-    ) TRUE else FALSE
-  
-  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
-  
-  if(!clean_install) {
-    # save metadata
-    meta_list <- list(
-      pkg = pkg,
-      ver = ver,
-      r_ver = getRversion(),
-      sys_info = R.Version(), 
-      repos = list(options("repos")),
-      val_date = val_date,
-      clean_install = clean_install,
-      ref = ref,
-      metric_pkg = metric_pkg,
-      # metrics = pkg_assessment, # saved separately for {riskreports}
-      decision = decisions[length(decisions)],
-      decision_reason = "Failed 'clean_install' step",
-      final_decision = decisions[length(decisions)],
-      final_decision_reason = "Failed 'clean_install' step",
-      depends = if(identical(depends, character(0))) NA_character_ else depends,
-      suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
-      rev_deps = NA_character_,
-      assessment_runtime = list(txt = NA_character_, mins = NA)
-    )
-    saveRDS(meta_list, file.path(meta_list, glue::glue("{pkg_v}_meta.rds")))
-    cat("\n-->", pkg_v,"didn't install cleanly.")
-    cat("\n--> Install Output:\n", paste(inst_out, collapse = "\n"),"\n")
-    cat("\n-->", pkg_v,"meta bundle saved.\n")
-    return(meta_list)
-  } else {
-    cat("\n-->", pkg_v,"installed cleanly.\n")
-  }
-  
-  
   #
   # ---- Assess ---- 
   #
@@ -270,6 +198,19 @@ val_pkg <- function(
     # 
     #### Initial Decision
     #
+    init_viable_metrics <- init_pkg_scores |>
+      dplyr::as_tibble() |>
+      t() |>
+      as.data.frame() |>
+      dplyr::filter(!is.na(V1)) |>
+      # make rownames a column
+      tibble::rownames_to_column(var = "metric") |>
+      dplyr::pull(metric)
+    
+    if("r_cmd_check" %in% viable_metrics){
+      init_vm <- init_viable_metrics[which(init_viable_metrics != "r_cmd_check")]
+      init_viable_metrics <- c(init_vm, "r_cmd_check_warnings", "r_cmd_check_errors")
+    }
     
     # pkg_assessment$downloads_1yr |> prettyNum(big.mark = ",")
     init_decision <- 
@@ -279,7 +220,9 @@ val_pkg <- function(
         excl_metrics = NULL, # "covr_coverage", # Subset not really necessary
         decisions = decisions,
         else_cat = decisions[length(decisions)],
-        decisions_df = build_decisions_df(rule_type = "decide")
+        decisions_df = build_decisions_df(
+          rule_type = "decide",
+          viable_metrics = init_viable_metrics)
       )
     
     auto_accepted <-
@@ -416,14 +359,33 @@ val_pkg <- function(
   # pkg_assessment <- readRDS(assessment_file)
   # pkg_scores <- readRDS(scores_file)
   
+  # riskmetric doesn't pick up certain metrics for pkg_ref(source = "pkg_cran_remote")
+  # What metrics do we need to remove for the decisioning process?
+  viable_metrics <- pkg_scores |>
+    dplyr::as_tibble() |>
+    t() |>
+    as.data.frame() |>
+    dplyr::filter(!is.na(V1)) |>
+    # make rownames a column
+    tibble::rownames_to_column(var = "metric") |>
+    dplyr::pull(metric)
+  
+  if("r_cmd_check" %in% viable_metrics){
+    vm <- viable_metrics[which(viable_metrics != "r_cmd_check")]
+    viable_metrics <- c(vm, "r_cmd_check_warnings", "r_cmd_check_errors")
+  }
+  
   decision <- 
     val_decision( 
       pkg = pkg,
-      source = list(assessment = pkg_assessment, scores = pkg_scores), # include both
+      source = list(assessment = pkg_assessment, scores = pkg_scores), 
       excl_metrics = exclude_met, # Subset if desired
       decisions = decisions,
       else_cat = decisions[length(decisions)],
-      decisions_df = build_decisions_df(rule_type = "decide")
+      decisions_df = build_decisions_df(
+        rule_type = "decide",
+        viable_metrics = viable_metrics
+        )
     )
   decision_aa <- decision |>
     dplyr::select(dplyr::ends_with("cataa")) |>
@@ -483,7 +445,6 @@ val_pkg <- function(
     sys_info = R.Version(),
     repos = list(options("repos")),
     val_date = val_date,
-    clean_install = clean_install,
     ref = ref,
     metric_pkg = metric_pkg,
     # metrics = pkg_assessment, # saved separately for {riskreports}

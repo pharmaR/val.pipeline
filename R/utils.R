@@ -310,12 +310,16 @@ pull_config <- function(
 #'   that are acceptable for this metric.
 #' - min_value: (Optional) A numeric value indicating the minimum acceptable
 #'   value for the primary metric(s).
+#' - auto_accept: (Optional) A formula that defines a condition under which the
+#'  package can be automatically accepted, regardless of other conditions.
+#' @param viable_metrics An optional character vector of metric names that are
+#'  considered viable for the chosen pkg_source. If provided, any metrics in
+#'  `rule_lst` that are not in `viable_metrics` will be dropped.
 #'
 #' @importFrom rlang expr_text is_empty
 #' @importFrom dplyr mutate select row_number left_join filter distinct tibble
 #' @importFrom purrr map map_chr imap_dfr pmap_chr pmap_lgl set_names
 #' @importFrom glue glue
-#'
 #'
 #' @examples build_decisions_df()
 #'
@@ -331,7 +335,8 @@ pull_config <- function(
 #' @export
 build_decisions_df <- function(
     rule_type = c("default", "remote_reduce", "decide")[1],
-    rule_lst = NULL # could input custom rules list here
+    rule_lst = NULL, # could input custom rules list here
+    viable_metrics = NULL
   ) {
   
   if (is.null(rule_lst)) {
@@ -342,6 +347,23 @@ build_decisions_df <- function(
     rule_lst <- figgy$rule_lst
   }
     
+  #
+  # Remove metrics from rule_lst that aren't in 'metrics'
+  if(!is.null(viable_metrics)) {
+    keep_rules <- names(rule_lst) %in% viable_metrics
+    if(any(!keep_rules)) {
+      dropped_rules <- names(rule_lst)[which(!keep_rules)]
+      cat(glue::glue("\n\n--> Dropping rules for non-viable metrics for chosen pkg_source:\n"))
+      cat("\n---->", paste(dropped_rules, collapse = '\n----> '), "\n")
+    }
+    # drop 'em
+    rule_lst <- rule_lst[keep_rules]
+    if(length(rule_lst) == 0) {
+      # probably need something else other than stop()?
+      stop(glue::glue("\n\n--> None of the metrics in 'rule_lst' are viable. Please check your 'metrics' inputs.\n"))
+    }
+  }
+  
   #
   # Clean up rules list & decision categories 
   #
@@ -391,7 +413,9 @@ build_decisions_df <- function(
     ) |> 
     # Add in column for metric_type
     dplyr::mutate(
-      metric_type = purrr::map_chr(metric, ~ rule_lst[[.x]][["type"]] %||% "Exception")
+      metric_type = purrr::map_chr(metric, ~
+        rule_lst[[.x]][["type"]] %||% {if(rule_type == "remote_reduce") "exception" else "secondary"}) |>
+        factor(levels = c("primary", {if(rule_type == "remote_reduce") "exception" else "secondary"}))
     ) |>
     # dplyr::mutate(
       # extract lower & Upper limit of the condition
@@ -415,7 +439,8 @@ build_decisions_df <- function(
       }),
       by = "metric"
     ) |>
-    dplyr::select(-met_dec_id) # Get rid of this ID
+    dplyr::select(-met_dec_id) |> # Get rid of this ID
+    dplyr::arrange(metric_type)
   
   
   
