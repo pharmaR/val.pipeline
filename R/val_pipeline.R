@@ -86,8 +86,6 @@ val_pipeline <- function(
   #
   # ---- Set capture 'old' options ----
   #
-  
-  # TO-DO: this should be moved inside val_categorize()
   old <- options()
   on.exit(function() options(old))
 

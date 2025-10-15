@@ -3,12 +3,41 @@
 devtools::load_all()
 
 # Create qualified pkg data.frame
-# trying to just do bioconductor packages
-qual <- val_pipeline(
+source("dev/pkg_lists.R") # build_pkgs & pkgs for CRAN only
+# See the full dependency tree before running val_build()
+# these_pkgs <- "withr"  # messes with the entire process
+# these_pkgs <- "matrix" # takes 5 mins to install
+# these_pkgs <- "askpass"
+these_pkgs <- "dplyr"
+# these_pkgs <- build_pkgs
+
+tree <- tools::package_dependencies(
+  packages = these_pkgs,
+  db = available.packages(),
+  # which = c("Suggests"),
+  which = "strong", #c("Depends", "Imports", "LinkingTo"),
+  # which = c("Depends", "Imports", "LinkingTo", "Suggests"), # prod
+  recursive = TRUE
+  # recursive = FALSE
+) |>
+  unlist(use.names = FALSE) |>
+  unique()
+# How many? # 621 pkgs -->  When recursive: 2,570. Only 744 when you don't include Suggests
+full_tree <- c(these_pkgs, tree) |> unique()
+full_tree |> length()
+
+# temporary until we can figure out what's gone haywire with this pkg
+# build_pkgs <- build_pkgs[build_pkgs != "withr"]
+
+qual <- val_build(
+  # pkg_names = build_pkgs,
+  pkg_names = "dplyr",
   ref = "source",
   metric_pkg = "riskmetric", 
-  deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
-  deps_recursive = TRUE,
+  # deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+  deps = NULL,
+  # deps_recursive = TRUE,
+  deps_recursive = FALSE,
   val_date = Sys.Date(),
   # val_date = as.Date("2025-10-07"),
   replace = FALSE, 

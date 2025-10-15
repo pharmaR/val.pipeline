@@ -485,10 +485,23 @@ build_decisions_df <- function(
 #' @keywords internal
 get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_accept = FALSE) {
   
+  # for debugging
+  # met_dec_df <- build_decisions_df() |> dplyr::mutate(derived_col = metric)
+  # met_names <- c("dwnlds")
+  # else_cat <- "High"
+  # ids <- FALSE
+  # ids <- TRUE
+  # auto_accept <- TRUE
+  # auto_accept <- FALSE
+  
   # If auto_accept is TRUE, Then set ids to FALSE
   if(auto_accept) {
     ids <- FALSE
   }
+  
+  # if pkg was accepted outside of val.pipeline, we'll need to add logic to
+  # auto_accept those packages
+  approved_pkgs <- pull_config(val = "approved_pkgs", rule_type = "default")
   
   cond_exprs <- purrr::map_chr(met_names, ~ {
     # .x <- met_names[1]
@@ -501,26 +514,42 @@ get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_ac
         else_cat <- met_dec_df$decision_id[which(met_dec_df$decision == else_cat)] |> unique()
       } 
     }
-    # if we want the "auto_accept" version of case_when()'s then we'll want to leave
-    if(auto_accept) else_cat <- FALSE else else_cat <- glue::glue("'{else_cat}'")
     
+    # insert a '.x' in place of .x so that the variable name takes is place
     conds <- gsub('.x', .x, dec_df$condition)
-    if(all(!is.na(dec_df$auto_accept))) {
+    
+    # create a 'then' for the if-else-then response based on ids or auto_accept
+    then <- if(ids) min(dec_df$decision_id) else {
+      if(auto_accept) TRUE else glue::glue("'{levels(dec_df$decision)[1]}'")
+    }
+    
+    # Same here: create the appropriate 'else_cat'
+    else_cat <- if(ids) else_cat else {
+      if(auto_accept) FALSE else glue::glue("'{else_cat}'")
+    }
+    
+    # if pkg was accepted outside of val.pipeline, we'll need to accept it here:
+    if(length(approved_pkgs) > 0) {
+      approved_pkgs_cond <- glue::glue("package %in% c('{paste(approved_pkgs, collapse = \"', '\")}') ~ {then}")
+    } else {
+      approved_pkgs_cond <- NULL
+    }
+    
+    # if there's an auto_accept condition, generate a condition for it
+    if(any(!is.na(dec_df$auto_accept))) {
       aa_cond <- gsub('.x', .x, dec_df$auto_accept) |> unique()
-      if(auto_accept) {
-        # TRUE / FALSE condition
-        auto_accept_cond <- glue::glue("{gsub('~', '', aa_cond)} ~ TRUE")
-      } else {
-        # Decision (id) outcome:
-        auto_accept_cond <- glue::glue("{gsub('~', '', aa_cond)} ~ '{if(ids) min(dec_df$decision_id) else levels(dec_df$decision)[1]}'")
-      }
+      auto_accept_cond <- glue::glue("{gsub('~', '', aa_cond)} ~ {then}")
     } else {
       auto_accept_cond <- NULL
     }
     
+    # build case_when statements!
+    # via: approved_pkgs, auto_accept, and decision conds, in that order
     c(
-      auto_accept_cond, # include a condition for auto_accepted categories, which should be run first
-      if(auto_accept) NULL else glue::glue("{gsub('~', '', conds)} ~ '{if(ids) dec_df$decision_id else dec_df$decision}'"),
+      # include a condition(s) for auto_accepted categories, which should be run first
+      if(auto_accept) c(approved_pkgs_cond, auto_accept_cond),
+      # otherwise, regular metric-based conditions
+      if(auto_accept) NULL else glue::glue("{gsub('~', '', conds)} ~ {if(ids) dec_df$decision_id else paste0('\"', dec_df$decision, '\"')}"),
       glue::glue(".default = {else_cat}")
     ) |>
       stringr::str_flatten_comma() %>%
