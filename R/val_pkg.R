@@ -4,10 +4,10 @@
 #' Validation process at the package level. Includes steps to download the
 #' package source (preferred), install the package, assess the package using the
 #' user-specified metric package (only `riskmetric` is supported currently),
-#' apply risk decisions, and build a report. Note: to save time during, every
+#' apply risk decisions, and build a report. Note: to save time, every
 #' package will be assessed using a "pkg_cran_remote" reference initially to see
 #' if any primary metrics met the "auto-accept" threshold(s), if applicable. If
-#' they did, then the running then computing 'covr_coverage' will be skipped.
+#' they did, the 'covr_coverage' computation will be skipped.
 #'
 #' @param pkg Character(1). Name of package to validate.
 #' @param ver Character(1). Version of package to validate.

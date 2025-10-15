@@ -13,7 +13,8 @@ val_build(
   val_date = Sys.Date(),
   out = "riskassessment",
   replace = FALSE,
-  opt_repos = c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()))
+  opt_repos = c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()), BioC
+    = "https://bioconductor.org/packages/3.21/bioc")
 )
 }
 \arguments{
@@ -62,11 +63,14 @@ Build a risk assessment validation for a set of R packages from various
 sources (CRAN / Bioconductor / GitHub), with the ability to include
 (optionally recursive) dependencies and suggests, and save the results in a
 structured directory. The cherry on top is that this build will use logic
-from val_filter() to not only apply risk decisions too all packages assessed,
-but goes back around and will re-categorize (invalidated) decisions based on
-whether any dependencies were categorized as "High Risk" / "Rejected". After
-the pipeline applies a decision onto each package using criteria provided in
-a config file, it even generates a report detailing specifics of the
-assessment as supporting evidence. The end result is a directory containing
-the assessment results and reports for each package evaluated.
+from val_decision() to not only apply risk decisions too all packages
+assessed, but goes back around and will re-categorize decisions based on
+whether any dependencies were categorized as "High Risk" / "Rejected". It
+also is intelligent enough to sort the list of packages to run those with the
+most dependencies first, so that if a package fails, it doesn't waste any
+time running it's reverse dependence.
+After the pipeline applies a decision onto each package using criteria
+provided in a config file, it even generates a report detailing specifics of
+the assessment as supporting evidence. The end result is a directory
+containing the assessment results and reports for each package evaluated.
 }
