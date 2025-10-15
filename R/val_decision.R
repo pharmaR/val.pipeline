@@ -367,7 +367,10 @@ val_decision <- function(
     
   } else {
     cat("\n-->No 'Primary' metrics found in 'decisions_df'.")
-    pkgs_primed <- pkgs_df
+    pkgs_primed <- pkgs_df |>
+      dplyr::mutate(
+        final_risk_cat = factor(NA, levels = decisions)
+      )
   }
   
   
@@ -383,7 +386,7 @@ val_decision <- function(
     # ---- 'Secondary' Metrics ----
     # Used for GitHub hosted pkgs, etc.
     secondary_metrics <- decisions_df |>
-      dplyr::filter(tolower(metric_type) != "primary") |>
+      dplyr::filter(!(tolower(metric_type) %in% "primary")) |>
       dplyr::mutate(derived_col = metric)
     
     sec_met_len <- secondary_metrics$metric |> unique() |> length()
@@ -758,7 +761,7 @@ val_categorize <- function(
   # "Medium" could move to "Low". Also, there may be some exception metrics
   # that will auto-accept a pkg to "Low" risk.
   exception_metrics <- decisions_df |>
-    dplyr::filter(tolower(metric_type) != "primary") 
+    dplyr::filter(!(tolower(metric_type) %in% "primary"))
   
   exc_met_len <- exception_metrics$metric |> unique() |> length()
   

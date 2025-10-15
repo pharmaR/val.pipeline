@@ -222,7 +222,8 @@ val_pkg <- function(
         else_cat = decisions[length(decisions)],
         decisions_df = build_decisions_df(
           rule_type = "decide",
-          viable_metrics = init_viable_metrics)
+          viable_metrics = init_viable_metrics
+          )
       )
     
     auto_accepted <-
