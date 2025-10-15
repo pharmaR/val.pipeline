@@ -541,7 +541,7 @@ get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_ac
     }
     
     # insert a '.x' in place of .x so that the variable name takes is place
-    conds <- gsub('.x', .x, dec_df$condition)
+    conds <- gsub('\\.x', .x, dec_df$condition)
     
     # create a 'then' for the if-else-then response based on ids or auto_accept
     then <- if(ids) min(dec_df$decision_id) else {
