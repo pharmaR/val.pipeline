@@ -387,8 +387,27 @@ val_pkg <- function(
         viable_metrics = viable_metrics
         )
     )
-
+  decision_aa <- decision |>
+    dplyr::select(dplyr::ends_with("cataa")) |>
+    as.vector() |> unlist() |> any()
   
+  if(decision_aa) {
+    approved_pkgs <- pull_config(val = "approved_pkgs", rule_type = "default")
+    aa_metrics <- decision |>
+      dplyr::select(dplyr::ends_with("cataa")) |>
+      names() %>%
+      gsub("_cataa", "", .)
+
+    decision_reason <- dplyr::case_when(
+      pkg %in% approved_pkgs ~ "Pre-Approved package",
+      length(aa_metrics) > 0 ~ paste("Met auto-accepted metric threshold(s) for:", paste(aa_metrics, collapse = ", ")),
+      TRUE ~ "Risk Assessment"
+    ) 
+  } else {
+    decision_reason <- "Risk Assessment"
+  }
+  
+  cat("\n-->", pkg_v,"decision reason:\n---->", decision_reason, "\n")
   
   #
   # ---- Build Report ----
@@ -430,7 +449,7 @@ val_pkg <- function(
     metric_pkg = metric_pkg,
     # metrics = pkg_assessment, # saved separately for {riskreports}
     decision = decision$final_risk,
-    decision_reason = "Assessment",
+    decision_reason = decision_reason,
     final_decision = NA_character_, # Will be set later
     final_decision_reason = NA_character_, # Will be set later
     depends = if(identical(depends, character(0))) NA_character_ else depends,

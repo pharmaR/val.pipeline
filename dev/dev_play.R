@@ -59,6 +59,7 @@ qual <- val_pipeline(
 # ---- val_build()----
 #
 
+source("dev/pkg_lists.R") # # build_pkgs & pkgs
 # See the full dependency tree before running val_build()
 # these_pkgs <- "withr"  # messes with the entire process
 # these_pkgs <- "matrix" # takes 5 mins to install
@@ -122,13 +123,18 @@ reports |> length()
 any(stringr::str_detect(reports, "spacesXYZ"))
 
 
-source("dev/pkg_lists.R")
+source("dev/pkg_lists.R") # build_pkgs & pkgs
 
 
 # pack = 'rlang'
 pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
 # pack = 'withr'
 # pack = 'SuppDists'
+pack = 'dplyr'
+# pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
+# pack = 'withr'
+# pack = 'SuppDists'
+
 # pack <- pkgs[which(pkgs == "SuppDists") + 1] # last left off:
 # pack
 
@@ -141,9 +147,12 @@ pkg_meta <- val_pkg(
   out_dir = val_dir,
   val_date = val_date
   )
+
 pkg_meta[!names(pkg_meta )%in% c("rev_deps","depends","suggests")]  
 assessed <- file.path(val_dir, "assessed")
 ass_files <- list.files(assessed, pattern = "_assessments.rds$")
 ass_pkg <- ass_files[stringr::str_detect(ass_files, pack)]
 ass <- readRDS(file.path(assessed, ass_pkg))
 ass$r_cmd_check
+
+
