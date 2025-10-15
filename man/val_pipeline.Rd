@@ -5,8 +5,8 @@
 \title{Validation: Execute an Assessment Pipeline}
 \usage{
 val_pipeline(
-  ref = c("source", "remote")[1],
-  metric_pkg = "riskmetric",
+  ref = c("source", "remote"),
+  metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
   deps = c("depends", "suggests")[1],
   deps_recursive = TRUE,
   val_date = Sys.Date(),
