@@ -147,7 +147,7 @@ update_opt_repos <- function(
     cran_pos <- which("CRAN" == toupper(names(opt_repos)))
     curr_cran <- opt_repos[[cran_pos]]
     # Grab the "base url", which will be the entire text string up till the last "/"
-    base_url <- substr(curr_cran, 1, max(unlist(gregexpr("/", curr_cran))))
+    base_url <- dirname(curr_cran)
     
     # if val_date is today & curr_cran is already "latest" or ends in today's date, then don't update
     if(val_date == Sys.Date()) {
