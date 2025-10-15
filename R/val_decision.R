@@ -400,6 +400,7 @@ val_decision <- function(
   #
   # ---- Return data for filtering (presumably)
   # 
+  cat("\n\n")
   print(
     pkgs_final$final_risk |>
       # factor(levels = c("Low", "Medium", "High")) |> # not needed
