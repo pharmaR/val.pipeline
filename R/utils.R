@@ -158,7 +158,7 @@ update_opt_repos <- function(
         return(opt_repos)
       } else {
         cat(paste0("--> Updating 'CRAN' repo to use latest snapshot.\n"))
-        new_cran <- paste0(base_url, "latest")
+        new_cran <- file.path(base_url, "latest")
         opt_repos[[cran_pos]] <- new_cran
         return(opt_repos)
       }
