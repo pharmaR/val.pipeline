@@ -666,8 +666,8 @@ rip_cats <- function(
   ), \(met, der) {
     
     # for debugging
-    # met <- met_der$metric[1]
-    # der <- met_der$derived_col[1]
+    # met <- met_der$metric[2]
+    # der <- met_der$derived_col[2]
     
     cat(glue::glue("\n\n--> Decisions based off '{met}' metric:\n\n"))
     cond_exprs <- get_case_whens(met_dec_df, der, else_cat)

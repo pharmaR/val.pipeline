@@ -231,8 +231,8 @@ val_build <- function(
     
     # i <- 1 # for debugging
     # i <- which(pkgs == "class")
-    # pkg <- pkgs[i + 1] # for debugging
-    # ver <- vers[i + 1] # for debugging
+    # pkg <- pkgs[i] # for debugging
+    # ver <- vers[i] # for debugging
     
     pkg_v <- paste(pkg, ver, sep = "_")
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))

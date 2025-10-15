@@ -7,8 +7,8 @@ source("dev/pkg_lists.R") # build_pkgs & pkgs for CRAN only
 # See the full dependency tree before running val_build()
 # these_pkgs <- "withr"  # messes with the entire process
 # these_pkgs <- "matrix" # takes 5 mins to install
-# these_pkgs <- "askpass"
-these_pkgs <- "dplyr"
+these_pkgs <- "askpass"
+# these_pkgs <- "dplyr"
 # these_pkgs <- build_pkgs
 
 tree <- tools::package_dependencies(
@@ -31,7 +31,7 @@ full_tree |> length()
 
 qual <- val_build(
   # pkg_names = build_pkgs,
-  pkg_names = "dplyr",
+  pkg_names = these_pkgs,
   ref = "source",
   metric_pkg = "riskmetric", 
   # deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
@@ -48,6 +48,20 @@ qual <- val_build(
 # Quick run
 # 
 
+# -- dev --
+pkg_names = these_pkgs
+ref = "source"
+metric_pkg = "riskmetric"
+# deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+deps = NULL
+# deps_recursive = TRUE
+deps_recursive = FALSE
+val_date = Sys.Date()
+# val_date = as.Date("2025-10-07")
+replace = FALSE
+out = 'dev/riskassessments'
+
+# -- defaults --
 # ref = "source"
 # metric_pkg = "riskmetric"
 # deps = "depends" # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
@@ -56,3 +70,5 @@ qual <- val_build(
 # # val_date = as.Date("2025-10-07")
 # replace = FALSE
 # out = 'dev/riskassessments'
+
+
