@@ -125,18 +125,22 @@ any(stringr::str_detect(reports, "spacesXYZ"))
 
 source("dev/pkg_lists.R") # build_pkgs & pkgs
 
-
+# CRAN
 # pack = 'rlang'
-pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
-# pack = 'withr'
-# pack = 'SuppDists'
-pack = 'dplyr'
 # pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
 # pack = 'withr'
 # pack = 'SuppDists'
-
+# pack = 'dplyr'
+# pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
+# pack = 'withr'
+# pack = 'SuppDists'
 # pack <- pkgs[which(pkgs == "SuppDists") + 1] # last left off:
 # pack
+
+# BioC
+pack = 'Biobase'
+# pack = 'BiocGenerics'
+
 
 pkg_meta <- val_pkg(
   pkg = pack,

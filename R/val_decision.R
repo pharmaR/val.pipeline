@@ -679,6 +679,7 @@ val_categorize <- function(
   }
   
   
+  # for debugging:
   # What's a bioconductor pkg with a high number of rev_deps?
   # options("repos")
   # names(pkgs)
