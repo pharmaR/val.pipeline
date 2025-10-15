@@ -16,6 +16,7 @@
 #' @param decisions character vector, the risk categories to use.
 #' @param else_cat character, the default risk category if no conditions are
 #'   met.
+#' @param avail_pkgs data.frame, the output of available.packages()
 #' @param decisions_df data.frame, the output of build_decisions_df()
 #'
 #' @importFrom dplyr filter pull mutate case_when between rename left_join
@@ -29,6 +30,7 @@ val_decision <- function(
     excl_metrics = NULL,
     decisions = c("Low", "Medium", "High"),
     else_cat = "High",
+    avail_pkgs = available.packages() |> as.data.frame(),
     decisions_df = build_decisions_df(rule_type = "decide")
 ) {
   # Verify pkg is not null
@@ -56,6 +58,7 @@ val_decision <- function(
   #
   # ---- Prepare workable fields to categorize  ----
   #
+  
   # First, allow user to subset the metrics
   # names(source$assessment)
   decisions_df <- decisions_df |>
@@ -143,7 +146,7 @@ val_decision <- function(
     
     deppies <- tools::package_dependencies(
       packages = pkg,
-      db = available.packages(),
+      db = avail_pkgs |> as.matrix(),
       which = c("Depends", "Imports", "LinkingTo"),
       recursive = FALSE
     ) |>
@@ -257,92 +260,122 @@ val_decision <- function(
   }
 
   
+  
   #
   # ---- Apply Decisions ----
   #
   
-  # ---- 'Primary' Metrics ----
+  # Some setup:
+  # Where did package come from?
+  repo_src <- avail_pkgs |>
+    dplyr::filter(Package %in% pkg) |> 
+    dplyr::pull(Repository) |>
+    dirname() |> dirname() # remove '/src/contrib/` ending
+  curr_repos <- options("repos")
+  
+  # look-up name of curr_repos based on repo_src. Yes, I know that is very
+  # dependent on the naming convention chosen for our repos
+  repo_name <- curr_repos$repos[curr_repos$repos %in% repo_src] |> names()
+  if(length(repo_name) == 0) repo_name <- "unknown"
+  if(length(repo_name) > 1) {
+    repo_name <- repo_name[1]
+    cat(glue::glue("\n!!! WARNING: Package '{pkg}' appears to come from multiple repos. Using '{repo_name[1]}' for decisioning.\n"))
+  }
+    # Note: instead of doing this here, we could track it at the pkg_meta level?
+  
+  # Which metrics are available?
+  all_mets <- decisions_df$metric |> unique()
+  
+  
+  
+  #
+  # --- Primary Metrics ----
+  #
+  
   primary_metrics <- decisions_df |>
-    dplyr::filter(tolower(metric_type) == "primary") |>
+    dplyr::filter(tolower(metric_type) == "primary") %>%
+    
+    # if this is not a CRAN pkg, do not use downloads_1yr as a primary metric
+    {if("downloads_1yr" %in% all_mets & toupper(repo_name) != "CRAN") {
+      dplyr::filter(., !(tolower(metric) %in% c("downloads_1yr"))) 
+      } else .} |>
+    
+    # For debugging:
     # dplyr::filter(tolower(metric) %in% c("downloads_1yr", "reverse_dependencies")) |>
     # dplyr::filter(tolower(metric) %in% c("covr_coverage")) |>
     dplyr::mutate(derived_col = metric)
   
   # Share a note
   prime_met_len <- primary_metrics$metric |> unique() |> length()
-  cat(glue::glue("\n\n--> Applying Decisions Categories for {prime_met_len} 'Primary' risk metric(s).\n\n"))
-  cat("\n---->", paste(primary_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
-  
-  # else_cat <- "High" # for debugging
-  
-  # Generate case_when()'s
-  cond_exprs <- get_case_whens(
-    met_dec_df = primary_metrics,
-    met_names = primary_metrics$metric |> unique(),
-    else_cat = else_cat
+  if(prime_met_len > 0) {
+    cat(glue::glue("\n\n--> Applying Decisions Categories for {prime_met_len} 'Primary' risk metric(s).\n\n"))
+    cat("\n---->", paste(primary_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
+    
+    # else_cat <- "High" # for debugging
+    
+    # Generate case_when()'s
+    cond_exprs <- get_case_whens(
+      met_dec_df = primary_metrics,
+      met_names = primary_metrics$metric |> unique(),
+      else_cat = else_cat
     )
-  cond_exprs_ids <- get_case_whens(
-    met_dec_df = primary_metrics, met_names = primary_metrics$metric |> unique(),
-    else_cat = else_cat,
-    ids = TRUE
-  )
-  cond_exprs_aa <- get_case_whens(
-    met_dec_df = primary_metrics,
-    met_names = primary_metrics |> dplyr::filter(!is.na(auto_accept)) |> distinct(derived_col) |> pull(derived_col),
-    else_cat = else_cat,
-    auto_accept = TRUE
-  )
+    cond_exprs_ids <- get_case_whens(
+      met_dec_df = primary_metrics, met_names = primary_metrics$metric |> unique(),
+      else_cat = else_cat,
+      ids = TRUE
+    )
+    cond_exprs_aa <- get_case_whens(
+      met_dec_df = primary_metrics,
+      met_names = primary_metrics |> dplyr::filter(!is.na(auto_accept)) |> distinct(derived_col) |> pull(derived_col),
+      else_cat = else_cat,
+      auto_accept = TRUE
+    )
+    
+    dec_id_df <- unique(primary_metrics[,c("decision", "decision_id")])
+    
+    # pkgs_df$dwnlds_cat <- NULL
+    pkgs_primed <-
+      pkgs_df |>
+      dplyr::rowwise() |> 
+      dplyr::mutate(!!! cond_exprs) |>
+      dplyr::mutate(!!! cond_exprs_ids) %>%
+      {if(length(cond_exprs_aa) > 0) dplyr::mutate(., !!! cond_exprs_aa) else .} |>
+      dplyr::ungroup() |>
+      dplyr::mutate(
+        # convert cat vars into factors so we can use pmax() on them
+        across(ends_with("_cat"), ~ factor(.x, levels = decisions)), 
+        
+        # if any column ending in "_cataa" is TRUE, then set final_risk_catid to 1 (Low)
+        final_risk_cataa = ifelse(rowSums(across(ends_with("_cataa"), ~ .x), na.rm = TRUE) > 0, 1, NA_integer_),
+        
+        # higher risk trumps lower risk amongst all _cat vars (e.g., High > Medium > Low)
+        max_catid = pmax(!!!rlang::syms(paste0(unique(primary_metrics$derived_col), "_catid")), na.rm = TRUE) |> as.integer(),
+        final_risk_catid = dplyr::case_when(
+          !is.na(final_risk_cataa) ~ final_risk_cataa,
+          is.finite(max_catid) ~ max_catid,
+          .default = as.integer(NA) # if this happens, need to investigate!
+        ),
+        final_risk_cat = decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid)
+      ) |>
+      dplyr::select(-c(ends_with("_catid"), "final_risk_cataa"))
+    
+    
+    cat("\n\n--> Primary Metric Decision Categories Assigned:\n")
+    pkgs_primed |>
+      dplyr::select(package, dplyr::ends_with("_cat")) |>
+      t() |> print()
+    
+  } else {
+    cat("\n-->No 'Primary' metrics found in 'decisions_df'.")
+    pkgs_primed <- pkgs_df
+  }
   
-  dec_id_df <- unique(primary_metrics[,c("decision", "decision_id")])
   
-  # pkgs_df$dwnlds_cat <- NULL
-  pkgs_primed <-
-    pkgs_df |>
-    dplyr::rowwise() |> 
-    dplyr::mutate(!!! cond_exprs) |>
-    dplyr::mutate(!!! cond_exprs_ids) %>%
-    {if(length(cond_exprs_aa) > 0) dplyr::mutate(., !!! cond_exprs_aa) else .} |>
-    dplyr::ungroup() |>
-    dplyr::mutate(
-      # convert cat vars into factors so we can use pmax() on them
-      across(ends_with("_cat"), ~ factor(.x, levels = decisions)), 
-      
-      # if any column ending in "_cataa" is TRUE, then set final_risk_catid to 1 (Low)
-      final_risk_cataa = ifelse(rowSums(across(ends_with("_cataa"), ~ .x), na.rm = TRUE) > 0, 1, NA_integer_),
-      
-      # higher risk trumps lower risk amongst all _cat vars (e.g., High > Medium > Low)
-      max_catid = pmax(!!!rlang::syms(paste0(unique(primary_metrics$derived_col), "_catid")), na.rm = TRUE) |> as.integer(),
-      final_risk_catid = dplyr::case_when(
-        !is.na(final_risk_cataa) ~ final_risk_cataa,
-        is.finite(max_catid) ~ max_catid,
-        .default = as.integer(NA) # if this happens, need to investigate!
-      ),
-      final_risk_cat = decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid)
-    ) |>
-    dplyr::select(-c(ends_with("_catid"), "final_risk_cataa"))
-  
-  
-  cat("\n\n--> Primary Metric Decision Categories Assigned:\n")
-  pkgs_primed |>
-    dplyr::select(package, dplyr::ends_with("_cat")) |>
-    t() |> print()
   
   #
-  # --- Where did package come from? ----
+  # --- Secondary Metrics ----
   #
-  repo_src <- available.packages() |>
-    as.data.frame() |>
-    dplyr::filter(Package %in% pkg) |> 
-    dplyr::pull(Repository) |>
-    dirname() |> dirname() # remove '/src/contrib/` ending
-  curr_repos <- options("repos")
-  
-  # lookup name of curr_repos based on repo_src. Yes, I know that is very dependent
-  # on the naming convention chosen for our repos
-  repo_name <- curr_repos$repos[curr_repos$repos %in% repo_src] |> names()
-  if(length(repo_name) == 0) repo_name <- "unknown"
   if(tolower(repo_name) != "cran") cat(glue::glue("\n--> Package '{pkg}' appears to come from repo: '{repo_name}' ({repo_src}) which requires secondary metric assessments.\n"))
-  
   
   # If not from CRAN, then make decision using secondary metric conditions
   if(tolower(repo_name) != "cran") {

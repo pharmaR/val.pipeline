@@ -108,7 +108,7 @@ val_pkg <- function(
   depends <- 
     tools::package_dependencies(
       packages = pkg,
-      db = available.packages(),
+      db = avail_pkgs |> as.matrix(),
       which = c("Depends", "Imports", "LinkingTo"),
       recursive = TRUE
     ) |>
@@ -118,7 +118,7 @@ val_pkg <- function(
   suggests <- 
     tools::package_dependencies(
       packages = pkg,
-      db = available.packages(),
+      db = avail_pkgs |> as.matrix(),
       which = "Suggests",
       recursive = TRUE # this really blows up for almost any pkg
     ) |>
@@ -382,6 +382,7 @@ val_pkg <- function(
       excl_metrics = exclude_met, # Subset if desired
       decisions = decisions,
       else_cat = decisions[length(decisions)],
+      avail_pkgs = avail_pkgs,
       decisions_df = build_decisions_df(
         rule_type = "decide",
         viable_metrics = viable_metrics
