@@ -305,7 +305,7 @@ val_decision <- function(
     # dplyr::filter(tolower(metric) %in% c("covr_coverage")) |>
     dplyr::mutate(derived_col = metric)
   
-  # Share a note
+  # Share a note about primary metrics being used
   prime_met_len <- primary_metrics$metric |> unique() |> length()
   if(prime_met_len > 0) {
     cat(glue::glue("\n\n--> Applying Decisions Categories for {prime_met_len} 'Primary' risk metric(s).\n\n"))
@@ -679,7 +679,13 @@ val_categorize <- function(
   }
   
   
-  
+  # What's a bioconductor pkg with a high number of rev_deps?
+  # options("repos")
+  # names(pkgs)
+  # see <- pkgs |>
+  #   # dplyr::filter() |>
+  #   dplyr::filter(package %in% c("Biobase", "BiocGenerics")) #|>
+  #   # dplyr::select(package, rev_deps, dwnlds, n_deps, src_cntrl, n_vig, n_sites)
   
   
   # Note! This area is to automatically exclude pkgs
@@ -702,25 +708,46 @@ val_categorize <- function(
   #
   # ---- Apply Decisions ----
   #
+  # Which metrics are available?
+  all_mets <- decisions_df$metric |> unique()
   
-
-  # ---- 'Primary' Metrics ----
+  
+  
+  #
+  # --- Primary Metrics ----
+  #
   primary_metrics <- decisions_df |>
-    dplyr::filter(tolower(metric_type) == "primary")
+    dplyr::filter(tolower(metric_type) == "primary") %>%
+    
+    # for debugging
     # dplyr::filter(tolower(metric) %in% c("downloads_1yr", "reverse_dependencies"))
-    # dplyr::filter(tolower(metric) %in% c("has_website"))
+    # dplyr::filter(tolower(metric) %in% c("has_website")) 
   
-  # Share a note
+    # if this is not a CRAN pkg, do not use downloads_1yr as a primary metric
+    {if("downloads_1yr" %in% all_mets & toupper(repo_name) != "CRAN") {
+      dplyr::filter(., !(tolower(metric) %in% c("downloads_1yr"))) 
+    } else .}
+  
+  # Share a note about primary metrics being used
   prime_met_len <- primary_metrics$metric |> unique() |> length()
-  cat(glue::glue("\n\n--> Applying Decisions Categories for {prime_met_len} 'Primary' risk metric(s).\n\n"))
-  cat("\n---->", paste(primary_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
   
-  # Create metric-based risk categories decision columns
-  pkgs_primed <- rip_cats(
-    met_dec_df = primary_metrics,
-    pkgs_df = pkgs,
-    else_cat = else_cat
-  )
+  if(prime_met_len > 0) {
+    cat(glue::glue("\n\n--> Applying Decisions Categories for {prime_met_len} 'Primary' risk metric(s).\n\n"))
+    cat("\n---->", paste(primary_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
+    
+    # Create metric-based risk categories decision columns
+    pkgs_primed <- rip_cats(
+      met_dec_df = primary_metrics,
+      pkgs_df = pkgs,
+      else_cat = else_cat
+    )
+  } else {
+    cat("\n-->No 'Primary' metrics found in 'decisions_df'.")
+    # Set as "Medium" risk for now, which allows it to get promoted to "low"
+    # risk as needed.
+    pkgs_primed <- pkgs |>
+      dplyr::mutate(final_risk_cat = factor(NA, levels = decisions))
+  }
   
   
 
@@ -761,10 +788,11 @@ val_categorize <- function(
       # from primary_risk_category if exception_risk_category is the lowest risk
       dplyr::mutate(
         final_risk_id = 
-          ifelse(
-            as.integer(exception_risk_category) == 1 & as.integer(primary_risk_category) > 1,
-            as.integer(primary_risk_category) - 1,
-            as.integer(primary_risk_category)
+          dplyr::case_when(
+            is.na(primary_risk_category) ~ exception_risk_category,
+            as.integer(exception_risk_category) == 1 &
+              as.integer(primary_risk_category) > 1 ~ as.integer(primary_risk_category) - 1,
+            .default = as.integer(primary_risk_category)
           )
       ) |>
       dplyr::left_join(
@@ -813,8 +841,10 @@ val_categorize <- function(
     pkgs_final <- pkgs_primed |>
       # if auto_pass is TRUE, then set final_risk to "Low"
       dplyr::mutate(
-        final_risk = ifelse(auto_pass, decisions[1], as.character(final_risk_cat)) |> factor(levels = decisions)
-      ) |>
+        final_risk = ifelse(auto_pass, decisions[1],
+          ifelse(is.na(final_risk_cat), else_cat,
+            final_risk_cat |> as.character()) |> factor(levels = decisions)
+      )) |>
       dplyr::select(
         package, version, final_risk,
         dplyr::everything()
