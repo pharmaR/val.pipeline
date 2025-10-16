@@ -421,7 +421,7 @@ val_pkg <- function(
     package_name = pkg,
     package_version = ver,
     # template_path = file.path(getwd(), "riskassessment"),
-    output_format = "html", #"md", "pdf", "all",
+    output_format = "typst", #"html", #"md", "pdf", "all",
     # params list: https://github.com/pharmaR/riskreports/blob/main/inst/report/package/pkg_template.qmd
     params = list(
       assessment_path = assessment_file,
