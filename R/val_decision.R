@@ -4,7 +4,7 @@
 #' First whack at attempting to filter packages based on org-level criterion
 #' used to set thresholds (and later update final decision (if not already 'high
 #' risk')) AND filter packages before running val_build(). Note: If PACKAGES
-#' file had assessments, we'd be using that (paired with {val.filter}), but
+#' file had assessments, we'd be using that (paired with \{val.filter\}), but
 #' instead, we're going to use riskscore::cran_assessed_20250812 for the time
 #' being
 #'
@@ -436,7 +436,7 @@ val_decision <- function(
 #' First whack at attempting to filter packages based on org-level criterion
 #' used to set thresholds (and later update final decision (if not already 'high
 #' risk')) AND filter packages before running val_build(). Note: If PACKAGES
-#' file had assessments, we'd be using that (paired with {val.filter}), but
+#' file had assessments, we'd be using that (paired with \{val.filter\}), but
 #' instead, we're going to use riskscore::cran_assessed_20250812 for the time
 #' being
 #'

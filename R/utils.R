@@ -619,8 +619,10 @@ decision_to_id <- function(decision_id_df, rev = FALSE, dec){
 #' @param dec A character vector (if rev = FALSE) or numeric/integer vector (if rev = TRUE) indicating the decision categories or decision_ids to convert
 #' 
 #' @examples
+#' \dontrun{
 #' dec_id_df <- unique(build_decisions_df("remote_reduce")[c("decision", "decision_id")])
 #' decision_to_id_v(dec_id_df, FALSE, c("High", "Medium", "Low"))
+#' }
 #' 
 #' @keywords internal
 decision_to_id_v <- Vectorize(decision_to_id, vectorize.args = "dec")
@@ -647,7 +649,12 @@ decision_to_id_v <- Vectorize(decision_to_id, vectorize.args = "dec")
 #' @examples
 #' # rip_cats(
 #' #   build_decisions_df() |> dplyr::mutate(derived_col = metric),
-#' #   available.packages() |> as.data.frame() |> dplyr::select(pkg, downloads_1yr = dplyr::starts_with("downloads_1yr")),
+#' #   available.packages() |> 
+#' #     as.data.frame() |> 
+#' #     dplyr::select(
+#' #       pkg, 
+#' #       downloads_1yr = dplyr::starts_with("downloads_1yr")
+#' #     ),
 #' #   "High"
 #' # )
 #'

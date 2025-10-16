@@ -5,7 +5,7 @@
 #' A pipeline to validate R packages using specific metrics and criteria,
 #' spelled out in the package's config file. This function orchestrates the
 #' reduction of a large set of packages delivered through various sources
-#' (either {riskscore} or a user-provided data set) based one primary &
+#' (either \{riskscore\} or a user-provided data set) based one primary &
 #' 'exception' criteria. Then, it builds the assessment co-hort using
 #' val_build(), returning a qualified list of packages and all required evidence
 #' needed for provisioning to PPM.
