@@ -32,7 +32,7 @@ conditions only reference decision categories that are allowed in
 \code{decision_lst}.
 }
 \examples{
-pull_config()
-pull_config("decide_github")
+pull_config(rule_type = "remote_reduce")
+pull_config("decide_github", rule_type = "remote_reduce")
 
 }

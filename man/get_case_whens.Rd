@@ -29,11 +29,13 @@ A helper function that builds the dplyr::case_when() statements from the
 decisions data.frame for each metric.
 }
 \examples{
+\dontrun{
 get_case_whens(
   build_decisions_df("remote_reduce") |> dplyr::mutate(derived_col = metric),
   c("downloads_1yr"),
   "High"
 )
+}
 
 }
 \keyword{internal}

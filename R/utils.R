@@ -89,10 +89,12 @@ strip_recording_df <- function(assessment) {
 #' @importFrom rlang expr parse_expr is_call
 #' 
 #' @examples
+#' \dontrun{
 #' to_the_limit("~ is.na(.x)", low = FALSE)
 #' to_the_limit("~ .x < 120000", low = FALSE)
 #' to_the_limit("~ dplyr::between(.x, 120000, 240000)", low = FALSE)
 #' to_the_limit("~ .x > 240000", low = FALSE)
+#' }
 #' 
 #' @keywords internal
 to_the_limit <- function(condition, low = TRUE) {
@@ -212,8 +214,9 @@ update_opt_repos <- function(
 #' @importFrom purrr map map_lgl set_names
 #' @importFrom glue glue
 #'
-#' @examples pull_config()
-#' @examples pull_config("decide_github")
+#' @examples 
+#' pull_config(rule_type = "remote_reduce")
+#' pull_config("decide_github", rule_type = "remote_reduce")
 #' 
 #' @return A named list of lists
 #' 
@@ -500,11 +503,13 @@ build_decisions_df <- function(
 #' @importFrom dplyr filter
 #' 
 #' @examples
+#' \dontrun{
 #' get_case_whens(
 #'   build_decisions_df("remote_reduce") |> dplyr::mutate(derived_col = metric),
 #'   c("downloads_1yr"),
 #'   "High"
 #' )
+#' }
 #' 
 #' @keywords internal
 get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_accept = FALSE) {
