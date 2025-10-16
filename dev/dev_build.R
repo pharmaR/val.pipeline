@@ -7,8 +7,8 @@ source("dev/pkg_lists.R") # build_pkgs & pkgs for CRAN only
 # See the full dependency tree before running val_build()
 # these_pkgs <- "withr"  # messes with the entire process
 # these_pkgs <- "matrix" # takes 5 mins to install
-these_pkgs <- "askpass"
-# these_pkgs <- "dplyr"
+# these_pkgs <- "askpass"
+these_pkgs <- c("Biobase", "BiocGenerics")
 # these_pkgs <- build_pkgs
 
 tree <- tools::package_dependencies(
@@ -44,6 +44,8 @@ qual <- val_build(
   out = 'dev/riskassessments'
 )
 
+qual_df <- qual$pkgs_df
+View(qual_df)
 # 
 # Quick run
 # 

@@ -289,12 +289,25 @@ val_build <- function(
         ) |>
         unlist(use.names = FALSE) 
       
+      # Where did package come from?
+      repo_src <- avail_pkgs |>
+        dplyr::filter(Package %in% pkg) |> 
+        dplyr::pull(Repository) |> 
+        dirname() |> dirname() # trim '/src/contrib/` ending
+      curr_repos <- options("repos")
+      repo_name <- curr_repos$repos[curr_repos$repos %in% repo_src]
+      if(length(repo_name) == 0) repo_name <- "unknown"
+      if(length(repo_name) > 1) {
+        repo_name <- repo_name[1]
+        cat(glue::glue("\n!!! WARNING: Package '{pkg}' appears to come from multiple repos. Using '{repo_name[1]}' for decisioning.\n"))
+      }
+      
       pkg_meta <- list(
         pkg = pkg,
         ver = ver,
         r_ver = getRversion(),
         sys_info = R.Version(),
-        repos = list(options("repos")),
+        repos = repo_name,
         val_date = val_date,
         ref = NA_character_,
         metric_pkg = NA_character_,
@@ -307,6 +320,7 @@ val_build <- function(
         rev_deps = NA_character_,
         assessment_runtime = list(txt = NA_character_, mins = NA)
       )
+      # save the pkg_meta
       saveRDS(pkg_meta, pkg_meta_file)
       cat("\n-->", pkg_v,"meta bundle saved.\n")
     }

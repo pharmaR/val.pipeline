@@ -55,8 +55,10 @@ val_pkg <- function(
   cat(paste0("\n\n\nNew Package: ", pkg, " v", ver," @ ", start_txt,"\n"))
   
   #
-  # ---- Setup Dirs ----
+  # ---- Setup ----
   #
+  
+  # Dirs
   if(ref == "source"){
     tarballs <- file.path(out_dir, 'tarballs')
     sourced <- file.path(out_dir, 'sourced')
@@ -71,12 +73,28 @@ val_pkg <- function(
   if(!dir.exists(assessed)) dir.create(assessed)
   if(!dir.exists(reports)) dir.create(reports)
   
+  # Where did package come from?
+  repo_src_contrib <- avail_pkgs |>
+    dplyr::filter(Package %in% pkg) |> 
+    dplyr::pull(Repository)  # keep '/src/contrib/` ending
+  repo_src <- repo_src_contrib |> dirname() |> dirname() # trim off '/src/contrib'
+  curr_repos <- options("repos")
+  repo_name <- curr_repos$repos[curr_repos$repos %in% repo_src]
+  if(length(repo_name) == 0) repo_name <- "unknown"
+  if(length(repo_name) > 1) {
+    repo_name <- repo_name[1]
+    cat(glue::glue("\n!!! WARNING: Package '{pkg}' appears to come from multiple repos. Using '{repo_name[1]}' for decisioning.\n"))
+  }
+  
+  # Decisions
+  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
+  
   if(ref == "source") {
     
     #
     # ---- Download Tarball ----
     #
-    tarball_url <- paste0("https://cran.r-project.org/src/contrib/", pkg_v,".tar.gz")
+    tarball_url <- file.path(repo_src_contrib, paste0(pkg_v,".tar.gz"))
     dwn_ld <- try(utils::download.file(tarball_url,
                                        file.path(tarballs, basename(tarball_url)), 
                                        quiet = TRUE, mode = "wb"),
@@ -207,7 +225,7 @@ val_pkg <- function(
       tibble::rownames_to_column(var = "metric") |>
       dplyr::pull(metric)
     
-    if("r_cmd_check" %in% viable_metrics){
+    if("r_cmd_check" %in% init_viable_metrics){
       init_vm <- init_viable_metrics[which(init_viable_metrics != "r_cmd_check")]
       init_viable_metrics <- c(init_vm, "r_cmd_check_warnings", "r_cmd_check_errors")
     }
@@ -445,7 +463,7 @@ val_pkg <- function(
     ver = ver,
     r_ver = getRversion(),
     sys_info = R.Version(),
-    repos = list(options("repos")),
+    repos = repo_name, # A named character
     val_date = val_date,
     ref = ref,
     metric_pkg = metric_pkg,

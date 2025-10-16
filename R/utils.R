@@ -705,8 +705,6 @@ rip_cats <- function(
   
   dec_id_df <- unique(met_dec_df[c("decision", "decision_id")])
   
-  # ############################################# Aaron left off here.
-  ######################################### Need to investigate why final_risk_cat is "low" when it seems most metrics failed as "high" risk
   return_pkgs <- pkgs_df |>
     dplyr::mutate(
       # convert cat vars into factors
