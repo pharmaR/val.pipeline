@@ -37,9 +37,6 @@ package can be automatically accepted, regardless of other conditions.
 \item{viable_metrics}{An optional character vector of metric names that are
 considered viable for the chosen pkg_source. If provided, any metrics in
 \code{rule_lst} that are not in \code{viable_metrics} will be dropped.}
-
-\item{decision_lst}{A character vector of decision categories, ordered from
-highest risk to lowest risk.opt_repos}
 }
 \value{
 A data.frame with columns:
@@ -59,6 +56,6 @@ val_filter() that includes columns "metric", "decision", "condition",
 "metric_type", and "accept_condition".
 }
 \examples{
-build_decisions_df()
+build_decisions_df("remote_reduce")
 
 }

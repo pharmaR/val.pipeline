@@ -21,7 +21,7 @@
 #' @param val_date Date. Date of validation. Default is current date.
 #'
 #' @importFrom glue glue
-#' @importFrom utils download.file untar
+#' @importFrom utils download.file untar capture.output
 #' @importFrom riskmetric pkg_ref pkg_assess pkg_score all_assessments
 #' @importFrom riskreports package_report
 #' @importFrom dplyr filter pull select arrange as_tibble
@@ -195,7 +195,7 @@ val_pkg <- function(
     
     init_assessed_end <- Sys.time()
     init_ass_mins <- difftime(init_assessed_end, start, units = "mins")
-    init_ass_mins_txt <- capture.output(init_assessed_end - start)
+    init_ass_mins_txt <- utils::capture.output(init_assessed_end - start)
     cat("\n-->", pkg_v, "initial assessment complete.\n")
     cat("----> (", init_ass_mins_txt, ")\n")
     
@@ -323,7 +323,7 @@ val_pkg <- function(
   
   assessed_end <- Sys.time()
   ass_mins <- difftime(assessed_end, start, units = "mins")
-  ass_mins_txt <- capture.output(assessed_end - start)
+  ass_mins_txt <- utils::capture.output(assessed_end - start)
   cat("\n-->", pkg_v,"assessed.\n")
   cat("----> (", ass_mins_txt, ")\n")
   
