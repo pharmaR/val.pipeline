@@ -39,6 +39,7 @@ Imports:
     purrr,
     riskmetric (>= 0.2.5),
     riskreports (>= 0.0.0.9006),
+    rlang,
     stringr,
     tidyr,
     tools
