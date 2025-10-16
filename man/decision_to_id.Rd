@@ -17,7 +17,7 @@ decision_to_id(decision_id_df, rev = FALSE, dec)
 Helper function to convert decision category to decision_id or vice versa
 }
 \examples{
-dec_id_df <- unique(build_decisions_df()[c("decision", "decision_id")])
+dec_id_df <- unique(build_decisions_df("remote_reduce")[c("decision", "decision_id")])
 decision_to_id(dec_id_df, FALSE, "High")
 
 }

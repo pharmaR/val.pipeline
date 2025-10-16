@@ -30,7 +30,7 @@ decisions data.frame for each metric.
 }
 \examples{
 get_case_whens(
-  build_decisions_df() |> dplyr::mutate(derived_col = metric),
+  build_decisions_df("remote_reduce") |> dplyr::mutate(derived_col = metric),
   c("downloads_1yr"),
   "High"
 )

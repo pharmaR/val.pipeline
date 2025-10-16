@@ -320,7 +320,7 @@ pull_config <- function(
 #' @importFrom purrr map map_chr imap_dfr pmap_chr pmap_lgl set_names
 #' @importFrom glue glue
 #'
-#' @examples build_decisions_df()
+#' @examples build_decisions_df("remote_reduce")
 #'
 #' @return A data.frame with columns:
 #' - metric: The name of the metric.
@@ -501,7 +501,7 @@ build_decisions_df <- function(
 #' 
 #' @examples
 #' get_case_whens(
-#'   build_decisions_df() |> dplyr::mutate(derived_col = metric),
+#'   build_decisions_df("remote_reduce") |> dplyr::mutate(derived_col = metric),
 #'   c("downloads_1yr"),
 #'   "High"
 #' )
@@ -593,7 +593,7 @@ get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_ac
 #' @param dec A character string (if rev = FALSE) or numeric/integer (if rev = TRUE) indicating the decision category or decision_id to convert
 #' 
 #' @examples
-#' dec_id_df <- unique(build_decisions_df()[c("decision", "decision_id")])
+#' dec_id_df <- unique(build_decisions_df("remote_reduce")[c("decision", "decision_id")])
 #' decision_to_id(dec_id_df, FALSE, "High")
 #' 
 #' @keywords internal
@@ -617,7 +617,7 @@ decision_to_id <- function(decision_id_df, rev = FALSE, dec){
 #' @param dec A character vector (if rev = FALSE) or numeric/integer vector (if rev = TRUE) indicating the decision categories or decision_ids to convert
 #' 
 #' @examples
-#' dec_id_df <- unique(build_decisions_df()[c("decision", "decision_id")])
+#' dec_id_df <- unique(build_decisions_df("remote_reduce")[c("decision", "decision_id")])
 #' decision_to_id_v(dec_id_df, FALSE, c("High", "Medium", "Low"))
 #' 
 #' @keywords internal

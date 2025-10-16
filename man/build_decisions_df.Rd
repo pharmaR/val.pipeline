@@ -56,6 +56,6 @@ val_filter() that includes columns "metric", "decision", "condition",
 "metric_type", and "accept_condition".
 }
 \examples{
-build_decisions_df()
+build_decisions_df("remote_reduce")
 
 }
