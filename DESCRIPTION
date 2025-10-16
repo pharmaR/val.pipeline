@@ -5,8 +5,8 @@ Authors@R:
   c(
     person(
       "Aaron", "Clark",
-      email = "clark.aaronchris@gmail.com"
-      role = c("aut", "cre"),
+      email = "clark.aaronchris@gmail.com",
+      role = c("aut", "cre")
     ),
     person(
       "R Validation Hub",
