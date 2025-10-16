@@ -198,6 +198,7 @@ update_opt_repos <- function(
 #' conditions only reference decision categories that are allowed in
 #' `decision_lst`.
 #'
+#' @param val Name of value (NULL to read all values)
 #' @param rule_type A character string indicating whether the decision
 #'   categories are used to "categorize" risk levels (e.g., "Low", "Medium",
 #'   "High") via val_categorize() or val_decision(). The difference being that

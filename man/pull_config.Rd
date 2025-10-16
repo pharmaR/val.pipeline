@@ -11,6 +11,8 @@ pull_config(
 )
 }
 \arguments{
+\item{val}{Name of value (NULL to read all values)}
+
 \item{rule_type}{A character string indicating whether the decision
 categories are used to "categorize" risk levels (e.g., "Low", "Medium",
 "High") via val_categorize() or val_decision(). The difference being that
