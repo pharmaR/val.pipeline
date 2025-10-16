@@ -291,8 +291,6 @@ pull_config <- function(
 #' val_filter() that includes columns "metric", "decision", "condition",
 #' "metric_type", and "accept_condition".
 #'
-#' @param decision_lst A character vector of decision categories, ordered from
-#'   highest risk to lowest risk.opt_repos
 #' @param rule_type A character string indicating whether the decision
 #'   categories are used to "categorize" risk levels (e.g., "Low", "Medium",
 #'   "High") via val_categorize() or val_decision(). The difference being that
