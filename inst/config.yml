@@ -3,7 +3,7 @@ default:
   approved_pkgs: [] # packages that have been approved manually outside of {val.pipeline} workflow
   decisions_lst: [Low, Medium, High]
   opt_repos: 
-    CRAN: https://packagemanager.posit.co/cran/latest
+    CRAN: #https://packagemanager.posit.co/cran/latest
     BioC: https://bioconductor.org/packages/3.21/bioc
     
 remote_reduce:
@@ -26,7 +26,7 @@ remote_reduce:
       Low: ~ .x > 7
     type: exception
     accept_cats: [Low, Medium]
-    auto_accept: ~ .x > 100 # anything above this is 'gold' & doesn't need to hit all the rules
+    auto_accept: ~ .x > 50 # anything above this is 'gold' & doesn't need to hit all the rules
   dependencies:
     cond:
       # High: ~ is.na(.x)

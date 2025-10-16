@@ -206,8 +206,8 @@ update_opt_repos <- function(
 
       } # else val_date was found
     }
-    return(opt_repos)
   }
+  return(opt_repos)
 }
   
 
@@ -685,8 +685,10 @@ rip_cats <- function(
   ), \(met, der) {
     
     # for debugging
-    # met <- met_der$metric[2]
-    # der <- met_der$derived_col[2]
+    # met <- met_der$metric[1]
+    # der <- met_der$derived_col[1]
+    
+    
     
     cat(glue::glue("\n\n--> Decisions based off '{met}' metric:\n\n"))
     cond_exprs <- get_case_whens(met_dec_df, der, else_cat)
@@ -697,7 +699,10 @@ rip_cats <- function(
     # else_cat <- "High" # for debugging
     # pkgs_df$dwnlds_cat <- NULL
     pkgs_df <<- pkgs_df |>
-      dplyr::rowwise() |> # Boo! Rowwise is really slow. We need to find a better way eventually.
+      dplyr::rowwise() %>% # Boo! Rowwise is really slow. We need to find a better way eventually.
+      # {if(met == "downloads_1yr" & toupper(repo_name) != "CRAN") {
+      #   dplyr::filter(., !(tolower(metric) %in% c("downloads_1yr")))
+      #   } else .} |>
       dplyr::mutate(!!! cond_exprs) |>
       dplyr::mutate(!!! cond_exprs_ids) %>%
       {if(length(cond_exprs_aa) > 0) dplyr::mutate(., !!! cond_exprs_aa) else .} |>

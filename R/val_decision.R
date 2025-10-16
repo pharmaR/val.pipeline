@@ -514,7 +514,24 @@ val_categorize <- function(
     options(repos = opt_repos, pkgType = "source", scipen = 999)
     # options("repos") # verify
     
-    avail_pkgs <- available.packages() |> as.data.frame()
+    # Some setup:
+    curr_repos <- options("repos")
+    avail_pkgs <- available.packages() |>as.data.frame()
+      
+    # Where did package come from?
+    # categorize Repository field to match names in options("repos")
+    avail_pkgs$repo_name <-
+      purrr::map_chr(avail_pkgs$Repository, ~ {
+        if(is.null(.x)) NA_character_ else {
+          repo_src <- .x |> dirname() |> dirname() # remove '/src/contrib/` ending
+          repo_name <- curr_repos$repos[curr_repos$repos %in% repo_src] |> names()
+          if(length(repo_name) == 0) repo_name <- "unknown"
+          if(length(repo_name) > 1) {
+            repo_name <- repo_name[1]
+          }
+          repo_name
+        }
+      })
     
     cat("\n\nCategorizing available packages. Starting w/", nrow(avail_pkgs), "pkgs.\n")
 
@@ -556,7 +573,7 @@ val_categorize <- function(
     # avail_pkgs$Repository |> table()
     
     pkgs <- avail_pkgs |>
-      dplyr::select(package = Package, version = Version) |>
+      dplyr::select(package = Package, version = Version, repo_src = Repository, repo_name) |>
       dplyr::left_join(
         riskscore::assessed_latest |>
           # if the package doesn't exist in riskscore for initial filtering, we
@@ -712,25 +729,27 @@ val_categorize <- function(
   #
   # ---- Apply Decisions ----
   #
+  
+  # Some setup
   # Which metrics are available?
   all_mets <- decisions_df$metric |> unique()
-  
   
   
   #
   # --- Primary Metrics ----
   #
   primary_metrics <- decisions_df |>
-    dplyr::filter(tolower(metric_type) == "primary") %>%
+    dplyr::filter(tolower(metric_type) == "primary")
     
     # for debugging
     # dplyr::filter(tolower(metric) %in% c("downloads_1yr", "reverse_dependencies"))
     # dplyr::filter(tolower(metric) %in% c("has_website")) 
   
     # if this is not a CRAN pkg, do not use downloads_1yr as a primary metric
-    {if("downloads_1yr" %in% all_mets & toupper(repo_name) != "CRAN") {
-      dplyr::filter(., !(tolower(metric) %in% c("downloads_1yr"))) 
-    } else .}
+    # Shoot, have to do this at the `pkgs` df level for val_cateogrize()
+    # {if("downloads_1yr" %in% all_mets & toupper(repo_name) != "CRAN") {
+    #   dplyr::filter(., !(tolower(metric) %in% c("downloads_1yr")))
+    # } else .}
   
   # Share a note about primary metrics being used
   prime_met_len <- primary_metrics$metric |> unique() |> length()
