@@ -55,8 +55,10 @@ val_pkg <- function(
   cat(paste0("\n\n\nNew Package: ", pkg, " v", ver," @ ", start_txt,"\n"))
   
   #
-  # ---- Setup Dirs ----
+  # ---- Setup ----
   #
+  
+  # Dirs
   if(ref == "source"){
     tarballs <- file.path(out_dir, 'tarballs')
     sourced <- file.path(out_dir, 'sourced')
@@ -70,6 +72,9 @@ val_pkg <- function(
   if(!dir.exists(installed)) dir.create(installed)
   if(!dir.exists(assessed)) dir.create(assessed)
   if(!dir.exists(reports)) dir.create(reports)
+  
+  # Decisions
+  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
   
   if(ref == "source") {
     
@@ -207,7 +212,7 @@ val_pkg <- function(
       tibble::rownames_to_column(var = "metric") |>
       dplyr::pull(metric)
     
-    if("r_cmd_check" %in% viable_metrics){
+    if("r_cmd_check" %in% init_viable_metrics){
       init_vm <- init_viable_metrics[which(init_viable_metrics != "r_cmd_check")]
       init_viable_metrics <- c(init_vm, "r_cmd_check_warnings", "r_cmd_check_errors")
     }
