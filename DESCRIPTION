@@ -41,6 +41,7 @@ Imports:
     riskreports (>= 0.0.0.9006),
     rlang,
     stringr,
+    tibble,
     tidyr,
     tools
 Remotes: 
