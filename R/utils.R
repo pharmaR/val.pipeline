@@ -593,8 +593,10 @@ get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_ac
 #' @param dec A character string (if rev = FALSE) or numeric/integer (if rev = TRUE) indicating the decision category or decision_id to convert
 #' 
 #' @examples
+#' \dontrun{
 #' dec_id_df <- unique(build_decisions_df("remote_reduce")[c("decision", "decision_id")])
 #' decision_to_id(dec_id_df, FALSE, "High")
+#' }
 #' 
 #' @keywords internal
 #' 
