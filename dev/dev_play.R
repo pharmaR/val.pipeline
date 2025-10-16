@@ -18,7 +18,7 @@
 # ---- Dev ----
 #
 val_date <- "2025-10-07"
-val_dir <- file.path('dev/riskassessments', paste0("R_", getRversion()), gsub("-","",val_date))
+val_dir <- file.path(Sys.getenv("RISK_OUTPATH") %|e|% getwd(), paste0("R_", getRversion()), gsub("-","",val_date))
 reports <- list.files(file.path(val_dir, "reports"))
 reports |> length()
 # any(stringr::str_detect(reports, "bit"))
@@ -51,7 +51,7 @@ qual <- val_pipeline(
     val_date = Sys.Date(),
     # val_date = as.Date("2025-10-07"),
     replace = FALSE, 
-    out = 'dev/riskassessments'
+    out = Sys.getenv("RISK_OUTPATH") %|e|% getwd()
 )
   
 
@@ -103,7 +103,7 @@ outtie <- val_build(
   val_date = Sys.Date(),
   # val_date = as.Date("2025-10-07"),
   replace = FALSE, 
-  out = 'dev/riskassessments'
+  out = Sys.getenv("RISK_OUTPATH") %|e|% getwd()
 ) 
 
 
@@ -117,7 +117,7 @@ remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
 avail_pkgs <- available.packages() |> as.data.frame()
 val_date <- Sys.Date()
 # val_date <- as.Date("2025-10-07")
-val_dir <- file.path('dev/riskassessments', paste0("R_", getRversion()), gsub("-","",val_date))
+val_dir <- file.path(Sys.getenv("RISK_OUTPATH") %|e|% getwd(), paste0("R_", getRversion()), gsub("-","",val_date))
 
 source("dev/pkg_lists.R") # build_pkgs & pkgs
 

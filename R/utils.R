@@ -1,3 +1,22 @@
+
+#' Empty string Coalesce
+#'
+#' If x is empty, nchar(), return y, otherwise return x
+#'
+#' @param x,y Two elements to test, one potentially empty
+#' 
+#' @export
+#'
+#' @examples
+#' "" %||% 1
+"%|e|%" <- function(x, y) {
+  if (!nzchar(x)) {
+    y
+  } else {
+    x
+  }
+}
+
 #' Strip Recording (for list() objects)
 #'
 #' Remove .recording attribute from all elements of the assessment,

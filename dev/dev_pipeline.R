@@ -11,7 +11,7 @@ qual <- val_pipeline(
   val_date = Sys.Date(),
   # val_date = as.Date("2025-10-07"),
   replace = FALSE, 
-  out = 'dev/riskassessments'
+  out = Sys.getenv("RISK_OUTPATH") %|e|% getwd()
 )
 
 # 
@@ -25,4 +25,4 @@ qual <- val_pipeline(
 # val_date = Sys.Date()
 # # val_date = as.Date("2025-10-07")
 # replace = FALSE
-# out = 'dev/riskassessments'
+# out = Sys.getenv("RISK_OUTPATH") %|e|% getwd()

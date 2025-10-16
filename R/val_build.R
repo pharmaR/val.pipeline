@@ -85,7 +85,7 @@ val_build <- function(
   # val_date = Sys.Date() # Sys.Date() # is  default
   # replace = FALSE # default
   # # replace = TRUE
-  # out = 'dev/riskassessments'
+  # out = Sys.getenv("RISK_OUTPATH") %|e|% getwd()
   # opt_repos = opt_repos
   
   # Assess args

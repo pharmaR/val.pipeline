@@ -7,8 +7,8 @@ source("dev/pkg_lists.R") # build_pkgs & pkgs for CRAN only
 # See the full dependency tree before running val_build()
 # these_pkgs <- "withr"  # messes with the entire process
 # these_pkgs <- "matrix" # takes 5 mins to install
-# these_pkgs <- "askpass"
-these_pkgs <- c("Biobase", "BiocGenerics")
+these_pkgs <- "askpass"
+# these_pkgs <- c("Biobase", "BiocGenerics")
 # these_pkgs <- build_pkgs
 
 tree <- tools::package_dependencies(
@@ -29,6 +29,8 @@ full_tree |> length()
 # temporary until we can figure out what's gone haywire with this pkg
 # build_pkgs <- build_pkgs[build_pkgs != "withr"]
 
+usethis::edit_r_environ()
+
 qual <- val_build(
   # pkg_names = build_pkgs,
   pkg_names = these_pkgs,
@@ -41,7 +43,9 @@ qual <- val_build(
   val_date = Sys.Date(),
   # val_date = as.Date("2025-10-07"),
   replace = FALSE, 
-  out = 'dev/riskassessments'
+  # use a env var for the out path
+  out = Sys.getenv("RISK_OUTPATH") %|e|% getwd()
+    # Sys.getenv("RISK_OUTPATH") %|e|% getwd()
 )
 
 qual_df <- qual$pkgs_df
@@ -61,7 +65,7 @@ deps_recursive = FALSE
 val_date = Sys.Date()
 # val_date = as.Date("2025-10-07")
 replace = FALSE
-out = 'dev/riskassessments'
+out = Sys.getenv("RISK_OUTPATH") %|e|% getwd()
 
 # -- defaults --
 # ref = "source"
@@ -71,6 +75,6 @@ out = 'dev/riskassessments'
 # val_date = Sys.Date()
 # # val_date = as.Date("2025-10-07")
 # replace = FALSE
-# out = 'dev/riskassessments'
+# out = Sys.getenv("RISK_OUTPATH") %|e|% getwd()
 
 
