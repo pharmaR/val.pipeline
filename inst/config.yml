@@ -22,10 +22,10 @@ remote_reduce:
     cond:
       # High: ~ is.na(.x)
       High: ~ .x < 2
-      Medium: ~ dplyr::between(.x, 2, 7)
-      Low: ~ .x > 7
+      Medium: ~ dplyr::between(.x, 2, 10)
+      Low: ~ .x > 10
     type: exception
-    accept_cats: [Low, Medium]
+    accept_cats: [Low]
     auto_accept: ~ .x > 50 # anything above this is 'gold' & doesn't need to hit all the rules
   dependencies:
     cond:

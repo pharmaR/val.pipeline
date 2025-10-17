@@ -88,15 +88,20 @@ val_pipeline <- function(
   #
   old <- options()
   on.exit(function() options(old))
-
+  options(repos = opt_repos)
+  # options('repos')
+  
   #
   # ---- val_categorize() ----
   #.
   
-  # Assess the 'dplyr' pkg to identify which metrics are available for 'pkg_cran_remote'
-  viable_metrics <- c("dplyr") |>
+  # Assess the 'dplyr' pkg to identify which metrics are available for
+  # 'pkg_cran_remote' Need one pkg from CRAN & one from BioConductor in case our
+  # config only specifies one.
+  viable_metrics <- c("dplyr", "Biobase") |>
     riskmetric::pkg_ref(source = "pkg_cran_remote") |>
     dplyr::as_tibble() |>
+    dplyr::filter(!is.na(version)) |> # remove either pkg if not found
     riskmetric::pkg_assess() |>
     riskmetric::pkg_score() |>
     dplyr::select(-c(package, version, pkg_ref, pkg_score)) |>

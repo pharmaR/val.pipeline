@@ -775,6 +775,87 @@ rip_cats <- function(
 
 
 
+#' Generate Decision Category Assignments, splitting out downloads conditions
+#' for only CRAN pkgs
+#'
+#' A helper function that splits the package metrics data.frame into CRAN and
+#' non-CRAN packages, applies the rip_cats() function to each subset based on
+#' the applicable metrics, and then rejoins the two data.frames.
+#'
+#' @param pkgs_data A data.frame of package metrics, typically created by
+#'   available.packages()
+#' @param dec_df A data.frame of decisions, typically created by
+#'   build_decisions_df()
+#' @param decisions A character vector of decision categories, ordered from
+#'   highest risk to lowest risk.
+#' @param else_cat A character string indicating the default category to assign
+#'   when none of the conditions are met.
+#' @param label A character string indicating the label to use in messages.
+#'
+#' @importFrom dplyr filter bind_rows mutate
+#' @importFrom glue glue
+#'
+#' @return A data.frame of package metrics with decision categories assigned.
+#' @keywords internal
+split_join_cats <- function(
+    pkgs_data = NULL,
+    dec_df = build_decisions_df(rule_type = "remote_reduce"),
+    decisions = dec_df$decision |> unique(),
+    else_cat = decisions[length(decisions)],
+    label = "Primary"
+  ) {
+  
+  # If pkgs_data is null, stop
+  if(is.null(pkgs_data)) {
+    stop("\n--> 'pkgs_data' cannot be NULL. Please provide a data.frame of package metrics.\n")
+  }
+  
+  # Create metric-based risk categories decision columns, splitting the logic
+  # Special logic for 'downloads_1yr' b/c it may not be applicable for
+  # non-CRAN pkgs
+  dwnld_metrics <- dec_df |> dplyr::filter(tolower(metric) == "downloads_1yr")
+  sans_dwnld_metrics <- dec_df |> dplyr::filter(!(tolower(metric) %in% "downloads_1yr"))
+  cran_pkgs <- pkgs_data |> dplyr::filter(toupper(repo_name) == "CRAN")
+  non_cran_pkgs <- pkgs_data |> dplyr::filter(!(toupper(repo_name) %in% "CRAN"))
+  
+  if((nrow(dwnld_metrics) > 0 & nrow(cran_pkgs) > 0) | 
+     (nrow(sans_dwnld_metrics) > 0 & nrow(non_cran_pkgs) > 0)
+  ) {
+    met_len <- dec_df$metric |> unique() |> length()
+    cat(glue::glue("\n\n--> Applying Decisions Categories for {met_len} '{label}' risk metric(s).\n\n"))
+    cat("\n---->", paste(dec_df$metric |> unique(), collapse = '\n----> '), "\n\n")
+    
+    if(nrow(dwnld_metrics) > 0 & nrow(cran_pkgs) > 0) {
+      pkgs_dwnlds <- rip_cats(
+        met_dec_df = dwnld_metrics,
+        pkgs_df = cran_pkgs,
+        else_cat = else_cat
+      )
+    } else {
+      pkgs_dwnlds <- cran_pkgs
+    }
+    
+    # Now Sans dwnlds
+    if(nrow(sans_dwnld_metrics) > 0 & nrow(non_cran_pkgs) > 0) {
+      pkgs_sans_dwnlds <- rip_cats(
+        met_dec_df = sans_dwnld_metrics,
+        pkgs_df = non_cran_pkgs,
+        else_cat = else_cat
+      )
+    } else {
+      pkgs_sans_dwnlds <- non_cran_pkgs
+    }
+    # Combine
+    pkgs_return <- dplyr::bind_rows(pkgs_dwnlds, pkgs_sans_dwnlds)
+  } else {
+    cat(glue::glue("\n--> No applicable '{label}' metrics found for pkg repo source(s).\n"))
+    pkgs_return <- pkgs_data |>
+      dplyr::mutate(final_risk_cat = factor(NA, levels = decisions))
+  }
+  return(pkgs_return)
+}
+
+
 
 
 
