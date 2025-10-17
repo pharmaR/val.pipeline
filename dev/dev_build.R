@@ -55,17 +55,17 @@ View(qual_df)
 # 
 
 # -- dev --
-pkg_names = these_pkgs
-ref = "source"
-metric_pkg = "riskmetric"
-# deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
-deps = NULL
-# deps_recursive = TRUE
-deps_recursive = FALSE
-val_date = Sys.Date()
-# val_date = as.Date("2025-10-07")
-replace = FALSE
-out = Sys.getenv("RISK_OUTPATH") %|e|% getwd()
+# pkg_names = these_pkgs
+# ref = "source"
+# metric_pkg = "riskmetric"
+# # deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+# deps = NULL
+# # deps_recursive = TRUE
+# deps_recursive = FALSE
+# val_date = Sys.Date()
+# # val_date = as.Date("2025-10-07")
+# replace = FALSE
+# out = Sys.getenv("RISK_OUTPATH") %|e|% getwd()
 
 # -- defaults --
 # ref = "source"
