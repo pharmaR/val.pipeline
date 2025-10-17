@@ -1,0 +1,350 @@
+---
+title: "`r basename(params$package_name)` v`r params$package_version`"
+date-format: "YYYY-MM-DD"
+date: today
+published-title: ""
+params:
+  package_name: dplyr
+  package_version: 1.0.0
+  package: NULL
+  image: "rhub/ref-image"
+  assessment_path: "assessments/dplyr.rds"
+  hide_reverse_deps: true
+  source: "pgk_install"
+format:
+  html: 
+    toc: true  
+    embed-resources: true
+    include-in-header: "top_page.html"
+    include-after-body: "transform_pre_class.html"
+    theme: 
+      dark: [darkly, custom.scss]
+      light: [default, custom.scss, custom_light.scss]
+  gfm:
+    html-math-method: webtex    
+  typst:
+    toc: true
+    section-numbering: 1.1.1
+    df-print: default
+    margin:
+      x: 2cm
+      y: 2cm
+filters:
+  - foldable_code.lua
+---
+
+```{r setup, include = FALSE}
+options(width = 80L, covr.record_tests = TRUE)
+
+knitr::opts_chunk$set(
+    echo = FALSE,
+    eval = TRUE,
+    error = TRUE,
+    cache = FALSE
+)
+library("tools")
+library("knitr")
+library("riskreports")
+```
+
+# Context
+
+
+```{r loading}
+pkg <- params$package
+pkg_name <- params$package_name
+pkg_version <- params$package_version
+risk_path <- params$assessment_path
+image <- params$image
+```
+
+Documents the installation of this package on an open source R environment, focusing on:
+
+- Installation environment description
+- Testing coverage
+
+It is limited to assess whether unit tests and documentation are present and can execute without error. 
+An assessment would be required that the tests and documentation are meaningful. 
+
+
+# Package `r basename(pkg)` v`r params$pkg_version`
+
+## Metric based risk assessment
+
+The following metrics are derived from the `riskmetric` R package.
+
+```{r read-riskmetric, warning=FALSE}
+d_riskmetric <- readRDS(risk_path)
+
+# Required fields
+required_fields <- c("r_cmd_check", "license", "remote_checks", "covr_coverage")
+
+# Missing fields
+missing_fields <- setdiff(required_fields, names(d_riskmetric))
+
+# Assign default error structure for missing fields to avoid errors
+for (field in missing_fields) {
+  d_riskmetric[[field]] <- structure(NA, class = c("pkg_metric_error", "pkg_metric"))
+}
+```
+
+```{r create_r_riskmetric, warning=FALSE}
+# Assesment produces a data.frame with one row
+r_riskmetric <- riskreports::assessment(d_riskmetric)
+is_na <- sapply(r_riskmetric, function(x) {
+  is.na(x) || (is.character(x) && startsWith(x, "no applicable"))
+})
+r_riskmetric$origin <- riskreports:::get_pkg_origin(params$source)
+```
+
+
+::: {.content-visible when-format="html"}
+
+```{r info_cards}
+riskreports:::create_metrics_cards(r_riskmetric)
+```
+
+:::
+
+::: {.content-hidden when-format="html"}
+
+```{r simple_cards}
+simple_cards <- data.frame(
+  "Downloads 1 year" = as.character(r_riskmetric$downloads_1yr),
+  "Reverse dependencies" = r_riskmetric$reverse_dependencies,
+  "License" = as.character(r_riskmetric$license),
+  "Origin" = r_riskmetric$origin
+)
+r_riskmetric$origin <- NULL
+knitr::kable(simple_cards)
+```
+
+:::
+
+```{r prepare_tables_namespace}
+namespace_table <- riskreports:::prepare_namespace_table(d_riskmetric)
+```
+
+
+::: {.content-visible when-format="html"}
+
+```{r prepare_tables_dependencies}
+deps <- d_riskmetric$dependencies
+deps$package <- gsub("\\n", " ", deps$package)
+row.names(deps) <- NULL
+dependencies_table <- htmltools::div(
+  htmltools::span(
+    "Overall the package has these dependencies:"
+  ),
+  reactable::reactable(
+    deps,
+    class = "metrics-table"
+  )
+)
+```
+
+:::
+
+```{r prepare_tables_reverse_dependencies}
+reverse_dependencies <- paste(d_riskmetric$reverse_dependencies, collapse = ", ")
+```
+
+```{r prepare_tables_examples}
+examples_content <- paste0(
+  "There are ",
+  if (!is_na["has_examples"]) sum(d_riskmetric$has_examples),
+  " examples from ",
+  if (!is_na["has_examples"]) length(d_riskmetric$has_examples),
+  " help pages (",
+  if (!is_na["has_examples"]) {
+    sprintf("%.2f%%", sum(d_riskmetric$has_examples) / length(d_riskmetric$has_examples) * 100)
+    } else {
+      "?"
+    },
+  ")."
+)
+```
+
+```{r prepare_tables_news}
+news_content <- paste0(
+  "The package has ",
+  if ("has_news" %in% names(d_riskmetric) && !is.null(d_riskmetric$has_news)) d_riskmetric$has_news,
+  " NEWS file and it is ",
+  if (is.null(d_riskmetric$news_current) && !d_riskmetric$news_current) "not",
+  "current."
+)
+```
+
+```{r general-riskmetric, warning=FALSE}
+#| tab.cap: "**Package general assessment:** Coverage, check results, size, 
+#|  download the last year, reverse dependencies and number of dependencies."
+
+summary_data <- summary_table(r_riskmetric[, !is.na(as.vector(r_riskmetric))])
+
+values_collapsed_rows <- c(
+  "Has news",
+  "Exported namespace",
+  "Dependencies",
+  "Reverse dependencies",
+  "Has examples"
+)
+
+indexes_collapsed_rows <- which(summary_data$Section %in% values_collapsed_rows)
+
+is_html <- knitr::is_html_output(excludes = "markdown")
+
+# Certain rows of this table are collapsible, containing detailed information.
+if (isTRUE(is_html)) {
+  reactable::reactable(
+  summary_data,
+  rownames = FALSE,
+  pagination = FALSE,
+  details = function(index) {
+    if(index %in% indexes_collapsed_rows) {
+      collapsed_content <- switch(summary_data$Section[index],
+        "Exported namespace" = namespace_table,
+        "Dependencies" =  dependencies_table,
+        "Reverse dependencies" = reverse_dependencies,
+        "Has examples" = examples_content,
+        "Has news" = news_content
+      )
+      htmltools::div(
+        style = "padding: 1rem;",
+        collapsed_content
+      )
+    }
+  },
+  columns = list(
+    Section = reactable::colDef(
+      name = ""
+    ),
+    Values = reactable::colDef(
+      name = "",
+      cell = function(value) {
+        if (value ==  "Yes") {
+          # Green 'Yes'
+          htmltools::span(value, style = "color:var(--bs-success); font-weight: bold;")
+        } else if (value == "No") {
+          # Red 'No'
+          htmltools::span(value, style = "color: var(--bs-danger); font-weight: bold;")
+        } else {
+          htmltools::span(value, style = "color: var(--bs-body-color); font-weight: bold;")
+        }
+      },
+      align = "center"
+    )
+  ),
+  class = "metrics-table"
+)
+} else {
+  knitr::kable(summary_data)
+}
+```
+
+```{r license, eval=!riskreports::is_risk_error(d_riskmetric$license) && !is.null(d_riskmetric$license), results='asis'}
+cat("## License", "\n")
+
+cat("The package uses ", d_riskmetric$license, ".", sep = "")
+```
+
+
+```{r, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]) || !riskreports::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
+cat("## Code checks", "\n")
+
+cat("Code checks for this package are:")
+```
+
+```{r r_cmd_check, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]])}
+d_riskmetric[["r_cmd_check"]] |> as.list() |> unlist()
+```
+
+
+
+```{r remote_checks, eval=!riskreports::is_risk_error(d_riskmetric[["remote_checks"]])}
+d_riskmetric[["remote_checks"]]
+```
+
+
+```{r covr_coverage, eval=!riskreports::is_risk_error(d_riskmetric[["covr_coverage"]]), results='asis'}
+cat("## Code coverage", "\n")
+
+cat("Code coverage for this package is: ", d_riskmetric[["covr_coverage"]])
+```
+
+
+# Installation environment
+
+
+## System Info
+
+```{r execution_info}
+#| tab.cap: "**System information**. Table about the system used to check the package."
+tt_sys_info_df <- data.frame(
+  Field = c("Image", "OS", "Platform", "System", "Execution Time"),
+  Value = c(
+    image,
+    sessionInfo()$running,
+    R.version$platform,
+    R.version$system,
+    format(Sys.time(), tz = "UTC", usetz = TRUE)
+  ))
+
+knitr::kable(tt_sys_info_df)
+```
+
+<!--
+From here we use the lua filter based on this issue from Quarto itself
+https://github.com/quarto-dev/quarto-cli/issues/341
+Please take into account that not all content in the chunks will be correctly folded
+- character vectors are
+- reactable tables are not
+An alternative is to use callout blocks with collapse = TRUE
+The advantage of the foldable_code lua filter is that the code is printed exactly as in the R console
+-->
+
+## R Session Info
+
+```{r session_info, attr.output='.details summary="Session info"'}
+sessionInfo()
+```
+
+```{r Platform, attr.output='.details summary="Platform"'}
+unlist(.Platform)
+```
+
+```{r capabilities, attr.output='.details summary="R\'s capabilities"'}
+capabilities()
+```
+
+```{r external-software, attr.output='.details summary="External software"'}
+extSoftVersion()
+```
+
+```{r graphic-software, attr.output='.details summary="Graphics external software"'}
+grSoftVersion()
+```
+
+```{r machine, attr.output='.details summary="Numerical characteristics of the machine"'}
+unlist(.Machine)
+```
+
+```{r RNGKind, attr.output='.details summary="Random number generation process"'}
+RNGkind()
+```
+
+## Information about the environment
+Environmental and options variables affect how package checks and software in it might behave.
+
+```{r computing, attr.output='.details summary="Environmental variables when running this report"'}
+riskreports::environ_report(exclude = c("GITHUB_PAT", "APPDATA", 
+                                        "GITHUB", "GITLAB_PAT", "GITLAB",
+                                        "ProgramFiles", "ProgramFiles(x86)",
+                                        "R_USER", "USERNAME", "USERPROFILE", 
+                                        "USERDNSDOMAIN", "USERDOMAIN", 
+                                        "USERDOMAIN_ROAMINGPROFILE", "R_DptShare"              
+                                        ))
+```
+
+```{r options, attr.output='.details summary="These are the options set to generate the report"'}
+riskreports::options_report(exclude = c("usethis.full_name", "usethis.description", "usethis.destdir"))
+```

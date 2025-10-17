@@ -1,0 +1,62 @@
+/*-- scss:defaults --*/
+$body-bg: #e8f7f7 !default;
+$link-color: #4697d2 !default;
+$card-light-color: #fcfcf7 !default;
+$card-header-light-color: #636363;
+$card-header-color: $card-header-light-color !default;
+
+$code-bg: #d6e9f7 !default;
+$btn-code-copy-color: black !default;
+$btn-code-copy-color-active: $link-color !default;
+/*-- scss:rules --*/
+
+.card {
+    background-color: $card-light-color;
+
+    .card-header {
+        color: $card-header-light-color;
+    }
+
+    .card-text {
+        color: $card-header-light-color;
+    }
+}
+
+.top-page {
+    box-shadow: 0px 5px 75px #f8fafa;
+
+    .btn {
+        background-color: var(--bs-black);
+        color: var(--bs-white);
+    }
+}
+
+.metrics-table {
+    color: $card-header-light-color;
+    border-bottom: 1px solid $card-header-light-color;
+
+    .rt-th {
+        border-bottom: 1px solid $card-header-light-color;
+    }
+    
+    .rt-td {
+        border-top: 1px solid $card-header-light-color;
+    }
+
+    .rt-expander::after {
+        border-top: 7px solid $card-header-light-color;
+    }
+}
+
+details > summary {
+    background-color: $code-bg;
+    color: var(--bs-body-color);
+}
+
+pre.details {
+    color: var(--bs-body-color);
+    background-color: $code-bg;
+}
+
+
+

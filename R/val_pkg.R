@@ -423,8 +423,8 @@ val_pkg <- function(
   pr <- riskreports::package_report(
     package_name = pkg,
     package_version = ver,
-    # template_path = file.path(getwd(), "riskassessment"),
-    output_format = "html", #"md", "pdf", "all",
+    template_path = system.file("report/package", package = "val.pipeline"),
+    output_format = "typst", # Options include html, gfm, and typst. Supplying 'all' does all 3
     # params list: https://github.com/pharmaR/riskreports/blob/main/inst/report/package/pkg_template.qmd
     params = list(
       assessment_path = assessment_file,
