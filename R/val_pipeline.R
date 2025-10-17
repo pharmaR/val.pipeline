@@ -234,7 +234,6 @@ val_pipeline <- function(
   # nrow(qual)
   saveRDS(qual, file.path(outtie$val_dir, paste0("qual_evidence_", val_date_txt, ".rds")))
   
-  
   # # Inspect the assessment dir
   # # valdate <- gsub("-", "", Sys.Date())
   # valdate <- "20250731"
@@ -259,6 +258,7 @@ val_pipeline <- function(
   # names(ass)
   # ass$covr_coverage$totalcoverage
   # ass$downloads_1yr |> prettyNum(big.mark = ",")
+  
   # 
   # # val_build(pkg_names = c('aamatch'), deps = NULL) # No coverage
   
