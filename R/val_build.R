@@ -46,7 +46,7 @@
 #' @importFrom purrr map2 set_names reduce map map_lgl list_flatten
 #' @importFrom stringr word
 #' @importFrom tools package_dependencies
-#' @importFrom utils available.packages
+#' @importFrom utils available.packages capture.output
 #'
 #' @return A list containing:
 #' - val_dir: The directory where the validation build results are stored.
@@ -450,7 +450,7 @@ val_build <- function(
   cat("\n--> Updated", nrow(changed_pkgs),"pkg metadata files.\n")
   
   val_end <- Sys.time()
-  val_end_txt <- capture.output(val_end - val_start)
+  val_end_txt <- utils::capture.output(val_end - val_start)
   cat("\n--> Build", val_end_txt,"\n")
   
   saveRDS(pkgs_df, file.path(val_dir, "qual_evidence.rds"))

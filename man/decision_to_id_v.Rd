@@ -17,8 +17,10 @@ decision_to_id_v(decision_id_df, rev = FALSE, dec)
 Vectorized version of decision_to_id()
 }
 \examples{
-dec_id_df <- unique(build_decisions_df()[c("decision", "decision_id")])
+\dontrun{
+dec_id_df <- unique(build_decisions_df("remote_reduce")[c("decision", "decision_id")])
 decision_to_id_v(dec_id_df, FALSE, c("High", "Medium", "Low"))
+}
 
 }
 \keyword{internal}

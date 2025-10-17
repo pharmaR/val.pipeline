@@ -4,7 +4,7 @@
 #' First whack at attempting to filter packages based on org-level criterion
 #' used to set thresholds (and later update final decision (if not already 'high
 #' risk')) AND filter packages before running val_build(). Note: If PACKAGES
-#' file had assessments, we'd be using that (paired with {val.filter}), but
+#' file had assessments, we'd be using that (paired with \{val.filter\}), but
 #' instead, we're going to use riskscore::cran_assessed_20250812 for the time
 #' being
 #'
@@ -436,7 +436,7 @@ val_decision <- function(
 #' First whack at attempting to filter packages based on org-level criterion
 #' used to set thresholds (and later update final decision (if not already 'high
 #' risk')) AND filter packages before running val_build(). Note: If PACKAGES
-#' file had assessments, we'd be using that (paired with {val.filter}), but
+#' file had assessments, we'd be using that (paired with \{val.filter\}), but
 #' instead, we're going to use riskscore::cran_assessed_20250812 for the time
 #' being
 #'
@@ -450,6 +450,7 @@ val_decision <- function(
 #'   across if_else everything select
 #' @importFrom purrr map map_int 
 #' @importFrom tools package_dependencies
+#' @importFrom utils head packageVersion
 #' 
 #' 
 val_categorize <- function(
@@ -481,7 +482,7 @@ val_categorize <- function(
     # Use "pkg_cran_remote" data from riskscore::cran_assessed_latest
     # remotes::install_github("pharmar/riskscore", force = TRUE,
     #                         ref = "main")
-    pv <- packageVersion("riskscore") # verify ‘v0.0.3'
+    pv <- utils::packageVersion("riskscore") # verify ‘v0.0.3'
     riskscore_run_date <- riskscore::assessed_latest$riskmetric_run_date |> unique()
     cat(paste0("\n--> Using {riskscore} Version: 'v", pv, "', last compiled on '",
                riskscore_run_date,"'.\n"))
@@ -517,7 +518,7 @@ val_categorize <- function(
     missing_ap <- package_col[!(package_col %in% avail_pkgs$Package)]
     if(length(missing_ap) > 0) {
       cat(glue::glue("\nNote: There are {length(missing_ap)} packages in the riskscore data that are NOT in available.packages(). These will be ignored, because they have likely been removed from their CRAN-like repo since the last riskscore build.\n\n"))
-      print(head(missing_ap, 20))
+      print(utils::head(missing_ap, 20))
       if(length(missing_ap) > 20) cat("...\n")
     }
     
@@ -528,7 +529,7 @@ val_categorize <- function(
     missing_rs <- avail_pkgs$Package[!(avail_pkgs$Package %in% package_col)]
     if(length(missing_rs) > 0) {
       cat(glue::glue("\n!!! WARNING: There are {length(missing_rs)} packages in available.packages() that are NOT in the riskscore data.\n"))
-      print(head(missing_rs, 20))
+      print(utils::head(missing_rs, 20))
       if(length(missing_rs) > 20) cat("...\n")
     }
     # options("repos")

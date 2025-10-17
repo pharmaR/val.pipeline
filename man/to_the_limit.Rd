@@ -15,10 +15,12 @@ to_the_limit(condition, low = TRUE)
 Helper function to parse lower & upper limit out of the condition string
 }
 \examples{
+\dontrun{
 to_the_limit("~ is.na(.x)", low = FALSE)
 to_the_limit("~ .x < 120000", low = FALSE)
 to_the_limit("~ dplyr::between(.x, 120000, 240000)", low = FALSE)
 to_the_limit("~ .x > 240000", low = FALSE)
+}
 
 }
 \keyword{internal}
