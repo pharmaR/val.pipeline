@@ -108,10 +108,12 @@ strip_recording_df <- function(assessment) {
 #' @importFrom rlang expr parse_expr is_call
 #' 
 #' @examples
+#' \dontrun{
 #' to_the_limit("~ is.na(.x)", low = FALSE)
 #' to_the_limit("~ .x < 120000", low = FALSE)
 #' to_the_limit("~ dplyr::between(.x, 120000, 240000)", low = FALSE)
 #' to_the_limit("~ .x > 240000", low = FALSE)
+#' }
 #' 
 #' @keywords internal
 to_the_limit <- function(condition, low = TRUE) {
@@ -217,6 +219,7 @@ update_opt_repos <- function(
 #' conditions only reference decision categories that are allowed in
 #' `decision_lst`.
 #'
+#' @param val Name of value (NULL to read all values)
 #' @param rule_type A character string indicating whether the decision
 #'   categories are used to "categorize" risk levels (e.g., "Low", "Medium",
 #'   "High") via val_categorize() or val_decision(). The difference being that
@@ -230,8 +233,9 @@ update_opt_repos <- function(
 #' @importFrom purrr map map_lgl set_names
 #' @importFrom glue glue
 #'
-#' @examples pull_config()
-#' @examples pull_config("decide_github")
+#' @examples 
+#' pull_config(rule_type = "remote_reduce")
+#' pull_config("decide_github", rule_type = "remote_reduce")
 #' 
 #' @return A named list of lists
 #' 
@@ -310,8 +314,6 @@ pull_config <- function(
 #' val_filter() that includes columns "metric", "decision", "condition",
 #' "metric_type", and "accept_condition".
 #'
-#' @param decision_lst A character vector of decision categories, ordered from
-#'   highest risk to lowest risk.opt_repos
 #' @param rule_type A character string indicating whether the decision
 #'   categories are used to "categorize" risk levels (e.g., "Low", "Medium",
 #'   "High") via val_categorize() or val_decision(). The difference being that
@@ -340,7 +342,7 @@ pull_config <- function(
 #' @importFrom purrr map map_chr imap_dfr pmap_chr pmap_lgl set_names
 #' @importFrom glue glue
 #'
-#' @examples build_decisions_df()
+#' @examples build_decisions_df("remote_reduce")
 #'
 #' @return A data.frame with columns:
 #' - metric: The name of the metric.
@@ -520,11 +522,13 @@ build_decisions_df <- function(
 #' @importFrom dplyr filter
 #' 
 #' @examples
+#' \dontrun{
 #' get_case_whens(
-#'   build_decisions_df() |> dplyr::mutate(derived_col = metric),
+#'   build_decisions_df("remote_reduce") |> dplyr::mutate(derived_col = metric),
 #'   c("downloads_1yr"),
 #'   "High"
 #' )
+#' }
 #' 
 #' @keywords internal
 get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_accept = FALSE) {
@@ -613,8 +617,10 @@ get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_ac
 #' @param dec A character string (if rev = FALSE) or numeric/integer (if rev = TRUE) indicating the decision category or decision_id to convert
 #' 
 #' @examples
-#' dec_id_df <- unique(build_decisions_df()[c("decision", "decision_id")])
+#' \dontrun{
+#' dec_id_df <- unique(build_decisions_df("remote_reduce")[c("decision", "decision_id")])
 #' decision_to_id(dec_id_df, FALSE, "High")
+#' }
 #' 
 #' @keywords internal
 #' 
@@ -637,8 +643,10 @@ decision_to_id <- function(decision_id_df, rev = FALSE, dec){
 #' @param dec A character vector (if rev = FALSE) or numeric/integer vector (if rev = TRUE) indicating the decision categories or decision_ids to convert
 #' 
 #' @examples
-#' dec_id_df <- unique(build_decisions_df()[c("decision", "decision_id")])
+#' \dontrun{
+#' dec_id_df <- unique(build_decisions_df("remote_reduce")[c("decision", "decision_id")])
 #' decision_to_id_v(dec_id_df, FALSE, c("High", "Medium", "Low"))
+#' }
 #' 
 #' @keywords internal
 decision_to_id_v <- Vectorize(decision_to_id, vectorize.args = "dec")
@@ -665,7 +673,12 @@ decision_to_id_v <- Vectorize(decision_to_id, vectorize.args = "dec")
 #' @examples
 #' # rip_cats(
 #' #   build_decisions_df() |> dplyr::mutate(derived_col = metric),
-#' #   available.packages() |> as.data.frame() |> dplyr::select(pkg, downloads_1yr = dplyr::starts_with("downloads_1yr")),
+#' #   available.packages() |> 
+#' #     as.data.frame() |> 
+#' #     dplyr::select(
+#' #       pkg, 
+#' #       downloads_1yr = dplyr::starts_with("downloads_1yr")
+#' #     ),
 #' #   "High"
 #' # )
 #'
