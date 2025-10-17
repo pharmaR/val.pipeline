@@ -5,8 +5,8 @@ Authors@R:
   c(
     person(
       "Aaron", "Clark",
-      email = "clark.aaronchris@gmail.com"
-      role = c("aut", "cre"),
+      email = "clark.aaronchris@gmail.com",
+      role = c("aut", "cre")
     ),
     person(
       "R Validation Hub",
@@ -39,7 +39,9 @@ Imports:
     purrr,
     riskmetric (>= 0.2.5),
     riskreports (>= 0.0.0.9006),
+    rlang,
     stringr,
+    tibble,
     tidyr,
     tools
 Remotes: 

@@ -11,6 +11,8 @@ pull_config(
 )
 }
 \arguments{
+\item{val}{Name of value (NULL to read all values)}
+
 \item{rule_type}{A character string indicating whether the decision
 categories are used to "categorize" risk levels (e.g., "Low", "Medium",
 "High") via val_categorize() or val_decision(). The difference being that
@@ -30,7 +32,7 @@ conditions only reference decision categories that are allowed in
 \code{decision_lst}.
 }
 \examples{
-pull_config()
-pull_config("decide_github")
+pull_config(rule_type = "remote_reduce")
+pull_config("decide_github", rule_type = "remote_reduce")
 
 }

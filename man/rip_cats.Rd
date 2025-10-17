@@ -24,7 +24,12 @@ with the decision categories for each metric.
 \examples{
 # rip_cats(
 #   build_decisions_df() |> dplyr::mutate(derived_col = metric),
-#   available.packages() |> as.data.frame() |> dplyr::select(pkg, downloads_1yr = dplyr::starts_with("downloads_1yr")),
+#   available.packages() |> 
+#     as.data.frame() |> 
+#     dplyr::select(
+#       pkg, 
+#       downloads_1yr = dplyr::starts_with("downloads_1yr")
+#     ),
 #   "High"
 # )
 
