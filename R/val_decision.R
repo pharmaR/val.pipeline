@@ -390,7 +390,7 @@ val_decision <- function(
     
     sec_met_len <- secondary_metrics$metric |> unique() |> length()
     
-    if(nrow(secondary_metrics > 0)){
+    if(nrow(secondary_metrics) > 0){
       
       cat(glue::glue("\n\n--> Applying Decisions Categories to {sec_met_len} 'Secondary' risk metric(s).\n\n"))
       cat("\n---->", paste(secondary_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
