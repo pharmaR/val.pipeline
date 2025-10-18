@@ -13,5 +13,5 @@ x \%|e|\% y
 If x is empty, nchar(), return y, otherwise return x
 }
 \examples{
-"" \%||\% 1
+"" \%|e|\% 1
 }
