@@ -1,7 +1,7 @@
 
 #' Empty string Coalesce
 #'
-#' If x is empty, nchar(), return y, otherwise return x
+#' If x has zero characters (nzchar(x) is FALSE), return y; otherwise return x.
 #'
 #' @param x,y Two elements to test, one potentially empty
 #' 
