@@ -10,7 +10,7 @@ x \%|e|\% y
 \item{x, y}{Two elements to test, one potentially empty}
 }
 \description{
-If x is empty, nchar(), return y, otherwise return x
+If x has zero characters, return y; otherwise return x.
 }
 \examples{
 "" \%|e|\% 1
