@@ -9,7 +9,7 @@
 #'
 #' @examples
 #' "" %||% 1
-"%|e|%" <- function(x, y) {
+`%|e|%` <- function(x, y) {
   if (!nzchar(x)) {
     y
   } else {
