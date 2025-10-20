@@ -180,7 +180,8 @@ news_content <- paste0(
 #| tab.cap: "**Package general assessment:** Coverage, check results, size, 
 #|  download the last year, reverse dependencies and number of dependencies."
 
-summary_data <- summary_table(r_riskmetric[, !is.na(as.vector(r_riskmetric))])
+summary_data <- summary_table(r_riskmetric[, !is.na(as.vector(r_riskmetric))]) |> 
+  stats::setNames(c("Metric", "Value"))
 
 values_collapsed_rows <- c(
   "Has news",
