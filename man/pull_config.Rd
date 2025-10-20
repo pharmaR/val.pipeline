@@ -6,7 +6,7 @@
 \usage{
 pull_config(
   val = NULL,
-  rule_type = c("default", "remote_reduce", "decide")[1],
+  rule_type = c("default", "remote_reduce", "decide"),
   config_path = system.file("config.yml", package = "val.pipeline")
 )
 }

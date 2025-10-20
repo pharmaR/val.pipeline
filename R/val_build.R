@@ -57,8 +57,8 @@
 #' 
 val_build <- function(
     pkg_names = NULL, #
-    ref = "source", 
-    metric_pkg = "riskmetric",
+    ref = c("source", "remote"),
+    metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
     deps = c("depends", "suggests")[1], # deps = c("depends"), deps = NULL
     deps_recursive = TRUE,
     val_date = Sys.Date(),
@@ -89,8 +89,8 @@ val_build <- function(
   # opt_repos = opt_repos
   
   # Assess args
-  if(!metric_pkg %in% c('risk.assessr', 'riskmetric')) stop("'metric_pkg' arg must be either 'riskmetric' or 'risk.assessr' but '", metric_pkg, "' was given.")
-  if(!ref %in% c('source', 'remote')) stop("'ref' arg must be either 'source' or 'remote' but '", ref, "' was given.")
+  ref <- match.arg(ref)
+  metric_pkg <- match.arg(metric_pkg)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
   
   # store R Version
