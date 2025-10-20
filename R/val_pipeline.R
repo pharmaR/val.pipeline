@@ -88,6 +88,8 @@ val_pipeline <- function(
   #
   old <- options()
   on.exit(function() options(old))
+  
+  # set the options
   options(repos = opt_repos)
   # options('repos')
   

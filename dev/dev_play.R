@@ -134,8 +134,8 @@ source("dev/pkg_lists.R") # build_pkgs & pkgs
 # pack
 
 # BioC
-pack = 'Biobase'
-# pack = 'BiocGenerics'
+# pack = 'Biobase'
+pack = 'BiocGenerics'
 
 
 pkg_meta <- val_pkg(

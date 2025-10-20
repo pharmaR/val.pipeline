@@ -24,7 +24,7 @@ remote_reduce:
       High: ~ .x < 2
       Medium: ~ dplyr::between(.x, 2, 10)
       Low: ~ .x > 10
-    type: exception
+    type: secondary
     accept_cats: [Low]
     auto_accept: ~ .x > 50 # anything above this is 'gold' & doesn't need to hit all the rules
   dependencies:
@@ -33,14 +33,14 @@ remote_reduce:
       High: ~ .x > 8
       Medium: ~ dplyr::between(.x, 4, 8)
       Low: ~ .x < 4
-    type: exception
+    type: secondary
     accept_cats: [Low, Medium]
   news_current:
     cond:
       # High: ~ is.na(.x)
       High: ~ .x != 1
       Low: ~ .x == 1
-    type: exception
+    type: secondary
     accept_cats: Low
   has_vignettes:
     cond:
@@ -48,20 +48,20 @@ remote_reduce:
       High: ~ .x < 1
       Medium: ~ .x == 1
       Low: ~ .x > 1
-    type: exception
+    type: secondary
     accept_cats: Low
   has_source_control:
     cond:
       # High: ~ is.na(.x)
       High: ~ .x == 0
       Low: ~ .x > 0
-    type: exception
+    type: secondary
     accept_cats: Low
   has_website:
     cond:
       High: ~ .x == 0
       Low: ~ .x > 0
-    type: exception
+    type: secondary
     accept_cats: Low
 
 

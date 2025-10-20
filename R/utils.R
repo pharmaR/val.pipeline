@@ -175,7 +175,7 @@ update_opt_repos <- function(
       if(stringr::str_detect(curr_cran, "latest") |
          stringr::str_detect(curr_cran, as.character(Sys.Date()))
       ) {
-        cat(paste0("--> 'CRAN' repo is already set to latest snapshot. No update needed.\n"))
+        cat(paste0("\n--> 'CRAN' repo is already set to latest snapshot. No update needed.\n"))
         return(opt_repos)
       } else {
         cat(paste0("--> Updating 'CRAN' repo to use latest snapshot.\n"))
@@ -435,8 +435,8 @@ build_decisions_df <- function(
     # Add in column for metric_type
     dplyr::mutate(
       metric_type = purrr::map_chr(metric, ~
-        rule_lst[[.x]][["type"]] %||% {if(rule_type == "remote_reduce") "exception" else "secondary"}) |>
-        factor(levels = c("primary", {if(rule_type == "remote_reduce") "exception" else "secondary"}))
+        rule_lst[[.x]][["type"]] %||% "secondary") |>
+        factor(levels = c("primary", "secondary"))
     ) |>
     # dplyr::mutate(
       # extract lower & Upper limit of the condition
@@ -652,6 +652,144 @@ decision_to_id <- function(decision_id_df, rev = FALSE, dec){
 decision_to_id_v <- Vectorize(decision_to_id, vectorize.args = "dec")
 
 
+
+
+
+
+
+#' Generate Decision Category Assignments by Package
+#'
+#' A helper function that applies the dplyr::case_when() statements from the
+#' decisions data.frame to the package metrics data.frame, creating new columns
+#' with the decision categories for each metric.
+#'
+#' @param label A character string indicating the metric type to process
+#' @param dec_df A data.frame of decisions, typically created by
+#'   build_decisions_df()
+#' @param pkgs_df A data.frame of package metrics, typically created by
+#'   available.packages() merged with riskmetric assessments
+#' @param else_cat A character string indicating the default category to assign
+#'   when none of the conditions are met.
+#'
+#' @importFrom dplyr mutate rowwise ungroup
+#' @importFrom purrr pwalk
+#' @importFrom glue glue
+#' @importFrom rlang !!! syms
+#' 
+#'
+#' @keywords internal
+rip_cats_by_pkg <- function(
+    label = 'primary',
+    repo_name = "CRAN",
+    dec_df = build_decisions_df(rule_type = "decide") |> dplyr::mutate(derived_col = metric),
+    pkgs_df = NULL,
+    else_cat = NULL
+) {
+  
+  # verify pkgs_df & else_cat is not NULL
+  if(is.null(pkgs_df)) {
+    stop(glue::glue("\n\n--> 'pkgs_df' cannot be NULL in rip_cats_by_pkg().\n"))
+  }
+  if(is.null(else_cat)) {
+    stop(glue::glue("\n\n--> 'else_cat' cannot be NULL in rip_cats_by_pkg().\n"))
+  }
+  
+  #
+  # ---- Setup ----
+  #
+  
+  # Which metrics are available?
+  all_mets <- dec_df$metric |> unique()
+  dec_id_df <- unique(dec_df[,c("decision", "decision_id")])
+  
+  #
+  # --- Subset Metrics ----
+  #
+  
+  subset_metrics <- dec_df |>
+    dplyr::filter(tolower(metric_type) == tolower(label)) %>%
+    
+    # if this is not a CRAN pkg, do not use downloads_1yr as a primary metric
+    {if("downloads_1yr" %in% all_mets & toupper(repo_name) != "CRAN") {
+      dplyr::filter(., !(tolower(metric) %in% c("downloads_1yr"))) 
+    } else .} |>
+    
+    # For debugging:
+    # dplyr::filter(tolower(metric) %in% c("downloads_1yr", "reverse_dependencies")) |>
+    # dplyr::filter(tolower(metric) %in% c("covr_coverage")) |>
+    dplyr::mutate(derived_col = metric)
+  
+  # Share a note about primary metrics being used
+  met_len <- subset_metrics$metric |> unique() |> length()
+  if(met_len > 0) {
+    cat(glue::glue("\n\n--> Applying Decisions Categories for {met_len} '{label}' risk metric(s).\n\n"))
+    cat("\n---->", paste(subset_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
+    
+    # else_cat <- "High" # for debugging
+    
+    # Generate case_when()'s
+    cond_exprs <- get_case_whens(
+      met_dec_df = subset_metrics,
+      met_names = subset_metrics$metric |> unique(),
+      else_cat = else_cat
+    )
+    cond_exprs_ids <- get_case_whens(
+      met_dec_df = subset_metrics, met_names = subset_metrics$metric |> unique(),
+      else_cat = else_cat,
+      ids = TRUE
+    )
+    cond_exprs_aa <- get_case_whens(
+      met_dec_df = subset_metrics,
+      met_names = subset_metrics |> dplyr::filter(!is.na(auto_accept)) |> distinct(derived_col) |> pull(derived_col),
+      else_cat = else_cat,
+      auto_accept = TRUE
+    )
+    
+    
+    # pkgs_df$dwnlds_cat <- NULL
+    pkgs_primed <-
+      pkgs_df |>
+      dplyr::rowwise() |> 
+      dplyr::mutate(!!! cond_exprs) |>
+      dplyr::mutate(!!! cond_exprs_ids) %>%
+      {if(length(cond_exprs_aa) > 0) dplyr::mutate(., !!! cond_exprs_aa) else .} |>
+      dplyr::ungroup() |>
+      dplyr::mutate(
+        # convert cat vars into factors so we can use pmax() on them
+        across(ends_with("_cat"), ~ factor(.x, levels = decisions)), 
+        
+        # if any column ending in "_cataa" is TRUE, then set final_risk_catid to 1 (Low)
+        final_risk_cataa = ifelse(rowSums(across(ends_with("_cataa"), ~ .x), na.rm = TRUE) > 0, 1, NA_integer_),
+        
+        # higher risk trumps lower risk amongst all _cat vars (e.g., High > Medium > Low)
+        max_catid = pmax(!!!rlang::syms(paste0(unique(subset_metrics$derived_col), "_catid")), na.rm = TRUE) |> as.integer(),
+        final_risk_catid = dplyr::case_when(
+          !is.na(final_risk_cataa) ~ final_risk_cataa,
+          is.finite(max_catid) ~ max_catid,
+          .default = as.integer(NA) # if this happens, need to investigate!
+        ),
+        final_risk_cat = decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid)
+      ) |>
+      dplyr::select(-c(ends_with("_catid"), "final_risk_cataa"))
+    
+    
+    cat(glue::glue("\n\n--> '{label}' Metric Decision Categories Assigned:\n"))
+    pkgs_primed |>
+      dplyr::select(package, dplyr::ends_with("_cat")) |>
+      t() |> print()
+    
+  } else {
+    cat(glue::glue("\n\n\n--> No '{label}' metrics found in 'dec_df' for this pkg's repo sources."))
+    pkgs_primed <- pkgs_df |>
+      dplyr::mutate(
+        final_risk_cat = factor(NA, levels = decisions)
+      )
+  }
+  return(pkgs_primed)
+}
+
+
+
 #' Generate Decision Category Assignments
 #'
 #' A helper function that applies the dplyr::case_when() statements from the
@@ -712,10 +850,7 @@ rip_cats <- function(
     # else_cat <- "High" # for debugging
     # pkgs_df$dwnlds_cat <- NULL
     pkgs_df <<- pkgs_df |>
-      dplyr::rowwise() %>% # Boo! Rowwise is really slow. We need to find a better way eventually.
-      # {if(met == "downloads_1yr" & toupper(repo_name) != "CRAN") {
-      #   dplyr::filter(., !(tolower(metric) %in% c("downloads_1yr")))
-      #   } else .} |>
+      dplyr::rowwise() |>
       dplyr::mutate(!!! cond_exprs) |>
       dplyr::mutate(!!! cond_exprs_ids) %>%
       {if(length(cond_exprs_aa) > 0) dplyr::mutate(., !!! cond_exprs_aa) else .} |>
@@ -766,7 +901,7 @@ rip_cats <- function(
   
   # Report of changes for primary risk alone
   if(nrow(met_der) > 1) {
-    cat(glue::glue("\n\n--> Decisions based off {nrow(met_der)} 'Primary' risk metric(s):\n\n"))
+    cat(glue::glue("\n\n--> Decisions based off {nrow(met_der)} '{label}' risk metric(s):\n\n"))
     Var1 <- return_pkgs[["final_risk_cat"]]
     print(
       Var1 |>

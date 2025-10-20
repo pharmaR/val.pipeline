@@ -83,7 +83,7 @@ val_pkg <- function(
   if(length(repo_name) == 0) repo_name <- "unknown"
   if(length(repo_name) > 1) {
     repo_name <- repo_name[1]
-    cat(glue::glue("\n!!! WARNING: Package '{pkg}' appears to come from multiple repos. Using '{repo_name[1]}' for decisioning.\n"))
+    cat(glue::glue("\n\n!!! WARNING: Package '{pkg}' appears to come from multiple repos. Using '{repo_name[1]}' for decisioning.\n"))
   }
   
   # Decisions
