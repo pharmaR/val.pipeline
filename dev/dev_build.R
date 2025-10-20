@@ -44,8 +44,8 @@ qual <- val_build(
   # val_date = as.Date("2025-10-07"),
   replace = FALSE, 
   # use a env var for the out path
-  out = Sys.getenv("RISK_OUTPATH") %|e|% getwd()
-    # Sys.getenv("RISK_OUTPATH") %|e|% getwd()
+  out = Sys.getenv("RISK_OUTPATH") %e% getwd()
+    # Sys.getenv("RISK_OUTPATH") %e% getwd()
 )
 
 qual_df <- qual$pkgs_df
@@ -65,7 +65,7 @@ View(qual_df)
 # val_date = Sys.Date()
 # # val_date = as.Date("2025-10-07")
 # replace = FALSE
-# out = Sys.getenv("RISK_OUTPATH") %|e|% getwd()
+# out = Sys.getenv("RISK_OUTPATH") %e% getwd()
 
 # -- defaults --
 # ref = "source"
@@ -75,6 +75,6 @@ View(qual_df)
 # val_date = Sys.Date()
 # # val_date = as.Date("2025-10-07")
 # replace = FALSE
-# out = Sys.getenv("RISK_OUTPATH") %|e|% getwd()
+# out = Sys.getenv("RISK_OUTPATH") %e% getwd()
 
 
