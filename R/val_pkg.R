@@ -79,7 +79,7 @@ val_pkg <- function(
     dplyr::pull(Repository)  # keep '/src/contrib/` ending
   repo_src <- repo_src_contrib |> dirname() |> dirname() # trim off '/src/contrib'
   curr_repos <- options("repos")
-  repo_name <- curr_repos$repos[curr_repos$repos %in% repo_src]
+  repo_name <- curr_repos$repos[curr_repos$repos %in% repo_src] # named char
   if(length(repo_name) == 0) repo_name <- "unknown"
   if(length(repo_name) > 1) {
     repo_name <- repo_name[1]

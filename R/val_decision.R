@@ -396,27 +396,102 @@ val_decision <- function(
       cat("\n---->", paste(secondary_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
       
       
-      
       #
       # ---- Perform 'Secondary' Checks ----
       #
-      # rm(pkgs_final)
-      pkgs_sec_cats <- rip_cats(
-        met_dec_df = secondary_metrics,
-        pkgs_df =  
-          pkgs_primed |>
-          dplyr::rename(primary_risk_category = final_risk_cat)
-          # dplyr::select(-dplyr::ends_with("_cat")), # DO NOT remove these since they are needed for final eval
-        ,else_cat = else_cat
-      ) 
       
+      # Generate case_when()'s
+      cond_exprs <- get_case_whens(
+        met_dec_df = secondary_metrics,
+        met_names = secondary_metrics$metric |> unique(),
+        else_cat = else_cat
+      )
+      cond_exprs_ids <- get_case_whens(
+        met_dec_df = secondary_metrics,
+        met_names = secondary_metrics$metric |> unique(),
+        else_cat = else_cat,
+        ids = TRUE
+      )
+      cond_exprs_aa <- get_case_whens(
+        met_dec_df = secondary_metrics,
+        met_names = secondary_metrics |> dplyr::filter(!is.na(auto_accept)) |> distinct(derived_col) |> pull(derived_col),
+        else_cat = else_cat,
+        auto_accept = TRUE
+      )
+      
+      # Build DF w/ secondary cats
+      pkgs_sec_cats <-
+        pkgs_primed |>
+        dplyr::rename(primary_risk_category = final_risk_cat) |>
+        dplyr::select(-dplyr::ends_with("_cat")) |> # remove to keep things tidy, or could leave them in?
+        dplyr::rowwise() |> 
+        dplyr::mutate(!!! cond_exprs) |>
+        dplyr::mutate(!!! cond_exprs_ids) %>%
+        {if(length(cond_exprs_aa) > 0) dplyr::mutate(., !!! cond_exprs_aa) else .} |>
+        dplyr::ungroup() |>
+        dplyr::mutate(
+          # convert cat vars into factors so we can use pmax() on them
+          across(ends_with("_cat"), ~ factor(.x, levels = decisions)), 
+          
+          # if any column ending in "_cataa" is TRUE, then set final_risk_catid to 1 (Low)
+          final_risk_cataa = ifelse(rowSums(across(ends_with("_cataa"), ~ .x), na.rm = TRUE) > 0, 1, NA_integer_),
+          
+          # higher risk trumps lower risk amongst all _cat vars (e.g., High > Medium > Low)
+          max_catid = pmax(!!!rlang::syms(paste0(unique(secondary_metrics$derived_col), "_catid")), na.rm = TRUE) |> as.integer(),
+          final_risk_catid = dplyr::case_when(
+            !is.na(final_risk_cataa) ~ final_risk_cataa,
+            is.finite(max_catid) ~ max_catid,
+            .default = as.integer(NA) # if this happens, need to investigate!
+          ),
+          final_risk_cat = decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid)
+        ) |>
+        dplyr::select(-c(ends_with("_catid"), "final_risk_cataa")) 
+      
+      # Print out results
       cat("\n\n--> All Metric Decision Categories Assigned:\n")
       pkgs_sec_cats |>
         dplyr::select(package, dplyr::ends_with("_cat")) |>
         t() |> print()
-      
 
+      
+      
+      
+      #
+      # ---- General=te Final Decision ----
+      #
+      
+      # Combine Primary & Secondary into final decision
       pkgs_final <- pkgs_sec_cats |>
+        dplyr::rename(secondary_risk_category = final_risk_cat) |>
+
+
+        # create final_risk variable that finds the highest risk between 
+        # primary_risk_category & secondary_risk_category 
+        dplyr::mutate(
+          final_risk_id = ifelse(
+              is.na(primary_risk_category), as.integer(secondary_risk_category),
+              max(as.integer(primary_risk_category), as.integer(secondary_risk_category))
+            )
+        ) |>
+        dplyr::left_join(
+          dec_id_df |> dplyr::rename(final_risk = decision),
+          by = c("final_risk_id" = "decision_id")
+        ) |>
+        dplyr::mutate(
+          final_risk = factor(final_risk, levels = decisions),
+        ) |>
+        dplyr::select(
+          package,
+          primary_risk_category, secondary_risk_category, final_risk,
+          # final_risk_manual,
+          dplyr::everything(),
+          -final_risk_id, # keep id?
+        )
+      
+      
+    } else {
+      cat("\n-->No 'Secondary' metrics found in 'decisions_df'.\n")
+      pkgs_final <- pkgs_primed |>
         dplyr::select(
           package, final_risk = final_risk_cat,
           dplyr::everything()

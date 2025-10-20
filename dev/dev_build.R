@@ -7,8 +7,8 @@ source("dev/pkg_lists.R") # build_pkgs & pkgs for CRAN only
 # See the full dependency tree before running val_build()
 # these_pkgs <- "withr"  # messes with the entire process
 # these_pkgs <- "matrix" # takes 5 mins to install
-these_pkgs <- "askpass"
-# these_pkgs <- c("Biobase", "BiocGenerics")
+# these_pkgs <- "askpass"
+these_pkgs <- c("Biobase", "BiocGenerics")
 # these_pkgs <- build_pkgs
 
 tree <- tools::package_dependencies(
@@ -29,7 +29,7 @@ full_tree |> length()
 # temporary until we can figure out what's gone haywire with this pkg
 # build_pkgs <- build_pkgs[build_pkgs != "withr"]
 
-usethis::edit_r_environ()
+# usethis::edit_r_environ() # to configure RISK_OUTPATH
 
 qual <- val_build(
   # pkg_names = build_pkgs,
