@@ -282,9 +282,8 @@ cat("Code coverage for this package is: ", d_riskmetric[["covr_coverage"]])
 ```{r execution_info}
 #| tab.cap: "**System information**. Table about the system used to check the package."
 tt_sys_info_df <- data.frame(
-  Field = c("Image", "OS", "Platform", "System", "Execution Time"),
+  Field = c("OS", "Platform", "System", "Execution Time"),
   Value = c(
-    image,
     sessionInfo()$running,
     R.version$platform,
     R.version$system,
