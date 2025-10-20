@@ -1,7 +1,7 @@
 ---
 title: "`r basename(params$package_name)` v`r params$package_version`"
-date-format: "YYYY-MM-DD"
-date: today
+date-format: "[Validation Date:] YYYY-MM-DD"
+date: "`r params$val_date`"
 published-title: ""
 params:
   package_name: dplyr
@@ -11,6 +11,7 @@ params:
   assessment_path: "assessments/dplyr.rds"
   hide_reverse_deps: true
   source: "pgk_install"
+  val_date: NULL
 format:
   html: 
     toc: true  

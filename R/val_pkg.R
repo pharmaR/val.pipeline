@@ -429,9 +429,10 @@ val_pkg <- function(
     params = list(
       assessment_path = assessment_file,
       hide_reverse_deps = 'false',
-      source = src_ref # defined above
+      source = src_ref, # defined above
+      val_date = as.character(val_date)
     ),
-    quiet = TRUE # To silence quarto output for readability
+    quiet = TRUE, # To silence quarto output for readability
   )
   # pr
   
