@@ -205,14 +205,7 @@ val_pkg <- function(
       init_pkg_assessment0 |> 
       strip_recording()
     
-    
     init_pkg_scores <- riskmetric::pkg_score(init_pkg_assessment)
-    
-    
-    init_pkg_scores |> dplyr::as_tibble() |> t() |> as.data.frame() |> tibble::rownames_to_column(var = "metric") |> dplyr::rename(cran = V1) |> 
-      left_join(
-        init_pkg_scoresb |> dplyr::as_tibble() |> t() |> as.data.frame() |> tibble::rownames_to_column(var = "metric") |> dplyr::rename(bioc = V1),
-      )
     
     init_assessed_end <- Sys.time()
     init_ass_mins <- difftime(init_assessed_end, start, units = "mins")
