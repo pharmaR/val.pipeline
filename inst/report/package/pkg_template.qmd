@@ -58,13 +58,7 @@ risk_path <- params$assessment_path
 image <- params$image
 ```
 
-Documents the installation of this package on an open source R environment, focusing on:
-
-- Installation environment description
-- Testing coverage
-
-It is limited to assess whether unit tests and documentation are present and can execute without error. 
-An assessment would be required that the tests and documentation are meaningful. 
+Context placeholder
 
 
 # Package Assessments
