@@ -67,7 +67,7 @@ It is limited to assess whether unit tests and documentation are present and can
 An assessment would be required that the tests and documentation are meaningful. 
 
 
-# Package `r basename(pkg)` v`r params$pkg_version`
+# Package Assessments
 
 ## Metric based risk assessment
 
@@ -113,7 +113,8 @@ simple_cards <- data.frame(
   "Downloads 1 year" = as.character(r_riskmetric$downloads_1yr),
   "Reverse dependencies" = r_riskmetric$reverse_dependencies,
   "License" = as.character(r_riskmetric$license),
-  "Origin" = r_riskmetric$origin
+  "Origin" = r_riskmetric$origin,
+  check.names = FALSE
 )
 r_riskmetric$origin <- NULL
 knitr::kable(simple_cards)
