@@ -173,7 +173,8 @@ val_pkg <- function(
     # "covr_coverage") so that if any primary metrics have an auto_accept
     # condition, we can then run again with a "pkg_source" ref while excluding
     # "covr_coverage" for final output. However, 
-    init_pkg_ref <- riskmetric::pkg_ref(pkg, source = "pkg_cran_remote")
+    init_pkg_ref <- riskmetric::pkg_ref(pkg, source = 
+        if(stringr::str_detect(tolower(repo_name), "bioc")) "pkg_bioc_remote" else "pkg_cran_remote")
     cat("\n-->", pkg_v, "initial reference complete.\n")
     
     # Pull available {riskmetric} assessments
@@ -204,7 +205,14 @@ val_pkg <- function(
       init_pkg_assessment0 |> 
       strip_recording()
     
+    
     init_pkg_scores <- riskmetric::pkg_score(init_pkg_assessment)
+    
+    
+    init_pkg_scores |> dplyr::as_tibble() |> t() |> as.data.frame() |> tibble::rownames_to_column(var = "metric") |> dplyr::rename(cran = V1) |> 
+      left_join(
+        init_pkg_scoresb |> dplyr::as_tibble() |> t() |> as.data.frame() |> tibble::rownames_to_column(var = "metric") |> dplyr::rename(bioc = V1),
+      )
     
     init_assessed_end <- Sys.time()
     init_ass_mins <- difftime(init_assessed_end, start, units = "mins")
