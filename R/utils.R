@@ -398,6 +398,8 @@ build_decisions_df <- function(
   # message("\n--> Building decision data.frame using the 'rule sets' for the following metrics:\n")
   # cat("\n---->", paste(rule_metric_nm, collapse = '\n----> '), "\n")
 
+  # Extract possible values of "metric_type"
+  types <- purrr::map_chr(rule_metric_nm, ~ rule_lst[[.x]][["type"]]) |> unique()
   
   # Build exceptions data.frame
   decisions_df0 <-
@@ -435,8 +437,8 @@ build_decisions_df <- function(
     # Add in column for metric_type
     dplyr::mutate(
       metric_type = purrr::map_chr(metric, ~
-        rule_lst[[.x]][["type"]] %||% "secondary") |>
-        factor(levels = c("primary", "secondary"))
+        rule_lst[[.x]][["type"]] %||% types[length(types)]) |>
+        factor(levels = types)
     ) |>
     # dplyr::mutate(
       # extract lower & Upper limit of the condition
