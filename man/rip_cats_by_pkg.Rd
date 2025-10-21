@@ -7,7 +7,7 @@
 rip_cats_by_pkg(
   label = "primary",
   repo_name = "CRAN",
-  dec_df = dplyr::mutate(build_decisions_df(rule_type = "decide"), derived_col = metric),
+  dec_df = build_decisions_df(rule_type = "decide"),
   pkgs_df = NULL,
   decisions = pull_config(val = "decisions_lst", rule_type = "default"),
   else_cat = NULL

@@ -713,7 +713,7 @@ decision_to_id_v <- Vectorize(decision_to_id, vectorize.args = "dec")
 rip_cats_by_pkg <- function(
     label = 'primary',
     repo_name = "CRAN",
-    dec_df = build_decisions_df(rule_type = "decide") |> dplyr::mutate(derived_col = metric),
+    dec_df = build_decisions_df(rule_type = "decide"),
     pkgs_df = NULL,
     decisions = pull_config(val = "decisions_lst", rule_type = "default"),
     else_cat = NULL
