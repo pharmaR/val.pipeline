@@ -78,13 +78,7 @@ val_pkg <- function(
     dplyr::filter(Package %in% pkg) |> 
     dplyr::pull(Repository)  # keep '/src/contrib/` ending
   repo_src <- repo_src_contrib |> dirname() |> dirname() # trim off '/src/contrib'
-  curr_repos <- options("repos")
-  repo_name <- curr_repos$repos[curr_repos$repos %in% repo_src] # named char
-  if(length(repo_name) == 0) repo_name <- "unknown"
-  if(length(repo_name) > 1) {
-    repo_name <- repo_name[1]
-    cat(glue::glue("\n\n!!! WARNING: Package '{pkg}' appears to come from multiple repos. Using '{repo_name[1]}' for decisioning.\n"))
-  }
+  repo_name <- get_repo_origin(repo_src = repo_src, pkg_name = pkg)
   
   # Decisions
   decisions <- pull_config(val = "decisions_lst", rule_type = "default")

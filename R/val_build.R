@@ -85,7 +85,7 @@ val_build <- function(
   # val_date = Sys.Date() # Sys.Date() # is  default
   # replace = FALSE # default
   # # replace = TRUE
-  # out = Sys.getenv("RISK_OUTPATH") %e% getwd()
+  # out = Sys.getenv("RISK_OUTPATH", unset = getwd())
   # opt_repos = opt_repos
   
   # Assess args
@@ -294,13 +294,9 @@ val_build <- function(
         dplyr::filter(Package %in% pkg) |> 
         dplyr::pull(Repository) |> 
         dirname() |> dirname() # trim '/src/contrib/` ending
-      curr_repos <- options("repos")
-      repo_name <- curr_repos$repos[curr_repos$repos %in% repo_src]
-      if(length(repo_name) == 0) repo_name <- "unknown"
-      if(length(repo_name) > 1) {
-        repo_name <- repo_name[1]
-        cat(glue::glue("\n\n!!! WARNING: Package '{pkg}' appears to come from multiple repos. Using '{repo_name[1]}' for decisioning.\n"))
-      }
+      repo_name <- get_repo_origin(repo_src = repo_src, pkg_name = pkg)
+      
+      
       
       pkg_meta <- list(
         pkg = pkg,

@@ -11,7 +11,7 @@ qual <- val_pipeline(
   # val_date = Sys.Date(),
   val_date = as.Date("2025-10-07"),
   replace = FALSE, 
-  out = Sys.getenv("RISK_OUTPATH") %e% getwd()
+  out = Sys.getenv("RISK_OUTPATH", unset = getwd())
 )
 
 # 
@@ -25,7 +25,7 @@ qual <- val_pipeline(
 # val_date = Sys.Date()
 # # val_date = as.Date("2025-10-07")
 # replace = FALSE
-# out = Sys.getenv("RISK_OUTPATH") %e% getwd()
+# out = Sys.getenv("RISK_OUTPATH", unset = getwd())
 
 
 
@@ -35,7 +35,7 @@ qual <- val_pipeline(
 # 
 # val_date_txt <- gsub("-", "", val_date)
 # val_dir <- file.path(
-#   Sys.getenv("RISK_OUTPATH") %e% getwd(),
+#   Sys.getenv("RISK_OUTPATH", unset = getwd()),
 #   glue::glue('R_{getRversion()}'),
 #   val_date_txt
 #   )

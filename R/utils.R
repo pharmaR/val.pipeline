@@ -17,6 +17,33 @@
   }
 }
 
+
+#' Get Repo Origin
+#' 
+#' Helper function to determine which repo a package came from
+#' 
+#' @param repo_src character, containing a repository URL for a single pkg
+#' @param pkg_name The name of the package (just for warning messages)
+#' 
+#' @importFrom glue glue
+#' 
+#' @return A character string indicating the name of the repository
+#' @examples
+#' get_repo_origin(repo_src = "https://packagemanager.posit.co/cran/2024-06-01", "fake")
+#' 
+#' @keywords internal
+get_repo_origin <- function(repo_src = NULL, pkg_name = NULL, names_only = FALSE) {
+  curr_repos <- getOption("repos")
+  repo_name <- curr_repos[curr_repos %in% repo_src] %>%
+    {if(names_only) names(.) else .}
+  if(length(repo_name) == 0) repo_name <- "unknown"
+  if(length(repo_name) > 1) {
+    repo_name <- repo_name[1]
+    cat(glue::glue("\n\n!!! WARNING: Package '{pkg_name}' appears to come from multiple repos. Using '{repo_name[1]}' for decisioning.\n"))
+  }
+  repo_name
+}
+
 #' Strip Recording (for list() objects)
 #'
 #' Remove .recording attribute from all elements of the assessment,

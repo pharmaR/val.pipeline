@@ -271,16 +271,11 @@ val_decision <- function(
     dplyr::filter(Package %in% pkg) |> 
     dplyr::pull(Repository) |>
     dirname() |> dirname() # remove '/src/contrib/` ending
-  curr_repos <- options("repos")
-  
-  # look-up name of curr_repos based on repo_src. Yes, I know that is very
-  # dependent on the naming convention chosen for our repos
-  repo_name <- curr_repos$repos[curr_repos$repos %in% repo_src] |> names()
-  if(length(repo_name) == 0) repo_name <- "unknown"
-  if(length(repo_name) > 1) {
-    repo_name <- repo_name[1]
-    cat(glue::glue("\n\n!!! WARNING: Package '{pkg}' appears to come from multiple repos. Using '{repo_name[1]}' for decisioning.\n"))
-  }
+  repo_name <- get_repo_origin(
+    repo_src = repo_src,
+    pkg_name = pkg,
+    names_only = TRUE
+    )
 
   
   #
@@ -441,16 +436,16 @@ val_categorize <- function(
     # options("repos") # verify
     
     # Some setup:
-    curr_repos <- options("repos")
-    avail_pkgs <- available.packages() |>as.data.frame()
-      
+    avail_pkgs <- available.packages() |> as.data.frame()
+    curr_repos <- getOptions("repos")
+    
     # Where did package come from?
     # categorize Repository field to match names in options("repos")
     avail_pkgs$repo_name <-
       purrr::map_chr(avail_pkgs$Repository, ~ {
         if(is.null(.x)) NA_character_ else {
           repo_src <- .x |> dirname() |> dirname() # remove '/src/contrib/` ending
-          repo_name <- curr_repos$repos[curr_repos$repos %in% repo_src] |> names()
+          repo_name <- curr_repos[curr_repos %in% repo_src] |> names()
           if(length(repo_name) == 0) repo_name <- "unknown"
           if(length(repo_name) > 1) {
             repo_name <- repo_name[1]
