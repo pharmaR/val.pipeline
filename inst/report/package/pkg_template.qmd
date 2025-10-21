@@ -105,8 +105,8 @@ riskreports:::create_metrics_cards(r_riskmetric)
 
 ```{r simple_cards}
 simple_cards <- data.frame(
-  "Downloads 1 year" = as.character(r_riskmetric$downloads_1yr),
-  "Reverse dependencies" = r_riskmetric$reverse_dependencies,
+  "Downloads 1 year" = prettyNum(r_riskmetric$downloads_1yr, big.mark = ","),
+  "Reverse dependencies" = prettyNum(r_riskmetric$reverse_dependencies, big.mark = ","),
   "License" = as.character(r_riskmetric$license),
   "Origin" = r_riskmetric$origin,
   check.names = FALSE
