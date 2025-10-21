@@ -10,7 +10,7 @@ params:
   image: "rhub/ref-image"
   assessment_path: "assessments/dplyr.rds"
   hide_reverse_deps: true
-  source: "pgk_install"
+  source: "pkg_install"
   val_date: NULL
 format:
   html: 
