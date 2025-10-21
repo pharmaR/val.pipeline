@@ -223,9 +223,11 @@ update_opt_repos <- function(
 #' @export
 pull_config <- function(
     val = NULL,
-    rule_type = c("default", "remote_reduce", "decide")[1],
+    rule_type = c("default", "remote_reduce", "decide"),
     config_path = system.file("config.yml", package = "val.pipeline")
 ) {
+
+  rule_type <- match.arg(rule_type)
   
   configgy <- config::get(
     value = val, # NULL means grab everything
@@ -336,10 +338,12 @@ pull_config <- function(
 #'
 #' @export
 build_decisions_df <- function(
-    rule_type = c("default", "remote_reduce", "decide")[1],
+    rule_type = c("default", "remote_reduce", "decide"),
     rule_lst = NULL, # could input custom rules list here
     viable_metrics = NULL
   ) {
+
+  rule_type <- match.arg(rule_type)
   
   if (is.null(rule_lst)) {
     cat(glue::glue("\n\n--> Building decision data.frame using rules from '{rule_type}' decision type.\n"))

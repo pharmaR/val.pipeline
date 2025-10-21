@@ -5,7 +5,7 @@
 \title{Build Decisions Data.Frame}
 \usage{
 build_decisions_df(
-  rule_type = c("default", "remote_reduce", "decide")[1],
+  rule_type = c("default", "remote_reduce", "decide"),
   rule_lst = NULL,
   viable_metrics = NULL
 )
