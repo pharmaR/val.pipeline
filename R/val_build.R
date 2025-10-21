@@ -230,7 +230,7 @@ val_build <- function(
   pkg_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
     
     # i <- 1 # for debugging
-    # i <- which(pkgs == "class")
+    # # i <- which(pkgs == "class")
     # pkg <- pkgs[i] # for debugging
     # ver <- vers[i] # for debugging
     

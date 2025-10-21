@@ -121,23 +121,24 @@ val_dir <- file.path(Sys.getenv("RISK_OUTPATH") %e% getwd(), paste0("R_", getRve
 
 source("dev/pkg_lists.R") # build_pkgs & pkgs
 
-# CRAN
-# pack = 'rlang'
+### CRAN pkgs ###
 # pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
 # pack = 'withr'
-# pack = 'SuppDists'
-# pack = 'dplyr'
-# pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
-# pack = 'withr'
-# pack = 'SuppDists'
 # pack <- pkgs[which(pkgs == "SuppDists") + 1] # last left off:
-# pack
 
-# BioC
+
+### BioC pkgs ###
 # pack = 'Biobase'
 pack = 'BiocGenerics'
 
+### Quick Load args ###
+# pkg = pack
+# ver = avail_pkgs$Version[avail_pkgs$Package == pack]
+# ref = if(pack %in% remote_pkgs) 'remote' else 'source'
+# metric_pkg = "riskmetric"
+# out_dir = val_dir
 
+### Run it ###
 pkg_meta <- val_pkg(
   pkg = pack,
   ver = avail_pkgs$Version[avail_pkgs$Package == pack],
@@ -148,6 +149,7 @@ pkg_meta <- val_pkg(
   val_date = val_date
   )
 
+### Inspect output ###
 pkg_meta[!names(pkg_meta )%in% c("rev_deps","depends","suggests")]  
 assessed <- file.path(val_dir, "assessed")
 ass_files <- list.files(assessed, pattern = "_assessments.rds$")

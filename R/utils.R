@@ -666,10 +666,13 @@ decision_to_id_v <- Vectorize(decision_to_id, vectorize.args = "dec")
 #' with the decision categories for each metric.
 #'
 #' @param label A character string indicating the metric type to process
+#' @param repo_name A character string indicating the repository name
 #' @param dec_df A data.frame of decisions, typically created by
 #'   build_decisions_df()
 #' @param pkgs_df A data.frame of package metrics, typically created by
 #'   available.packages() merged with riskmetric assessments
+#' @param decisions A character vector of decision categories, typically
+#'  obtained from pull_config()
 #' @param else_cat A character string indicating the default category to assign
 #'   when none of the conditions are met.
 #'
@@ -685,6 +688,7 @@ rip_cats_by_pkg <- function(
     repo_name = "CRAN",
     dec_df = build_decisions_df(rule_type = "decide") |> dplyr::mutate(derived_col = metric),
     pkgs_df = NULL,
+    decisions = pull_config(val = "decisions_lst", rule_type = "default"),
     else_cat = NULL
 ) {
   

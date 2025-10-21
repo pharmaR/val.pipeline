@@ -291,16 +291,18 @@ val_decision <- function(
     repo_name = repo_name,
     dec_df = decisions_df,
     pkgs_df = pkgs_df,
+    decisions = decisions,
     else_cat = else_cat
   )
-  
+  prime_decision <- primed_pkgs$final_risk_cat
 
   #
   # --- Secondary Metrics ----
   #
   
   # If not from CRAN, then make decision using secondary metric conditions
-  if(tolower(repo_name) != "cran" & primed_pkgs$final_risk_cat == decisions[1]) {
+  if(tolower(repo_name) != "cran" &
+     (is.na(prime_decision) | prime_decision == decisions[1])) {
   
     cat(glue::glue("\n\n\n--> Package '{pkg}' appears to come from repo: '{repo_name}' ({repo_src}) which requires secondary metric assessments.\n\n"))
     #
@@ -313,13 +315,15 @@ val_decision <- function(
       pkgs_df = primed_pkgs |>
         dplyr::rename(primary_risk_category = final_risk_cat) |>
         dplyr::select(-dplyr::ends_with("_cat")), # remove to keep things tidy, or could leave them in?
+      decisions = decisions,
       else_cat = else_cat
     )
       
 
     #
-    # ---- Generalte Final Decision ----
+    # ---- Generate Final Decision ----
     #
+    dec_id_df <- unique(decisions_df[,c("decision", "decision_id")])
     
     # Combine Primary & Secondary into final decision
     pkgs_final <- pkgs_sec_cats |>
