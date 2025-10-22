@@ -437,7 +437,7 @@ val_categorize <- function(
     
     # Some setup:
     avail_pkgs <- available.packages() |> as.data.frame()
-    curr_repos <- getOptions("repos")
+    curr_repos <- getOption("repos")
     
     # Where did package come from?
     # categorize Repository field to match names in options("repos")
