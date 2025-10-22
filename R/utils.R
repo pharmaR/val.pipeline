@@ -346,13 +346,10 @@ pull_config <- function(
 #' val_filter() that includes columns "metric", "decision", "condition",
 #' "metric_type", and "accept_condition".
 #'
-#' @param rule_type A character string indicating whether the decision
-#'   categories are used to "categorize" risk levels (e.g., "Low", "Medium",
-#'   "High") via val_categorize() or val_decision(). The difference being that
-#'   "categorize" is going to be used to filter the initial list of packages
-#'   using a remote pkg_ref() assessment, whereas "decision" is used to filter
-#'   the final list of packages after a 'pkg_source' pkg_ref() assessment is
-#'   produced locally on the GxP system of interest.
+#' @param rule_type A character string indicating whether to use val_categorize() or val_decision(). The difference being that
+#'   "reduce_remote" is going to be used to filter the initial list of packages
+#'   using a "pkg_remote" based pkg_ref() assessment and conversely, the "decide" rule_type
+#'   is used to categorize the risk of a 'pkg_source' pkg_ref() assessment on the GxP system of interest.
 #' @param rule_lst A named list of lists, where each sub-list contains:
 #' - cond: A named list of formulas, where the names correspond to decision
 #'   categories in `decision_lst`, and the formulas define the conditions for
@@ -387,10 +384,13 @@ pull_config <- function(
 #'
 #' @export
 build_decisions_df <- function(
-    rule_type = c("default", "remote_reduce", "decide")[1],
+    rule_type = c("remote_reduce", "decide")[1],
     rule_lst = NULL, # could input custom rules list here
     viable_metrics = NULL
   ) {
+  # rule_type = "remote_reduce"
+  # rule_lst = NULL
+  # viable_metrics = NULL
   
   if (is.null(rule_lst)) {
     cat(glue::glue("\n\n--> Building decision data.frame using rules from '{rule_type}' decision type.\n"))
@@ -398,10 +398,17 @@ build_decisions_df <- function(
     figgy <- pull_config(rule_type = rule_type)
     decision_lst <- figgy$default_lst$decisions_lst
     rule_lst <- figgy$rule_lst
+  } else {
+    cat(glue::glue("\n\n--> Building decision data.frame using rules from custom 'rule_lst'.\n"))
+    if(!"decision_lst" %in% 'names(rule_list)'){
+      decision_lst <- pull_config(val = "decisions_lst", rule_type = "default")
+    } else {
+      decision_lst <- rule_lst$decision_lst
+    }
   }
     
   #
-  # Remove metrics from rule_lst that aren't in 'metrics'
+  # Remove metrics from rule_lst that aren't in 'viable_metrics'
   if(!is.null(viable_metrics)) {
     keep_rules <- names(rule_lst) %in% viable_metrics
     if(any(!keep_rules)) {
@@ -413,7 +420,7 @@ build_decisions_df <- function(
     rule_lst <- rule_lst[keep_rules]
     if(length(rule_lst) == 0) {
       # probably need something else other than stop()?
-      stop(glue::glue("\n\n--> None of the metrics in 'rule_lst' are viable. Please check your 'metrics' inputs.\n"))
+      stop(glue::glue("\n\n--> None of the metrics in 'rule_lst' are viable. Please check your 'viable_metrics' inputs.\n"))
     }
   }
   
