@@ -272,7 +272,7 @@ pull_config <- function(
     rule_type = c("default", "remote_reduce", "decide")[1],
     config_path = system.file("config.yml", package = "val.pipeline")
 ) {
-  
+
   configgy <- config::get(
     value = val, # NULL means grab everything
     config = rule_type,
@@ -283,13 +283,18 @@ pull_config <- function(
   if(!is.null(val)) {
     return(configgy)
   }
-  
+
   # 
   # ---- Pull ----
   #
   fig_names <- names(configgy)
   decisions_pos <- which(fig_names == "decisions_lst")[1] # grab first time 'decisions_lst' shows up
   default_names <- fig_names[1:decisions_pos] 
+  # if is.null(value) & rule_type is 'default', make sure to stop here & return the default config elements
+    if(is.null(val) & rule_type == 'default') {
+      return(configgy[default_names])
+    }
+
   rule_names <- fig_names[(decisions_pos + 1): length(fig_names)]
   rule_names <- rule_names[rule_names != "inherits"]
   
@@ -563,13 +568,20 @@ build_decisions_df <- function(
 get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_accept = FALSE) {
   
   # for debugging
-  # met_dec_df <- build_decisions_df() |> dplyr::mutate(derived_col = metric)
+  # met_dec_df <- build_decisions_df(rule_type = "decide") |> dplyr::mutate(derived_col = metric)
+  # class(met_dec_df$decision) # verify
   # met_names <- c("dwnlds")
   # else_cat <- "High"
   # ids <- FALSE
   # ids <- TRUE
   # auto_accept <- TRUE
   # auto_accept <- FALSE
+
+  # verify that met_dec_df$decision is a factor
+  if(!is.factor(met_dec_df$decision)) {
+    decisions <- pull_config(val = "decisions_lst", rule_type = "default")
+    met_dec_df$decision <- factor(met_dec_df$decision, levels = levels(decisions))
+  }
   
   # If auto_accept is TRUE, Then set ids to FALSE
   if(auto_accept) {
@@ -586,9 +598,10 @@ get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_ac
       dplyr::filter(derived_col == .x)
     
     # if else_cat is character & ids is TRUE, we need to convert else_cat to decision_id
-    if(ids & is.character(else_cat)) {
-      if(else_cat %in% met_dec_df$decision) {
-        else_cat <- met_dec_df$decision_id[which(met_dec_df$decision == else_cat)] |> unique()
+      if(ids & is.character(else_cat)) {
+      if(else_cat %in% levels(met_dec_df$decision)) {
+        else_cat <- which(else_cat == levels(met_dec_df$decision))
+          # met_dec_df$decision_id[which(met_dec_df$decision == else_cat)] |> unique()
       } 
     }
     
