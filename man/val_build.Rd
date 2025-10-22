@@ -6,8 +6,8 @@
 \usage{
 val_build(
   pkg_names = NULL,
-  ref = "source",
-  metric_pkg = "riskmetric",
+  ref = c("source", "remote"),
+  metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
   deps = c("depends", "suggests")[1],
   deps_recursive = TRUE,
   val_date = Sys.Date(),

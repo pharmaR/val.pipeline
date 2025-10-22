@@ -8,8 +8,8 @@ val_pkg(
   pkg,
   ver,
   avail_pkgs,
-  ref = "source",
-  metric_pkg = "riskmetric",
+  ref = c("source", "remote"),
+  metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
   out_dir,
   val_date = Sys.Date()
 )

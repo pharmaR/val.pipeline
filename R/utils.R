@@ -29,7 +29,9 @@
 #' 
 #' @return A character string indicating the name of the repository
 #' @examples
+#' \dontrun{
 #' get_repo_origin(repo_src = "https://packagemanager.posit.co/cran/2024-06-01", "fake")
+#' }
 #' 
 #' @keywords internal
 get_repo_origin <- function(repo_src = NULL, pkg_name = NULL, names_only = FALSE) {
@@ -269,9 +271,11 @@ update_opt_repos <- function(
 #' @export
 pull_config <- function(
     val = NULL,
-    rule_type = c("default", "remote_reduce", "decide")[1],
+    rule_type = c("default", "remote_reduce", "decide"),
     config_path = system.file("config.yml", package = "val.pipeline")
 ) {
+
+  rule_type <- match.arg(rule_type)
 
   configgy <- config::get(
     value = val, # NULL means grab everything
@@ -384,13 +388,15 @@ pull_config <- function(
 #'
 #' @export
 build_decisions_df <- function(
-    rule_type = c("remote_reduce", "decide")[1],
+    rule_type = c("remote_reduce", "decide"),
     rule_lst = NULL, # could input custom rules list here
     viable_metrics = NULL
   ) {
   # rule_type = "remote_reduce"
   # rule_lst = NULL
   # viable_metrics = NULL
+
+  rule_type <- match.arg(rule_type)
   
   if (is.null(rule_lst)) {
     cat(glue::glue("\n\n--> Building decision data.frame using rules from '{rule_type}' decision type.\n"))
