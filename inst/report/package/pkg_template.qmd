@@ -248,17 +248,18 @@ cat("The package uses ", d_riskmetric$license, ".", sep = "")
 ```{r, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]) || !riskreports::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
 cat("## Code checks", "\n")
 
-cat("Code checks for this package are:")
+cat("Code checks for this package are:", "\n")
 ```
 
-```{r r_cmd_check, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]])}
-d_riskmetric[["r_cmd_check"]] |> as.list() |> unlist()
+```{r r_cmd_check, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]), results='asis'}
+r_cmd <- d_riskmetric[["r_cmd_check"]]
+cat("R CMD check for this package: ", paste(stringr::str_to_title(names(r_cmd)), r_cmd, sep = " - "))
 ```
 
 
 
-```{r remote_checks, eval=!riskreports::is_risk_error(d_riskmetric[["remote_checks"]])}
-d_riskmetric[["remote_checks"]]
+```{r remote_checks, eval=!riskreports::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
+cat("Remote checks for this package: ", d_riskmetric[["remote_checks"]])
 ```
 
 
