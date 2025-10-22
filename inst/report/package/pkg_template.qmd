@@ -248,25 +248,25 @@ cat("The package uses ", d_riskmetric$license, ".", sep = "")
 ```{r, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]) || !riskreports::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
 cat("## Code checks", "\n")
 
-cat("Code checks for this package are:", "\n")
+cat("Code checks for this package:", "\n")
 ```
 
 ```{r r_cmd_check, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]), results='asis'}
 r_cmd <- d_riskmetric[["r_cmd_check"]]
-cat("R CMD check for this package: ", paste(stringr::str_to_title(names(r_cmd)), r_cmd, sep = " - "))
+cat("R CMD check: ", paste(stringr::str_to_title(names(r_cmd)), r_cmd, sep = " - "))
 ```
 
 
 
 ```{r remote_checks, eval=!riskreports::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
-cat("Remote checks for this package: ", d_riskmetric[["remote_checks"]])
+cat("Remote checks: ", d_riskmetric[["remote_checks"]])
 ```
 
 
 ```{r covr_coverage, eval=!riskreports::is_risk_error(d_riskmetric[["covr_coverage"]]), results='asis'}
 cat("## Code coverage", "\n")
 
-cat("Code coverage for this package is: ", d_riskmetric[["covr_coverage"]])
+cat("Code coverage for this package: ", d_riskmetric[["covr_coverage"]])
 ```
 
 
