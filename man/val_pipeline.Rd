@@ -11,7 +11,7 @@ val_pipeline(
   deps_recursive = TRUE,
   val_date = Sys.Date(),
   replace = FALSE,
-  out = "dev/riskassessments",
+  out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
   opt_repos = c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()), BioC
     = "https://bioconductor.org/packages/3.21/bioc")
 )
@@ -35,7 +35,7 @@ Default is TRUE.}
 FALSE.}
 
 \item{out}{Character. Output directory for assessments. Default is
-'dev/riskassessments'.}
+Sys.getenv("RISK_OUTPATH", unset = getwd()).}
 
 \item{opt_repos}{Named character vector. Repositories to use. Default is
 opt_repos from config.}

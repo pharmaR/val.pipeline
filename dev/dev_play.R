@@ -18,7 +18,7 @@
 # ---- Dev ----
 #
 val_date <- "2025-10-07"
-val_dir <- file.path('dev/riskassessments', paste0("R_", getRversion()), gsub("-","",val_date))
+val_dir <- file.path(Sys.getenv("RISK_OUTPATH", unset = getwd()), paste0("R_", getRversion()), gsub("-","",val_date))
 reports <- list.files(file.path(val_dir, "reports"))
 reports |> length()
 # any(stringr::str_detect(reports, "bit"))
@@ -51,7 +51,7 @@ qual <- val_pipeline(
     val_date = Sys.Date(),
     # val_date = as.Date("2025-10-07"),
     replace = FALSE, 
-    out = 'dev/riskassessments'
+    out = Sys.getenv("RISK_OUTPATH", unset = getwd())
 )
   
 
@@ -103,7 +103,7 @@ outtie <- val_build(
   val_date = Sys.Date(),
   # val_date = as.Date("2025-10-07"),
   replace = FALSE, 
-  out = 'dev/riskassessments'
+  out = Sys.getenv("RISK_OUTPATH", unset = getwd())
 ) 
 
 
@@ -117,27 +117,28 @@ remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
 avail_pkgs <- available.packages() |> as.data.frame()
 val_date <- Sys.Date()
 # val_date <- as.Date("2025-10-07")
-val_dir <- file.path('dev/riskassessments', paste0("R_", getRversion()), gsub("-","",val_date))
-reports <- list.files(file.path(val_dir, "reports"))
-reports |> length()
-any(stringr::str_detect(reports, "spacesXYZ"))
-
+val_dir <- file.path(Sys.getenv("RISK_OUTPATH", unset = getwd()), paste0("R_", getRversion()), gsub("-","",val_date))
 
 source("dev/pkg_lists.R") # build_pkgs & pkgs
 
-
-# pack = 'rlang'
-pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
-# pack = 'withr'
-# pack = 'SuppDists'
-pack = 'dplyr'
+### CRAN pkgs ###
 # pack = 'askpass' # 2.5 - 3 mins when deps, 2 pkgs, no prompts
 # pack = 'withr'
-# pack = 'SuppDists'
-
 # pack <- pkgs[which(pkgs == "SuppDists") + 1] # last left off:
-# pack
 
+
+### BioC pkgs ###
+# pack = 'Biobase'
+pack = 'BiocGenerics'
+
+### Quick Load args ###
+# pkg = pack
+# ver = avail_pkgs$Version[avail_pkgs$Package == pack]
+# ref = if(pack %in% remote_pkgs) 'remote' else 'source'
+# metric_pkg = "riskmetric"
+# out_dir = val_dir
+
+### Run it ###
 pkg_meta <- val_pkg(
   pkg = pack,
   ver = avail_pkgs$Version[avail_pkgs$Package == pack],
@@ -148,6 +149,7 @@ pkg_meta <- val_pkg(
   val_date = val_date
   )
 
+### Inspect output ###
 pkg_meta[!names(pkg_meta )%in% c("rev_deps","depends","suggests")]  
 assessed <- file.path(val_dir, "assessed")
 ass_files <- list.files(assessed, pattern = "_assessments.rds$")

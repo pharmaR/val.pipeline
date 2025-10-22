@@ -16,6 +16,7 @@
 #' @param decisions character vector, the risk categories to use.
 #' @param else_cat character, the default risk category if no conditions are
 #'   met.
+#' @param avail_pkgs data.frame, the output of available.packages()
 #' @param decisions_df data.frame, the output of build_decisions_df()
 #'
 #' @importFrom dplyr filter pull mutate case_when between rename left_join
@@ -29,6 +30,7 @@ val_decision <- function(
     excl_metrics = NULL,
     decisions = c("Low", "Medium", "High"),
     else_cat = "High",
+    avail_pkgs = available.packages() |> as.data.frame(),
     decisions_df = build_decisions_df(rule_type = "decide")
 ) {
   # Verify pkg is not null
@@ -51,9 +53,12 @@ val_decision <- function(
     stop("\nInvalid source specified. Must be a list with elements 'assessment' and 'scores'")
   }
   
+  
+  
   #
   # ---- Prepare workable fields to categorize  ----
   #
+  
   # First, allow user to subset the metrics
   # names(source$assessment)
   decisions_df <- decisions_df |>
@@ -141,7 +146,7 @@ val_decision <- function(
     
     deppies <- tools::package_dependencies(
       packages = pkg,
-      db = available.packages(),
+      db = avail_pkgs |> as.matrix(),
       which = c("Depends", "Imports", "LinkingTo"),
       recursive = FALSE
     ) |>
@@ -214,7 +219,7 @@ val_decision <- function(
   # export_help
   if("export_help" %in% decisions_df$metric &
      "export_help" %in% names(scores)) {
-    pkgs_df$export_help <- if(is.null(scores$export_help)) NA_real_ else scores$export_help * 100
+    pkgs_df$export_help <- if(is.null(scores$export_help)) NA_real_ else as.numeric(scores$export_help) * 100
   } else {
     decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "export_help"))
   }
@@ -242,7 +247,7 @@ val_decision <- function(
   # has_examples
   if("has_examples" %in% decisions_df$metric &
      "has_examples" %in% names(scores)) {
-    pkgs_df$has_examples <- if(is.null(scores$has_examples)) NA_real_ else scores$has_examples * 100
+    pkgs_df$has_examples <- if(is.null(scores$has_examples)) NA_real_ else as.numeric(scores$has_examples) * 100
   } else {
     decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "has_examples"))
   }
@@ -255,159 +260,100 @@ val_decision <- function(
   }
 
   
+  
   #
   # ---- Apply Decisions ----
   #
   
-  # ---- 'Primary' Metrics ----
-  primary_metrics <- decisions_df |>
-    dplyr::filter(tolower(metric_type) == "primary") |>
-    # dplyr::filter(tolower(metric) %in% c("downloads_1yr", "reverse_dependencies")) |>
-    # dplyr::filter(tolower(metric) %in% c("covr_coverage")) |>
-    dplyr::mutate(derived_col = metric)
-  
-  # Share a note
-  prime_met_len <- primary_metrics$metric |> unique() |> length()
-  cat(glue::glue("\n\n--> Applying Decisions Categories for {prime_met_len} 'Primary' risk metric(s).\n\n"))
-  cat("\n---->", paste(primary_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
-  
-  # else_cat <- "High" # for debugging
-  
-  # Generate case_when()'s
-  cond_exprs <- get_case_whens(
-    met_dec_df = primary_metrics,
-    met_names = primary_metrics$metric |> unique(),
-    else_cat = else_cat
+  # Some setup:
+  # Where did package come from?
+  repo_src <- avail_pkgs |>
+    dplyr::filter(Package %in% pkg) |> 
+    dplyr::pull(Repository) |>
+    dirname() |> dirname() # remove '/src/contrib/` ending
+  repo_name <- get_repo_origin(
+    repo_src = repo_src,
+    pkg_name = pkg,
+    names_only = TRUE
     )
-  cond_exprs_ids <- get_case_whens(
-    met_dec_df = primary_metrics, met_names = primary_metrics$metric |> unique(),
-    else_cat = else_cat,
-    ids = TRUE
-  )
-  cond_exprs_aa <- get_case_whens(
-    met_dec_df = primary_metrics,
-    met_names = primary_metrics |> dplyr::filter(!is.na(auto_accept)) |> distinct(derived_col) |> pull(derived_col),
-    else_cat = else_cat,
-    auto_accept = TRUE
-  )
-  
-  dec_id_df <- unique(primary_metrics[,c("decision", "decision_id")])
-  
-  # pkgs_df$dwnlds_cat <- NULL
-  pkgs_primed <-
-    pkgs_df |>
-    dplyr::rowwise() |> 
-    dplyr::mutate(!!! cond_exprs) |>
-    dplyr::mutate(!!! cond_exprs_ids) %>%
-    {if(length(cond_exprs_aa) > 0) dplyr::mutate(., !!! cond_exprs_aa) else .} |>
-    dplyr::ungroup() |>
-    dplyr::mutate(
-      # convert cat vars into factors so we can use pmax() on them
-      across(ends_with("_cat"), ~ factor(.x, levels = decisions)), 
-      
-      # if any column ending in "_cataa" is TRUE, then set final_risk_catid to 1 (Low)
-      final_risk_cataa = ifelse(rowSums(across(ends_with("_cataa"), ~ .x), na.rm = TRUE) > 0, 1, NA_integer_),
-      
-      # higher risk trumps lower risk amongst all _cat vars (e.g., High > Medium > Low)
-      max_catid = pmax(!!!rlang::syms(paste0(unique(primary_metrics$derived_col), "_catid")), na.rm = TRUE) |> as.integer(),
-      final_risk_catid = dplyr::case_when(
-        !is.na(final_risk_cataa) ~ final_risk_cataa,
-        is.finite(max_catid) ~ max_catid,
-        .default = as.integer(NA) # if this happens, need to investigate!
-      ),
-      final_risk_cat = decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid)
-    ) |>
-    dplyr::select(-c(ends_with("_catid"), "final_risk_cataa"))
-  
 
-  # everything below hasn't really been worked out yet.
-  pkg_source = "cran"
-  if(tolower(pkg_source) == "github") {
-    
   
-    # ---- 'Secondary' Metrics ----
-    # Used for GitHub hosted pkgs, etc.
-    secondary_metrics <- decisions_df |>
-      dplyr::filter(tolower(metric_type) != "primary") 
+  #
+  # --- Primary Metrics ----
+  #
+  primed_pkgs <- rip_cats_by_pkg(
+    label = "Primary",
+    repo_name = repo_name,
+    dec_df = decisions_df,
+    pkgs_df = pkgs_df,
+    decisions = decisions,
+    else_cat = else_cat
+  )
+  prime_decision <- primed_pkgs$final_risk_cat
+
+  #
+  # --- Secondary Metrics ----
+  #
+  
+  # If not from CRAN, then make decision using secondary metric conditions
+  if(tolower(repo_name) != "cran" &
+     (is.na(prime_decision) | prime_decision == decisions[1])) {
+  
+    cat(glue::glue("\n\n\n--> Package '{pkg}' appears to come from repo: '{repo_name}' ({repo_src}) which requires secondary metric assessments.\n\n"))
+    #
+    # ---- Perform 'Secondary' Checks ----
+    #
+    pkgs_sec_cats <- rip_cats_by_pkg(
+      label = "Secondary",
+      repo_name = repo_name,
+      dec_df = decisions_df,
+      pkgs_df = primed_pkgs |>
+        dplyr::rename(primary_risk_category = final_risk_cat) |>
+        dplyr::select(-dplyr::ends_with("_cat")), # remove to keep things tidy, or could leave them in?
+      decisions = decisions,
+      else_cat = else_cat
+    )
+      
+
+    #
+    # ---- Generate Final Decision ----
+    #
+    dec_id_df <- unique(decisions_df[,c("decision", "decision_id")])
     
-    sec_met_len <- secondary_metrics$metric |> unique() |> length()
-    
-    if(nrow(secondary_metrics > 0)){
-      
-      cat(glue::glue("\n\n--> Applying Decisions Categories to {sec_met_len} 'Exception' risk metric(s).\n\n"))
-      cat("\n---->", paste(secondary_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
-      
-      
-      # Create metric-based risk categories decision columns
-      # rm(pkgs_final)
-      pkgs_sec_cats <- rip_cats(
-        met_dec_df = secondary_metrics,
-        pkgs_df =  
-          pkgs_primed |>
-          dplyr::rename(primary_risk_category = final_risk_cat) |>
-          dplyr::select(-dplyr::ends_with("_cat")),
-        else_cat = else_cat
+    # Combine Primary & Secondary into final decision
+    pkgs_final <- pkgs_sec_cats |>
+      dplyr::rename(secondary_risk_category = final_risk_cat) |>
+
+      # create final_risk variable that finds the highest risk between 
+      # primary_risk_category & secondary_risk_category 
+      dplyr::mutate(
+        final_risk_id = ifelse(
+            is.na(primary_risk_category), as.integer(secondary_risk_category),
+            max(as.integer(primary_risk_category), as.integer(secondary_risk_category))
+          )
       ) |>
-        dplyr::rename(exception_risk_category = final_risk_cat)
-      
-      #
-      # ---- Promote 'Exceptions' ----
-      #
-      promos <-
-        pkgs_sec_cats |>
-        
-        # create final_risk variable that reduces the decision category
-        # from primary_risk_category if exception_risk_category is the lowest risk
-        dplyr::mutate(
-          final_risk_id = 
-            ifelse(
-              as.integer(exception_risk_category) == 1 & as.integer(primary_risk_category) > 1,
-              as.integer(primary_risk_category) - 1,
-              as.integer(primary_risk_category)
-            )
-        ) |>
-        dplyr::left_join(
-          dec_id_df |> dplyr::rename(final_risk = decision),
-          by = c("final_risk_id" = "decision_id")
-        ) |>
-        dplyr::mutate(
-          final_risk = factor(final_risk, levels = decisions),
-        ) |>
-        dplyr::select(
-          package, version, 
-          primary_risk_category, exception_risk_category, final_risk, 
-          # final_risk_manual, 
-          dplyr::everything(),
-          -final_risk_id, # keep id?
-        ) 
-      
-      # Make note of Pkgs that shifted thanks to exceptions
-      cat("\n--> Exceptions to Primary metric decisions based on meeting ALL of the following metric criterion:\n\n")
-      diff_table <- {
-        promos$final_risk |>
-          factor(levels = levels(decisions_df$decision)) |>
-          table()
-      } - {
-        promos$primary_risk_category |>
-          factor(levels = levels(decisions_df$decision)) |>
-          table()
-      }
-      
-      # print note on promotions to console
-      cat("\n")
-      print(
-        diff_table |>
-          as.data.frame() |>
-          dplyr::rename(`Risk Shifted` = Var1, Added = Freq)
+      dplyr::left_join(
+        dec_id_df |> dplyr::rename(final_risk = decision),
+        by = c("final_risk_id" = "decision_id")
+      ) |>
+      dplyr::mutate(
+        final_risk = factor(final_risk, levels = decisions),
+      ) |>
+      dplyr::select(
+        package,
+        primary_risk_category, secondary_risk_category, final_risk,
+        # final_risk_manual,
+        dplyr::everything(),
+        -final_risk_id # keep id?
       )
-      
-      pkgs_final <- promos |>
-        dplyr::select(-primary_risk_category, -exception_risk_category)
-    }
+    
     
   } else {
-    
-    pkgs_final <- pkgs_primed |>
+    if(primed_pkgs$final_risk_cat != decisions[1]) {
+      cat(glue::glue("\n\n--> Package '{pkg}' has been categorized as '{primed_pkgs$final_risk_cat}' risk based on Primary metrics alone. No Secondary metrics needed.\n"))
+    }
+    # Secondary metrics not needed because it's a CRAN pkg or pkg 'failed'
+    pkgs_final <- primed_pkgs |>
       dplyr::select(
         package, final_risk = final_risk_cat,
         dplyr::everything()
@@ -417,6 +363,7 @@ val_decision <- function(
   #
   # ---- Return data for filtering (presumably)
   # 
+  cat("\n\n--> Final Risk Summary for package '", pkg, "':\n", sep = "")
   print(
     pkgs_final$final_risk |>
       # factor(levels = c("Low", "Medium", "High")) |> # not needed
@@ -461,17 +408,10 @@ val_categorize <- function(
 ) {
   # @importFrom riskscore cran_assessed_20250812 cran_scored_20250812
   
-  
-  
-  
   # verify decisions_df is compliant
   if(!all(c("metric", "decision", "condition", "metric_type", "accept_condition") %in% colnames(decisions_df))) {
     stop("'decisions_df' is not compliant. Must contain columns: 'metric', 'decision', 'condition', 'metric_type', 'accept_condition'")
   }
-  
-  
-  
-  
   
   # Use package metrics based on specified source
   if(length(source) > 1) {
@@ -487,7 +427,7 @@ val_categorize <- function(
     cat(paste0("\n--> Using {riskscore} Version: 'v", pv, "', last compiled on '",
                riskscore_run_date,"'.\n"))
     if(Sys.Date() - as.Date(riskscore_run_date) > 60) {
-      cat(glue::glue("\n!!! WARNING: the latest riskscore assessment date is more than 60 days old, compared to today's validation date. Consider updating {{riskscore}} w/ a fresh run.\n"))
+      cat(glue::glue("\n\n!!! WARNING: the latest riskscore assessment date is more than 60 days old, compared to today's validation date. Consider updating {{riskscore}} w/ a fresh run.\n"))
     }
     
     opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
@@ -495,7 +435,24 @@ val_categorize <- function(
     options(repos = opt_repos, pkgType = "source", scipen = 999)
     # options("repos") # verify
     
+    # Some setup:
     avail_pkgs <- available.packages() |> as.data.frame()
+    curr_repos <- getOption("repos")
+    
+    # Where did package come from?
+    # categorize Repository field to match names in options("repos")
+    avail_pkgs$repo_name <-
+      purrr::map_chr(avail_pkgs$Repository, ~ {
+        if(is.null(.x)) NA_character_ else {
+          repo_src <- .x |> dirname() |> dirname() # remove '/src/contrib/` ending
+          repo_name <- curr_repos[curr_repos %in% repo_src] |> names()
+          if(length(repo_name) == 0) repo_name <- "unknown"
+          if(length(repo_name) > 1) {
+            repo_name <- repo_name[1]
+          }
+          repo_name
+        }
+      })
     
     cat("\n\nCategorizing available packages. Starting w/", nrow(avail_pkgs), "pkgs.\n")
 
@@ -505,8 +462,6 @@ val_categorize <- function(
       package_col <- riskscore::assessed_latest$package |> unlist()
       ver_col <- riskscore::assessed_latest$version |> unlist()
     } else {
-      # package_col <- riskscore::assessed_20250812$package
-      # ver_col <- riskscore::assessed_20250812$version
       package_col <- riskscore::assessed_latest$package
       ver_col <- riskscore::assessed_latest$version
     }
@@ -517,8 +472,9 @@ val_categorize <- function(
     # Pkgs not in available.packages()
     missing_ap <- package_col[!(package_col %in% avail_pkgs$Package)]
     if(length(missing_ap) > 0) {
-      cat(glue::glue("\nNote: There are {length(missing_ap)} packages in the riskscore data that are NOT in available.packages(). These will be ignored, because they have likely been removed from their CRAN-like repo since the last riskscore build.\n\n"))
+      cat(glue::glue("\nNote: There are {length(missing_ap)} packages in the riskscore data that are NOT in available.packages(). These will be ignored, because they have likely been removed from their CRAN-like repo since the last riskscore build. OR, the current option('repos') urls are excluding them.\n\n"))
       print(utils::head(missing_ap, 20))
+
       if(length(missing_ap) > 20) cat("...\n")
     }
     
@@ -528,7 +484,7 @@ val_categorize <- function(
     # val_build() using pkg_sources? Yes!
     missing_rs <- avail_pkgs$Package[!(avail_pkgs$Package %in% package_col)]
     if(length(missing_rs) > 0) {
-      cat(glue::glue("\n!!! WARNING: There are {length(missing_rs)} packages in available.packages() that are NOT in the riskscore data.\n"))
+      cat(glue::glue("\n\n!!! WARNING: There are {length(missing_rs)} packages in available.packages() that are NOT in the riskscore data.\n"))
       print(utils::head(missing_rs, 20))
       if(length(missing_rs) > 20) cat("...\n")
     }
@@ -537,7 +493,7 @@ val_categorize <- function(
     # avail_pkgs$Repository |> table()
     
     pkgs <- avail_pkgs |>
-      dplyr::select(package = Package, version = Version) |>
+      dplyr::select(package = Package, version = Version, repo_src = Repository, repo_name) |>
       dplyr::left_join(
         riskscore::assessed_latest |>
           # if the package doesn't exist in riskscore for initial filtering, we
@@ -664,8 +620,6 @@ val_categorize <- function(
   
   
   
-  
-  
   # Note! This area is to automatically exclude pkgs
   # that are considered high risk so we won't have to waste compute
   # assessing these pkgs. That said, we'll be filtering based
@@ -687,24 +641,38 @@ val_categorize <- function(
   # ---- Apply Decisions ----
   #
   
-
-  # ---- 'Primary' Metrics ----
+  # Some setup
+  # Which metrics are available?
+  all_mets <- decisions_df$metric |> unique()
+  
+  
+  #
+  # --- Primary Metrics ----
+  #
   primary_metrics <- decisions_df |>
     dplyr::filter(tolower(metric_type) == "primary")
+    # for debugging
     # dplyr::filter(tolower(metric) %in% c("downloads_1yr", "reverse_dependencies"))
-    # dplyr::filter(tolower(metric) %in% c("has_website"))
+    # dplyr::filter(tolower(metric) %in% c("has_website")) 
   
-  # Share a note
-  prime_met_len <- primary_metrics$metric |> unique() |> length()
-  cat(glue::glue("\n\n--> Applying Decisions Categories for {prime_met_len} 'Primary' risk metric(s).\n\n"))
-  cat("\n---->", paste(primary_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
   
-  # Create metric-based risk categories decision columns
-  pkgs_primed <- rip_cats(
-    met_dec_df = primary_metrics,
-    pkgs_df = pkgs,
-    else_cat = else_cat
-  )
+  if(nrow(primary_metrics) > 0) {
+    
+    primed_pkgs <- split_join_cats(
+      pkgs_data = pkgs,
+      dec_df = primary_metrics,
+      decisions = decisions,
+      else_cat = else_cat,
+      label = "Primary"
+    )
+    
+  } else {
+    cat("\n\n-->No 'Primary' metrics found in 'decisions_df'.")
+    # Set as "Medium" risk for now, which allows it to get promoted to "low"
+    # risk as needed.
+    primed_pkgs <- pkgs |>
+      dplyr::mutate(final_risk_cat = factor(NA, levels = decisions))
+  }
   
   
 
@@ -714,30 +682,44 @@ val_categorize <- function(
   # "Medium" could move to "Low". Also, there may be some exception metrics
   # that will auto-accept a pkg to "Low" risk.
   exception_metrics <- decisions_df |>
-    dplyr::filter(tolower(metric_type) != "primary") 
+    dplyr::filter(!(tolower(metric_type) %in% "primary"))
   
-  exc_met_len <- exception_metrics$metric |> unique() |> length()
+  # exc_met_len <- exception_metrics$metric |> unique() |> length()
   
   if(nrow(exception_metrics > 0)){
     
-    cat(glue::glue("\n\n> Applying Decisions Categories to {exc_met_len} 'Exception' risk metric(s).\n\n"))
-    cat("\n---->", paste(exception_metrics$metric |> unique(), collapse = '\n----> '), "\n")
-    
-    # Create metric-based risk categories decision columns
-    # rm(pkgs_final)
-    pkgs_exc_cats <- rip_cats(
-      met_dec_df = exception_metrics,
-      pkgs_df =  
-        pkgs_primed |>
+    pkgs_exc_cats <- split_join_cats(
+      pkgs_data = 
+        primed_pkgs |>
           dplyr::rename(primary_risk_category = final_risk_cat) |>
           dplyr::select(-c(dplyr::ends_with("_cat"), dplyr::ends_with("_cataa"))),
-      else_cat = else_cat
-      ) |>
+      dec_df = exception_metrics,
+      decisions = decisions,
+      else_cat = else_cat,
+      label = "Exception"
+    ) |>
       dplyr::rename(exception_risk_category = final_risk_cat)
+    
+    # cat(glue::glue("\n\n> Applying Decisions Categories to {exc_met_len} 'Exception' risk metric(s).\n\n"))
+    # cat("\n---->", paste(exception_metrics$metric |> unique(), collapse = '\n----> '), "\n")
+    # 
+    # # Create metric-based risk categories decision columns
+    # # rm(pkgs_final)
+    # pkgs_exc_cats <- rip_cats(
+    #   met_dec_df = exception_metrics,
+    #   pkgs_df =  
+    #     primed_pkgs |>
+    #       dplyr::rename(primary_risk_category = final_risk_cat) |>
+    #       dplyr::select(-c(dplyr::ends_with("_cat"), dplyr::ends_with("_cataa"))),
+    #   else_cat = else_cat
+    #   ) |>
+    #   dplyr::rename(exception_risk_category = final_risk_cat)
 
     #
     # ---- Promote 'Exceptions' ----
     #
+    
+    dec_id_df <- unique(decisions_df[,c("decision", "decision_id")])
     promos <-
       pkgs_exc_cats |>
       
@@ -745,10 +727,11 @@ val_categorize <- function(
       # from primary_risk_category if exception_risk_category is the lowest risk
       dplyr::mutate(
         final_risk_id = 
-          ifelse(
-            as.integer(exception_risk_category) == 1 & as.integer(primary_risk_category) > 1,
-            as.integer(primary_risk_category) - 1,
-            as.integer(primary_risk_category)
+          dplyr::case_when(
+            is.na(primary_risk_category) ~ as.integer(exception_risk_category),
+            as.integer(exception_risk_category) == 1 &
+              as.integer(primary_risk_category) > 1 ~ as.integer(primary_risk_category) - 1,
+            .default = as.integer(primary_risk_category)
           )
       ) |>
       dplyr::left_join(
@@ -771,34 +754,39 @@ val_categorize <- function(
         ) 
     
     # Make note of Pkgs that shifted thanks to exceptions
-    cat("\n--> Exceptions to Primary metric decisions based on meeting ALL of the following metric criterion:\n\n")
-    diff_table <- {
-      promos$final_risk |>
-        factor(levels = levels(decisions_df$decision)) |>
-        table()
-    } - {
-      promos$primary_risk_category |>
-        factor(levels = levels(decisions_df$decision)) |>
-        table()
+    if(!all(is.na(promos$primary_risk_category))) {
+      cat("\n--> Exceptions to Primary metric decisions based on meeting ALL of the following metric criterion:\n\n")
+      diff_table <- {
+        promos$final_risk |>
+          factor(levels = levels(decisions_df$decision)) |>
+          table()
+      } - {
+        promos$primary_risk_category |>
+          factor(levels = levels(decisions_df$decision)) |>
+          table()
+      }
+      
+      # print note on promotions to console
+      cat("\n")
+      print(
+        diff_table |>
+          as.data.frame() |>
+          dplyr::rename(`Risk Shifted` = Var1, Added = Freq)
+      )
     }
     
-    # print note on promotions to console
-    cat("\n")
-    print(
-      diff_table |>
-        as.data.frame() |>
-        dplyr::rename(`Risk Shifted` = Var1, Added = Freq)
-    )
-    
+    # remove primary & exception risk category columns
     pkgs_final <- promos |>
       dplyr::select(-primary_risk_category, -exception_risk_category)
     
   } else {
-    pkgs_final <- pkgs_primed |>
+    pkgs_final <- primed_pkgs |>
       # if auto_pass is TRUE, then set final_risk to "Low"
       dplyr::mutate(
-        final_risk = ifelse(auto_pass, decisions[1], as.character(final_risk_cat)) |> factor(levels = decisions)
-      ) |>
+        final_risk = ifelse(auto_pass, decisions[1],
+          ifelse(is.na(final_risk_cat), else_cat,
+            final_risk_cat |> as.character()) |> factor(levels = decisions)
+      )) |>
       dplyr::select(
         package, version, final_risk,
         dplyr::everything()
