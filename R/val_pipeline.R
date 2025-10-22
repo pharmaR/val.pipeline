@@ -22,11 +22,14 @@
 #' @param replace Logical. Whether to replace existing assessments. Default is
 #'   FALSE.
 #' @param out Character. Output directory for assessments. Default is
-#'   'dev/riskassessments'.
+#'   Sys.getenv("RISK_OUTPATH", unset = getwd()).
 #' @param opt_repos Named character vector. Repositories to use. Default is
 #'   opt_repos from config.
 #' @return A list containing the validation directory and a data frame of
 #'   package assessments.
+#'
+#' @importFrom dplyr as_tibble filter pull select
+#' @importFrom tibble rownames_to_column
 #'
 #' @export
 #' 
@@ -38,7 +41,7 @@ val_pipeline <- function(
   deps_recursive = TRUE,
   val_date = Sys.Date(),
   replace = FALSE, 
-  out = 'dev/riskassessments',
+  out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
   opt_repos = 
     c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()),
       BioC = 'https://bioconductor.org/packages/3.21/bioc')
@@ -88,15 +91,22 @@ val_pipeline <- function(
   #
   old <- options()
   on.exit(function() options(old))
-
+  
+  # set the options
+  options(repos = opt_repos)
+  # options('repos')
+  
   #
   # ---- val_categorize() ----
   #.
   
-  # Assess the 'dplyr' pkg to identify which metrics are available for 'pkg_cran_remote'
-  viable_metrics <- c("dplyr") |>
+  # Assess the 'dplyr' pkg to identify which metrics are available for
+  # 'pkg_cran_remote' Need one pkg from CRAN & one from BioConductor in case our
+  # config only specifies one.
+  viable_metrics <- c("dplyr", "Biobase") |>
     riskmetric::pkg_ref(source = "pkg_cran_remote") |>
     dplyr::as_tibble() |>
+    dplyr::filter(!is.na(version)) |> # remove either pkg if not found
     riskmetric::pkg_assess() |>
     riskmetric::pkg_score() |>
     dplyr::select(-c(package, version, pkg_ref, pkg_score)) |>
@@ -229,7 +239,6 @@ val_pipeline <- function(
   # nrow(qual)
   saveRDS(qual, file.path(outtie$val_dir, paste0("qual_evidence_", val_date_txt, ".rds")))
   
-  
   # # Inspect the assessment dir
   # # valdate <- gsub("-", "", Sys.Date())
   # valdate <- "20250731"
@@ -254,6 +263,7 @@ val_pipeline <- function(
   # names(ass)
   # ass$covr_coverage$totalcoverage
   # ass$downloads_1yr |> prettyNum(big.mark = ",")
+  
   # 
   # # val_build(pkg_names = c('aamatch'), deps = NULL) # No coverage
   

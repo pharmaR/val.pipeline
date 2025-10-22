@@ -8,8 +8,8 @@ source("dev/pkg_lists.R") # build_pkgs & pkgs for CRAN only
 # these_pkgs <- "withr"  # messes with the entire process
 # these_pkgs <- "matrix" # takes 5 mins to install
 # these_pkgs <- "askpass"
-these_pkgs <- "dplyr"
-# these_pkgs <- build_pkgs
+# these_pkgs <- c("Biobase", "BiocGenerics")
+these_pkgs <- build_pkgs
 
 tree <- tools::package_dependencies(
   packages = these_pkgs,
@@ -29,25 +29,45 @@ full_tree |> length()
 # temporary until we can figure out what's gone haywire with this pkg
 # build_pkgs <- build_pkgs[build_pkgs != "withr"]
 
+# usethis::edit_r_environ() # to configure RISK_OUTPATH
+
 qual <- val_build(
   # pkg_names = build_pkgs,
-  pkg_names = "dplyr",
+  pkg_names = these_pkgs,
   ref = "source",
   metric_pkg = "riskmetric", 
   # deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
   deps = NULL,
-  # deps_recursive = TRUE,
-  deps_recursive = FALSE,
+  deps_recursive = TRUE,
+  # deps_recursive = FALSE,
   val_date = Sys.Date(),
   # val_date = as.Date("2025-10-07"),
   replace = FALSE, 
-  out = 'dev/riskassessments'
+  # use a env var for the out path
+  out = Sys.getenv("RISK_OUTPATH", unset = getwd())
+    # Sys.getenv("RISK_OUTPATH", unset = getwd())
 )
 
+qual_df <- qual$pkgs_df
+View(qual_df)
 # 
 # Quick run
 # 
 
+# -- dev --
+# pkg_names = these_pkgs
+# ref = "source"
+# metric_pkg = "riskmetric"
+# # deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+# deps = NULL
+# # deps_recursive = TRUE
+# deps_recursive = FALSE
+# val_date = Sys.Date()
+# # val_date = as.Date("2025-10-07")
+# replace = FALSE
+# out = Sys.getenv("RISK_OUTPATH", unset = getwd())
+
+# -- defaults --
 # ref = "source"
 # metric_pkg = "riskmetric"
 # deps = "depends" # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
@@ -55,4 +75,6 @@ qual <- val_build(
 # val_date = Sys.Date()
 # # val_date = as.Date("2025-10-07")
 # replace = FALSE
-# out = 'dev/riskassessments'
+# out = Sys.getenv("RISK_OUTPATH", unset = getwd())
+
+

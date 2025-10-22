@@ -82,7 +82,7 @@ qualification_results <- val_pipeline(
   deps_recursive = TRUE,
   val_date = Sys.Date(),
   replace = FALSE, 
-  out = 'dev/riskassessments'
+  out = Sys.getenv("RISK_OUTPATH", unset = getwd())
 )
 ```
 

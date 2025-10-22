@@ -10,6 +10,7 @@ val_decision(
   excl_metrics = NULL,
   decisions = c("Low", "Medium", "High"),
   else_cat = "High",
+  avail_pkgs = as.data.frame(available.packages()),
   decisions_df = build_decisions_df(rule_type = "decide")
 )
 }
@@ -26,6 +27,8 @@ without changing the config}
 
 \item{else_cat}{character, the default risk category if no conditions are
 met.}
+
+\item{avail_pkgs}{data.frame, the output of available.packages()}
 
 \item{decisions_df}{data.frame, the output of build_decisions_df()}
 }

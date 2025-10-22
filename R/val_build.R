@@ -85,7 +85,7 @@ val_build <- function(
   # val_date = Sys.Date() # Sys.Date() # is  default
   # replace = FALSE # default
   # # replace = TRUE
-  # out = 'dev/riskassessments'
+  # out = Sys.getenv("RISK_OUTPATH", unset = getwd())
   # opt_repos = opt_repos
   
   # Assess args
@@ -230,9 +230,9 @@ val_build <- function(
   pkg_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
     
     # i <- 1 # for debugging
-    # i <- which(pkgs == "class")
-    # pkg <- pkgs[i + 1] # for debugging
-    # ver <- vers[i + 1] # for debugging
+    # # i <- which(pkgs == "class")
+    # pkg <- pkgs[i] # for debugging
+    # ver <- vers[i] # for debugging
     
     pkg_v <- paste(pkg, ver, sep = "_")
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
@@ -289,12 +289,21 @@ val_build <- function(
         ) |>
         unlist(use.names = FALSE) 
       
+      # Where did package come from?
+      repo_src <- avail_pkgs |>
+        dplyr::filter(Package %in% pkg) |> 
+        dplyr::pull(Repository) |> 
+        dirname() |> dirname() # trim '/src/contrib/` ending
+      repo_name <- get_repo_origin(repo_src = repo_src, pkg_name = pkg)
+      
+      
+      
       pkg_meta <- list(
         pkg = pkg,
         ver = ver,
         r_ver = getRversion(),
         sys_info = R.Version(),
-        repos = list(options("repos")),
+        repos = repo_name,
         val_date = val_date,
         ref = NA_character_,
         metric_pkg = NA_character_,
@@ -307,6 +316,7 @@ val_build <- function(
         rev_deps = NA_character_,
         assessment_runtime = list(txt = NA_character_, mins = NA)
       )
+      # save the pkg_meta
       saveRDS(pkg_meta, pkg_meta_file)
       cat("\n-->", pkg_v,"meta bundle saved.\n")
     }
@@ -453,8 +463,8 @@ val_build <- function(
   val_end_txt <- utils::capture.output(val_end - val_start)
   cat("\n--> Build", val_end_txt,"\n")
   
-  saveRDS(pkgs_df, file.path(val_dir, "qual_evidence.rds"))
-  cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
+  # saveRDS(pkgs_df, file.path(val_dir, "qual_evidence.rds"))
+  # cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
   
   # Return object 
   return(list(

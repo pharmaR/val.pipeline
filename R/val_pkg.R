@@ -73,6 +73,13 @@ val_pkg <- function(
   if(!dir.exists(assessed)) dir.create(assessed)
   if(!dir.exists(reports)) dir.create(reports)
   
+  # Where did package come from?
+  repo_src_contrib <- avail_pkgs |>
+    dplyr::filter(Package %in% pkg) |> 
+    dplyr::pull(Repository)  # keep '/src/contrib/` ending
+  repo_src <- repo_src_contrib |> dirname() |> dirname() # trim off '/src/contrib'
+  repo_name <- get_repo_origin(repo_src = repo_src, pkg_name = pkg)
+  
   # Decisions
   decisions <- pull_config(val = "decisions_lst", rule_type = "default")
   
@@ -81,7 +88,7 @@ val_pkg <- function(
     #
     # ---- Download Tarball ----
     #
-    tarball_url <- paste0("https://cran.r-project.org/src/contrib/", pkg_v,".tar.gz")
+    tarball_url <- file.path(repo_src_contrib, paste0(pkg_v,".tar.gz"))
     dwn_ld <- try(utils::download.file(tarball_url,
                                        file.path(tarballs, basename(tarball_url)), 
                                        quiet = TRUE, mode = "wb"),
@@ -113,7 +120,7 @@ val_pkg <- function(
   depends <- 
     tools::package_dependencies(
       packages = pkg,
-      db = available.packages(),
+      db = avail_pkgs |> as.matrix(),
       which = c("Depends", "Imports", "LinkingTo"),
       recursive = TRUE
     ) |>
@@ -123,7 +130,7 @@ val_pkg <- function(
   suggests <- 
     tools::package_dependencies(
       packages = pkg,
-      db = available.packages(),
+      db = avail_pkgs |> as.matrix(),
       which = "Suggests",
       recursive = TRUE # this really blows up for almost any pkg
     ) |>
@@ -160,7 +167,8 @@ val_pkg <- function(
     # "covr_coverage") so that if any primary metrics have an auto_accept
     # condition, we can then run again with a "pkg_source" ref while excluding
     # "covr_coverage" for final output. However, 
-    init_pkg_ref <- riskmetric::pkg_ref(pkg, source = "pkg_cran_remote")
+    init_pkg_ref <- riskmetric::pkg_ref(pkg, source = 
+        if(stringr::str_detect(tolower(repo_name), "bioc")) "pkg_bioc_remote" else "pkg_cran_remote")
     cat("\n-->", pkg_v, "initial reference complete.\n")
     
     # Pull available {riskmetric} assessments
@@ -227,7 +235,8 @@ val_pkg <- function(
         else_cat = decisions[length(decisions)],
         decisions_df = build_decisions_df(
           rule_type = "decide",
-          viable_metrics = init_viable_metrics)
+          viable_metrics = init_viable_metrics
+          )
       )
     
     auto_accepted <-
@@ -387,6 +396,7 @@ val_pkg <- function(
       excl_metrics = exclude_met, # Subset if desired
       decisions = decisions,
       else_cat = decisions[length(decisions)],
+      avail_pkgs = avail_pkgs,
       decisions_df = build_decisions_df(
         rule_type = "decide",
         viable_metrics = viable_metrics
@@ -449,7 +459,7 @@ val_pkg <- function(
     ver = ver,
     r_ver = getRversion(),
     sys_info = R.Version(),
-    repos = list(options("repos")),
+    repos = repo_name, # A named character
     val_date = val_date,
     ref = ref,
     metric_pkg = metric_pkg,
