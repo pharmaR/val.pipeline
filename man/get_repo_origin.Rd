@@ -18,7 +18,9 @@ A character string indicating the name of the repository
 Helper function to determine which repo a package came from
 }
 \examples{
+\dontrun{
 get_repo_origin(repo_src = "https://packagemanager.posit.co/cran/2024-06-01", "fake")
+}
 
 }
 \keyword{internal}

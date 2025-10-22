@@ -29,7 +29,9 @@
 #' 
 #' @return A character string indicating the name of the repository
 #' @examples
+#' \dontrun{
 #' get_repo_origin(repo_src = "https://packagemanager.posit.co/cran/2024-06-01", "fake")
+#' }
 #' 
 #' @keywords internal
 get_repo_origin <- function(repo_src = NULL, pkg_name = NULL, names_only = FALSE) {
