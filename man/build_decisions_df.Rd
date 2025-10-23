@@ -11,10 +11,12 @@ build_decisions_df(
 )
 }
 \arguments{
-\item{rule_type}{A character string indicating whether to use val_categorize() or val_decision(). The difference being that
-"reduce_remote" is going to be used to filter the initial list of packages
-using a "pkg_remote" based pkg_ref() assessment and conversely, the "decide" rule_type
-is used to categorize the risk of a 'pkg_source' pkg_ref() assessment on the GxP system of interest.}
+\item{rule_type}{A character string indicating whether to use
+val_categorize() or val_decision(). The difference being that
+"remote_reduce" is going to be used to filter the initial list of packages
+using a "pkg_remote" based pkg_ref() assessment and conversely, the
+"decide" rule_type is used to categorize the risk of a 'pkg_source'
+pkg_ref() assessment on the GxP system of interest.}
 
 \item{rule_lst}{A named list of lists, where each sub-list contains:
 \itemize{
