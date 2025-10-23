@@ -11,6 +11,8 @@ test_that("split_join_cats() handles data with no applicable metrics", {
     decision = factor("High", levels = c("Low", "Medium", "High")),
     decision_id = 3,
     condition = "~ .x > 100",
+    auto_accept = NA_character_,
+    derived_col = "other_metric",
     stringsAsFactors = FALSE
   )
   
@@ -27,8 +29,7 @@ test_that("split_join_cats() handles data with no applicable metrics", {
       dec_df = mock_dec_df,
       decisions = c("Low", "Medium", "High"),
       else_cat = "High"
-    ),
-    "No applicable.*metrics found"
+    )
   )
   
   expect_s3_class(result, "data.frame")
@@ -136,6 +137,12 @@ test_that("split_join_cats() handles mixed CRAN and non-CRAN packages", {
   expect_s3_class(result, "data.frame")
   expect_equal(nrow(result), 2)
   expect_true(all(c("cran_pkg", "bioc_pkg") %in% result$package))
+  expect_equal(
+    factor(c("High", "Medium"), levels = c("Low", "Medium", "High")),
+    result$final_risk_cat)
+  expect_equal(
+    factor(c("High", NA), levels = c("Low", "Medium", "High")),
+    result$downloads_1yr_cat )
 })
 
 test_that("split_join_cats() preserves original data structure", {
