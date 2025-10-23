@@ -9,4 +9,10 @@
 library(testthat)
 library(val.pipeline)
 
+options(repos = c(
+  CRAN = 'https://packagemanager.posit.co/cran/latest',
+  BioC = 'https://bioconductor.org/packages/3.21/bioc'
+))
+# options("repos")
+
 test_check("val.pipeline")

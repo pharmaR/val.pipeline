@@ -50,9 +50,8 @@ test_that("strip_recording preserves other attributes and classes", {
   expect_equal(attr(result$metric1, "other_attr"), "keep")
   expect_true("character" %in% class(result$metric1))
 
-  
   # Try with real {riskmetric} output
-  result2 <- riskmetric::pkg_ref("zoo", source = "pkg_cran_remote") |>
+  result2 <- riskmetric::pkg_ref("askpass", source = "pkg_cran_remote") |>
     riskmetric::pkg_assess() |>
     strip_recording()
 
