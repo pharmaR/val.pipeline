@@ -1,0 +1,13 @@
+<!-- This js code will change the pre tags to add the same class than exist in the code blocks in Quarto
+ if echo=TRUE. Additionally, we add the html button with the expected class so we replicate the functionality
+ to have a copy button for code blocks but for code output
+ NOTE: In case the report is expanded and we have more pre tags that do not need copy button, replace the
+ getElementsByTagName for something more specific or add additional condition like select elements by tag and by class later -->
+<script>
+    list_details_pre = document.getElementsByTagName("pre");
+    for (let i = 0; i < list_details_pre.length; i++) {
+        list_details_pre[i].className += " sourceCode r code-with-copy";
+        list_details_pre[i].insertAdjacentHTML("beforeend",
+        "<button class='code-copy-button' title='Copy to Clipboard'><i class='bi'></i></button>");
+    }
+</script>
