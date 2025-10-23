@@ -1,3 +1,4 @@
+
 test_that("strip_recording removes .recording attribute from list elements", {
   # Create a dummy mock assessment with .recording attributes
   metric1 <- "value1"
@@ -23,14 +24,17 @@ test_that("strip_recording removes .recording attribute from list elements", {
   result2 <- riskmetric::pkg_ref("zoo", source = "pkg_cran_remote") |>
     riskmetric::pkg_assess() |>
     strip_recording()
-  names(result2)
+
   expect_null(attr(result2$has_news, ".recording"))
   expect_null(attr(result$downloads_1y, ".recording"))
   expect_true("list_of_pkg_metric" %in% class(result2))
   expect_true("list" %in% class(result2))
   expect_false("with_eval_recording" %in% class(result2$has_news))
-  expect_false("with_eval_recording" %in% class(result2$downloads_1y))
+  expect_false("with_eval_recording" %in% class(result2$downloads_1yr))
 })
+
+
+
 
 test_that("strip_recording preserves other attributes and classes", {
   metric1 <- "value1"

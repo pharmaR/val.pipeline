@@ -318,7 +318,7 @@ val_decision <- function(
       decisions = decisions,
       else_cat = else_cat
     )
-      
+    # pkgs_sec_cats$final_risk_cat |> class()
 
     #
     # ---- Generate Final Decision ----
@@ -326,6 +326,7 @@ val_decision <- function(
     dec_id_df <- unique(decisions_df[,c("decision", "decision_id")])
     
     # Combine Primary & Secondary into final decision
+    
     pkgs_final <- pkgs_sec_cats |>
       dplyr::rename(secondary_risk_category = final_risk_cat) |>
 

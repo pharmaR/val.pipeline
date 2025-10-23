@@ -1,4 +1,4 @@
-test_that("pull_config returns config when val is specified", {
+test_that("pull_config() returns config when 'val' is specified", {
   # Test with a specific value
   result <- pull_config(val = "decisions_lst", rule_type = "default")
   
@@ -6,7 +6,7 @@ test_that("pull_config returns config when val is specified", {
   expect_true(length(result) > 0)
 })
 
-test_that("pull_config returns full config structure when val is NULL", {
+test_that("pull_config() returns full config structure when val is NULL", {
   result <- pull_config(val = NULL, rule_type = "decide")
   
   expect_type(result, "list")
@@ -15,7 +15,7 @@ test_that("pull_config returns full config structure when val is NULL", {
   expect_true("decisions_lst" %in% names(result$default_lst))
 })
 
-test_that("pull_config handles different rule types", {
+test_that("pull_config() handles different rule types", {
   result_default <- pull_config(rule_type = "default")
   result_decide <- pull_config(rule_type = "decide")
   result_remote <- pull_config(rule_type = "remote_reduce")
@@ -28,8 +28,15 @@ test_that("pull_config handles different rule types", {
   expect_true("default_lst" %in% names(result_remote))
 })
 
-test_that("pull_config validates decision categories", {
+test_that("pull_config() validates decision categories", {
   # This test checks that the function validates decision categories
   # The actual validation logic depends on the config file structure
   expect_no_error(pull_config(rule_type = "default"))
+})
+
+
+test_that("pull_config() returns default config when 'rule_type' is invalid", {
+  expect_error(
+    pull_config(val = "decisions_lst", rule_type = "invalid_type")
+  )
 })

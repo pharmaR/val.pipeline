@@ -40,3 +40,7 @@ test_that("decision_to_id_v() works with vectors", {
   result <- decision_to_id_v(decision_id_df, rev = TRUE, c(3, 1))
   expect_equal(result, c("High", "Low"))
 })
+
+
+
+

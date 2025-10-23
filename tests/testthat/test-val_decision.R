@@ -57,14 +57,14 @@ test_that("val_decision() processes package with minimal data", {
   options(repos = c(CRAN = "https://cran.r-project.org"))
   on.exit(options(repos = old_repos))
   
-  # expect_output(
+  expect_output(
     result <- val_decision(
       pkg = "testpkg",
       source = mock_source,
       avail_pkgs = mock_avail
     )
-    # ,"Final Risk Summary"
-  # )
+  ,"Final Risk Summary"
+  )
   
   expect_s3_class(result, "data.frame")
   expect_true("package" %in% names(result))
@@ -84,11 +84,15 @@ test_that("val_decision() processes package with minimal data", {
       news_current = 0.8
     )
   )
-  result <- val_decision(
-      pkg = "testpkg",
-      source = mock_source,
-      avail_pkgs = mock_avail
-    )
+  expect_output(
+    result <- val_decision(
+        pkg = "testpkg",
+        source = mock_source,
+        avail_pkgs = mock_avail
+      )
+    ,"Final Risk Summary"
+  )
+    
   expect_true(result$downloads_1yr_cataa == TRUE) 
   expect_true(result$final_risk == "Low") 
   
@@ -114,20 +118,19 @@ test_that("val_decision() handles NA values in assessment", {
   options(repos = c(CRAN = "https://cran.r-project.org"))
   on.exit(options(repos = old_repos))
   
-  # expect_output(
+  expect_output(
     result <- val_decision(
       pkg = "testpkg",
       source = mock_source,
       avail_pkgs = mock_avail
     )
-    # ,
-  #   "Final Risk Summary"
-  # )
+  ,
+    "Final Risk Summary"
+  )
   
   expect_s3_class(result, "data.frame")
   expect_true(result$final_risk == "High") # else cat when NA
 })
-
 
 
 test_that("val_decision() excludes specified metrics", {
@@ -150,16 +153,15 @@ test_that("val_decision() excludes specified metrics", {
   options(repos = c(CRAN = "https://cran.r-project.org"))
   on.exit(options(repos = old_repos))
   
-  # expect_output(
-    result <- val_decision(
-      pkg = "testpkg",
-      source = mock_source,
-      avail_pkgs = mock_avail,
-      excl_metrics = "downloads_1yr"
-    )
-    # ,
-    # "Final Risk Summary"
-  # )
+  expect_output(
+      result <- val_decision(
+        pkg = "testpkg",
+        source = mock_source,
+        avail_pkgs = mock_avail,
+        excl_metrics = "downloads_1yr"
+      )
+    ,"Final Risk Summary"
+  )
   
   expect_true(result$final_risk == "High")
   expect_false("downloads_1yr" %in% names(result))

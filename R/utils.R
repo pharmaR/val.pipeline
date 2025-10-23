@@ -759,7 +759,12 @@ rip_cats_by_pkg <- function(
   
   # Which metrics are available?
   all_mets <- dec_df$metric |> unique()
-  dec_id_df <- unique(dec_df[,c("decision", "decision_id")])
+  decisions_fct <- factor(decisions, levels = decisions)
+  dec_id_df <- data.frame(
+    decision = decisions,
+    decision_id = decisions_fct |> as.integer()
+  )
+  # dec_id_df <- unique(dec_df[,c("decision", "decision_id")])
   
   #
   # --- Subset Metrics ----
@@ -827,7 +832,9 @@ rip_cats_by_pkg <- function(
           is.finite(max_catid) ~ max_catid,
           .default = as.integer(NA) # if this happens, need to investigate!
         ),
-        final_risk_cat = decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid)
+        final_risk_cat = factor(
+          decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid),
+          levels = decisions)
       ) |>
       dplyr::select(-c(ends_with("_catid"), "final_risk_cataa"))
     
@@ -951,7 +958,10 @@ rip_cats <- function(
         is.finite(max_catid) ~ max_catid,
         .default = as.integer(NA) # if this happens, need to investigate!
       ),
-      final_risk_cat = decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid) 
+      final_risk_cat = factor(
+        decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid),
+        levels = levels(met_dec_df$decision)
+      )
     ) |>
     dplyr::select(-c(ends_with("_catid"), "final_risk_cataa"))
   
