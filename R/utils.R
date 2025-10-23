@@ -350,10 +350,12 @@ pull_config <- function(
 #' val_filter() that includes columns "metric", "decision", "condition",
 #' "metric_type", and "accept_condition".
 #'
-#' @param rule_type A character string indicating whether to use val_categorize() or val_decision(). The difference being that
-#'   "reduce_remote" is going to be used to filter the initial list of packages
-#'   using a "pkg_remote" based pkg_ref() assessment and conversely, the "decide" rule_type
-#'   is used to categorize the risk of a 'pkg_source' pkg_ref() assessment on the GxP system of interest.
+#' @param rule_type A character string indicating whether to use
+#'   val_categorize() or val_decision(). The difference being that
+#'   "remote_reduce" is going to be used to filter the initial list of packages
+#'   using a "pkg_remote" based pkg_ref() assessment and conversely, the
+#'   "decide" rule_type is used to categorize the risk of a 'pkg_source'
+#'   pkg_ref() assessment on the GxP system of interest.
 #' @param rule_lst A named list of lists, where each sub-list contains:
 #' - cond: A named list of formulas, where the names correspond to decision
 #'   categories in `decision_lst`, and the formulas define the conditions for
@@ -365,10 +367,10 @@ pull_config <- function(
 #' - min_value: (Optional) A numeric value indicating the minimum acceptable
 #'   value for the primary metric(s).
 #' - auto_accept: (Optional) A formula that defines a condition under which the
-#'  package can be automatically accepted, regardless of other conditions.
+#'   package can be automatically accepted, regardless of other conditions.
 #' @param viable_metrics An optional character vector of metric names that are
-#'  considered viable for the chosen pkg_source. If provided, any metrics in
-#'  `rule_lst` that are not in `viable_metrics` will be dropped.
+#'   considered viable for the chosen pkg_source. If provided, any metrics in
+#'   `rule_lst` that are not in `viable_metrics` will be dropped.
 #'
 #' @importFrom rlang expr_text is_empty
 #' @importFrom dplyr mutate select row_number left_join filter distinct tibble
@@ -406,7 +408,7 @@ build_decisions_df <- function(
     rule_lst <- figgy$rule_lst
   } else {
     cat(glue::glue("\n\n--> Building decision data.frame using rules from custom 'rule_lst'.\n"))
-    if(!"decision_lst" %in% 'names(rule_list)'){
+    if(!"decision_lst" %in% names(rule_list)){
       decision_lst <- pull_config(val = "decisions_lst", rule_type = "default")
     } else {
       decision_lst <- rule_lst$decision_lst
