@@ -33,14 +33,17 @@ test_that("split_join_cats() handles data with no applicable metrics", {
   
   expect_s3_class(result, "data.frame")
   expect_true("final_risk_cat" %in% names(result))
+  expect_true(is.na(result$final_risk_cat))
 })
 
 test_that("split_join_cats() processes CRAN packages with downloads_1yr", {
+  
   mock_dec_df <- data.frame(
     metric = "downloads_1yr",
     decision = factor("High", levels = c("Low", "Medium", "High")),
     decision_id = 3,
     condition = "~ .x > 1000",
+    auto_accept = NA_character_,
     derived_col = "downloads_1yr",
     stringsAsFactors = FALSE
   )
@@ -63,7 +66,7 @@ test_that("split_join_cats() processes CRAN packages with downloads_1yr", {
   )
   
   expect_s3_class(result, "data.frame")
-  expect_equal(result$package, "testpkg")
+  expect_equal(result$final_risk_cat, factor("High", levels = c("Low", "Medium", "High")))
 })
 
 test_that("split_join_cats() processes non-CRAN packages without downloads_1yr", {
@@ -72,6 +75,7 @@ test_that("split_join_cats() processes non-CRAN packages without downloads_1yr",
     decision = factor(c("High", "Medium"), levels = c("Low", "Medium", "High")),
     decision_id = c(3, 2),
     condition = c("~ .x > 1000", "~ .x < 50"),
+    auto_accept = NA_character_,
     derived_col = c("downloads_1yr", "other_metric"),
     stringsAsFactors = FALSE
   )
@@ -95,8 +99,10 @@ test_that("split_join_cats() processes non-CRAN packages without downloads_1yr",
   )
   
   expect_s3_class(result, "data.frame")
-  expect_equal(result$package, "testpkg")
+  expect_true(all(c("other_metric_cat", "final_risk_cat") %in% names(result)))
+  expect_equal(result$final_risk_cat, factor("Medium", levels = c("Low", "Medium", "High")))
 })
+
 
 test_that("split_join_cats() handles mixed CRAN and non-CRAN packages", {
   mock_dec_df <- data.frame(
@@ -104,6 +110,7 @@ test_that("split_join_cats() handles mixed CRAN and non-CRAN packages", {
     decision = factor(c("High", "Medium"), levels = c("Low", "Medium", "High")),
     decision_id = c(3, 2),
     condition = c("~ .x > 1000", "~ .x < 50"),
+    auto_accept = NA_character_,
     derived_col = c("downloads_1yr", "other_metric"),
     stringsAsFactors = FALSE
   )
@@ -137,6 +144,7 @@ test_that("split_join_cats() preserves original data structure", {
     decision = factor("Low", levels = c("Low", "Medium", "High")),
     decision_id = 1,
     condition = "~ .x < 50",
+    auto_accept = NA_character_,
     derived_col = "test_metric",
     stringsAsFactors = FALSE
   )

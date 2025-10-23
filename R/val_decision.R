@@ -715,6 +715,7 @@ val_categorize <- function(
     #     primed_pkgs |>
     #       dplyr::rename(primary_risk_category = final_risk_cat) |>
     #       dplyr::select(-c(dplyr::ends_with("_cat"), dplyr::ends_with("_cataa"))),
+    #   decisions = decisions,
     #   else_cat = else_cat
     #   ) |>
     #   dplyr::rename(exception_risk_category = final_risk_cat)
