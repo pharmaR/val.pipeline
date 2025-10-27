@@ -8,7 +8,7 @@
 #' been computed and are available in the `source` parameter.#'
 #'
 #' @param pkg character, the package name to assess
-#' @param source data.frame, comprised of `riskmetric` assessments & scores,
+#' @param source_df data.frame, comprised of `riskmetric` assessments & scores,
 #'   usually the output of `workable_assessments()`.
 #' @param excl_metrics character vector, allow users to subset metrics as needed
 #'   without changing the config

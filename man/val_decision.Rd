@@ -17,6 +17,9 @@ val_decision(
 \arguments{
 \item{pkg}{character, the package name to assess}
 
+\item{source_df}{data.frame, comprised of \code{riskmetric} assessments & scores,
+usually the output of \code{workable_assessments()}.}
+
 \item{excl_metrics}{character vector, allow users to subset metrics as needed
 without changing the config}
 
@@ -28,9 +31,6 @@ met.}
 \item{avail_pkgs}{data.frame, the output of available.packages()}
 
 \item{decisions_df}{data.frame, the output of build_decisions_df()}
-
-\item{source}{data.frame, comprised of \code{riskmetric} assessments & scores,
-usually the output of \code{workable_assessments()}.}
 }
 \description{
 Categorize packages based on org-level criterion / thresholds at the
