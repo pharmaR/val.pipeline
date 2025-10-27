@@ -1,5 +1,5 @@
 default:
-  remote_only: [withr, VGAM, shinyBS, fitdistrplus, collapse, gamlss.dist] # withr - crashes, VGAM 10h, shinyBS 5h, collapse 1.5h, fitdistrplus 1.7h, gamlss.dist 1h,
+  remote_only: [withr, VGAM, shinyBS, fitdistrplus, collapse, gamlss.dist, gss, segmented] # withr - crashes, VGAM 10h, shinyBS 5h, collapse 1.6h, fitdistrplus 1.7h, gamlss.dist 52m, gss 52m, segmented 45m
   approved_pkgs: [] # packages that have been approved manually outside of {val.pipeline} workflow
   decisions_lst: [Low, Medium, High]
   opt_repos: 
