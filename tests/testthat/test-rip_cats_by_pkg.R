@@ -85,6 +85,32 @@ test_that("rip_cats_by_pkg() processes data with matching metric types", {
   expect_s3_class(result, "data.frame")
   expect_true(result$final_risk_cat == metric_dec)
   expect_true(paste(metric_name, "cat", sep = "_") %in% names(result))
+  
+  # Now try a 'secondary' metric
+  mock_dec_df <- data.frame(
+    metric = metric_name,
+    metric_type = "secondary",
+    decision = metric_dec,
+    decision_id = 1,
+    condition = "~ .x > 100",
+    auto_accept = NA_character_,
+    stringsAsFactors = FALSE
+  )
+  
+  expect_output(
+    result <- rip_cats_by_pkg(
+      label = "secondary",
+      dec_df = mock_dec_df,
+      pkgs_df = mock_pkgs,
+      decisions = c("Low", "Medium", "High"),
+      else_cat = "High"
+    )
+    ,"Applying Decisions Categories.*secondary"
+  )
+  
+  expect_s3_class(result, "data.frame")
+  expect_true(result$final_risk_cat == metric_dec)
+  expect_true(paste(metric_name, "cat", sep = "_") %in% names(result))
 })
 
 
