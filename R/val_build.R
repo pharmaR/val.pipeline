@@ -65,7 +65,7 @@ val_build <- function(
     out = 'riskassessment',
     replace = FALSE,
     opt_repos = 
-    c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()),
+    c(CRAN = "https://packagemanager.posit.co/cran/latest",
       BioC = 'https://bioconductor.org/packages/3.21/bioc')
     ){
   
@@ -231,7 +231,6 @@ val_build <- function(
   pkg_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
     
     # i <- 1 # for debugging
-    # # i <- which(pkgs == "class")
     # pkg <- pkgs[i] # for debugging
     # ver <- vers[i] # for debugging
     

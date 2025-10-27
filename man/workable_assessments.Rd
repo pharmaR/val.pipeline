@@ -10,7 +10,7 @@ workable_assessments(
   val_date = Sys.Date(),
   metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
   source = NULL,
-  src_ref = c("source", "remote")
+  source_ref = c("source", "remote")
 )
 }
 \arguments{
@@ -26,7 +26,7 @@ Options are "riskmetric", "val.meter", or "risk.assessr"}
 \item{source}{The source object containing the package assessment.
 Typically the output of pkg_assess() & pkg_score() from the \code{riskmetric}.}
 
-\item{src_ref}{A character string indicating the source reference,
+\item{source_ref}{A character string indicating the source reference,
 either "source" (local pkg_source) or "remote" (CRAN/pkg_remote)}
 }
 \value{

@@ -208,6 +208,16 @@ val_pkg <- function(
     cat("----> (", init_ass_mins_txt, ")\n")
     
     
+    # Create workable DF of assessments
+    init_assessment_record <- workable_assessments(
+      pkg = pkg,
+      ver = ver,
+      val_date = val_date,
+      metric_pkg = metric_pkg,
+      source = list(assessment = init_pkg_assessment, scores = init_pkg_scores),
+      source_ref = "remote"
+    )
+    
     # 
     #### Initial Decision
     #
@@ -225,11 +235,10 @@ val_pkg <- function(
       init_viable_metrics <- c(init_vm, "r_cmd_check_warnings", "r_cmd_check_errors")
     }
     
-    # pkg_assessment$downloads_1yr |> prettyNum(big.mark = ",")
     init_decision <- 
       val_decision( 
         pkg = pkg,
-        source = list(assessment = init_pkg_assessment, scores = init_pkg_scores), # include both
+        source_df = init_assessment_record,
         excl_metrics = NULL, # "covr_coverage", # Subset not really necessary
         decisions = decisions,
         else_cat = decisions[length(decisions)],
@@ -341,9 +350,9 @@ val_pkg <- function(
     pkg = pkg,
     ver = ver,
     val_date = val_date,
-    metric_pkg = "riskmetric",
+    metric_pkg = metric_pkg,
     source = list(assessment = pkg_assessment, scores = pkg_scores),
-    src_ref = src_ref
+    source_ref = ref
   )
   
   #

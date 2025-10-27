@@ -36,6 +36,7 @@
 #' @keywords internal
 get_repo_origin <- function(repo_src = NULL, pkg_name = NULL, names_only = FALSE) {
   curr_repos <- getOption("repos")
+  if(is.null(curr_repos)) return("unknown")
   repo_name <- curr_repos[stringr::str_detect(repo_src, curr_repos)] %>%
     {if(names_only) names(.) else .}
   if(length(repo_name) == 0) repo_name <- "unknown"
@@ -567,7 +568,7 @@ build_decisions_df <- function(
 #'  Options are "riskmetric", "val.meter", or "risk.assessr"
 #' @param source The source object containing the package assessment.
 #'  Typically the output of pkg_assess() & pkg_score() from the `riskmetric`.
-#' @param src_ref A character string indicating the source reference,
+#' @param source_ref A character string indicating the source reference,
 #' either "source" (local pkg_source) or "remote" (CRAN/pkg_remote)
 #' 
 #' @importFrom dplyr as_tibble
@@ -581,11 +582,11 @@ workable_assessments <- function(
     val_date = Sys.Date(),
     metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
     source = NULL,
-    src_ref = c("source", "remote")
+    source_ref = c("source", "remote")
     ) {
   
   match.arg(metric_pkg)
-  match.arg(src_ref)
+  match.arg(source_ref)
   
   #
   # ---- Prepare workable fields to categorize  ----
@@ -611,13 +612,13 @@ workable_assessments <- function(
       version = ver,
       val_date = val_date,
       riskmetric_version = as.character(packageVersion("riskmetric")),
-      ref = src_ref, # Simplified to 'source' or 'remote'
+      ref = source_ref, # Simplified to 'source' or 'remote'
       stringsAsFactors = FALSE
       )
     
     # downloads_1yr
     if("downloads_1yr" %in% names(assessment)) {
-      work_df$downloads_1yr <- if(is.null(assessment$downloads_1yr)) NA_real_ else as.numeric(assessment$downloads_1yr)
+      work_df$downloads_1yr <- if(rlang::is_empty(assessment$downloads_1yr)) NA_real_ else as.numeric(assessment$downloads_1yr)
     } 
     
     # covr_coverage
@@ -656,7 +657,7 @@ workable_assessments <- function(
     
     # reverse_dependencies
     if("reverse_dependencies" %in% names(assessment)) {
-      work_df$reverse_dependencies <- if(is.null(assessment$reverse_dependencies)) NA_real_ else assessment$reverse_dependencies |> length()
+      work_df$reverse_dependencies <- if(rlang::is_empty(assessment$reverse_dependencies)) NA_real_ else assessment$reverse_dependencies |> length()
     } 
     
     # dependencies
@@ -677,71 +678,76 @@ workable_assessments <- function(
     
     # has_vignettes
     if("has_vignettes" %in% names(assessment)) {
-      work_df$has_vignettes <- if(is.null(assessment$has_vignettes)) NA_real_ else as.numeric(assessment$has_vignettes)
+      work_df$has_vignettes <- if(rlang::is_empty(assessment$has_vignettes)) NA_real_ else as.numeric(assessment$has_vignettes)
     } 
     
     # has_source_control
     if("has_source_control" %in% names(assessment)) {
-      work_df$has_source_control <- if(is.null(assessment$has_source_control)) NA_real_ else assessment$has_source_control |> length()
+      work_df$has_source_control <- if(rlang::is_empty(assessment$has_source_control)) NA_real_ else assessment$has_source_control |> length()
     } 
     
     # has_website
     if("has_website" %in% names(assessment)) {
-      work_df$has_website <- if(is.null(assessment$has_website)) NA_real_ else assessment$has_website |> length()
+      work_df$has_website <- if(rlang::is_empty(assessment$has_website)) NA_real_ else assessment$has_website |> length()
     } 
     
     # has_news
     if("has_news" %in% names(assessment)) {
-      work_df$has_news <- if(is.null(assessment$has_news)) NA_real_ else as.numeric(assessment$has_news)
+      work_df$has_news <- if(rlang::is_empty(assessment$has_news)) NA_real_ else as.numeric(assessment$has_news)
     } 
     
     # news_current
     if("news_current" %in% names(scores)) {
-      work_df$news_current <- if(is.null(scores$news_current)) NA_real_ else as.numeric(scores$news_current)
+      work_df$news_current <- if(rlang::is_empty(scores$news_current)) NA_real_ else as.numeric(scores$news_current)
     } 
     
     # bugs_status
     if("bugs_status" %in% names(scores)) {
-      work_df$bugs_status <- if(is.null(scores$bugs_status)) NA_real_ else as.numeric(scores$bugs_status)
+      work_df$bugs_status <- if(rlang::is_empty(scores$bugs_status)) NA_real_ else as.numeric(scores$bugs_status)
     } 
     
     # remote_checks
     if("remote_checks" %in% names(assessment)) {
-      work_df$remote_checks <- if(is.null(assessment$remote_checks)) NA_real_ else as.numeric(assessment$remote_checks)
+      if("pkg_metric_error" %in% class(assessment$remote_checks)) {
+        work_df$remote_checks <- NA_real_
+      } else {
+        work_df$remote_checks <- if(rlang::is_empty(assessment$remote_checks)) NA_real_ else as.numeric(assessment$remote_checks)
+      }
     }
     
     # exported_namespace
     if("exported_namespace" %in% names(assessment)) {
-      work_df$exported_namespace <- if(is.null(assessment$exported_namespace)) NA_real_ else assessment$exported_namespace |> length()
+      work_df$exported_namespace <- if(rlang::is_empty(assessment$exported_namespace)) NA_real_ else assessment$exported_namespace |> length()
     } 
+    
     # export_help
     if("export_help" %in% names(scores)) {
-      work_df$export_help <- if(is.null(scores$export_help)) NA_real_ else as.numeric(scores$export_help) * 100
+      work_df$export_help <- if(rlang::is_empty(scores$export_help)) NA_real_ else as.numeric(scores$export_help) * 100
     }
     
     # has_maintainer
     if("has_maintainer" %in% names(assessment)) {
-      work_df$has_maintainer <- if(is.null(assessment$has_maintainer)) NA_real_ else assessment$has_maintainer |> length()
+      work_df$has_maintainer <- if(rlang::is_empty(assessment$has_maintainer)) NA_real_ else assessment$has_maintainer |> length()
     } 
     
     # size_codebase
     if("size_codebase" %in% names(assessment)) {
-      work_df$size_codebase <- if(is.null(assessment$size_codebase)) NA_real_ else as.numeric(assessment$size_codebase)
+      work_df$size_codebase <- if(rlang::is_empty(assessment$size_codebase)) NA_real_ else as.numeric(assessment$size_codebase)
     } 
     
     # has_bug_reports_url
     if("has_bug_reports_url" %in% names(assessment)) {
-      work_df$has_bug_reports_url <- if(is.null(assessment$has_bug_reports_url)) NA_real_ else assessment$has_bug_reports_url
+      work_df$has_bug_reports_url <- if(rlang::is_empty(assessment$has_bug_reports_url)) NA_real_ else assessment$has_bug_reports_url
     } 
     
     # has_examples
     if("has_examples" %in% names(scores)) {
-      work_df$has_examples <- if(is.null(scores$has_examples)) NA_real_ else as.numeric(scores$has_examples) * 100
+      work_df$has_examples <- if(rlang::is_empty(scores$has_examples)) NA_real_ else as.numeric(scores$has_examples) * 100
     } 
     
     # license
     if("license" %in% names(assessment)) {
-      work_df$license <- if(is.null(assessment$license)) NA_real_ else assessment$license
+      work_df$license <- if(rlang::is_empty(assessment$license)) NA_character_ else assessment$license
     } 
     
   } else if(metric_pkg == "val.meter") {

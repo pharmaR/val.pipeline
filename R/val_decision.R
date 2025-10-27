@@ -42,6 +42,11 @@ val_decision <- function(
     stop("'decisions_df' is not compliant. Must contain columns: 'metric', 'decision', 'condition', 'metric_type', 'accept_condition'")
   }
   
+  # verify that source_df is a data.frame
+  if(!is.data.frame(source_df)) {
+    stop("Invalid source specified. Must be a data.frame containing package assessments and scores.")
+  }
+  
   
   #
   # ---- Prepare workable fields to categorize  ----
