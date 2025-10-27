@@ -108,6 +108,11 @@ val_build <- function(
   # ---- Setup ----
   #
   
+  # Pull in some config variables
+  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
+  remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
+  # opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
+  
   old <- options()
   on.exit(function() options(old))
   if(ref == 'source') {
@@ -115,11 +120,7 @@ val_build <- function(
   } else {
     options(repos = opt_repos) # , rlang_interactive = FALSE
   }
-  
-  # Pull in some config variables
-  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
-  remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
-  
+  # options("repos")
   
   #
   # ---- Which pkgs, ordered ----
@@ -302,7 +303,7 @@ val_build <- function(
         pkg = pkg,
         ver = ver,
         r_ver = getRversion(),
-        sys_info = R.Version(),
+        sys_info = list(R.Version()),
         repos = repo_name,
         val_date = val_date,
         ref = NA_character_,
@@ -335,10 +336,8 @@ val_build <- function(
   
   
   
-  
-  
   #
-  # ---- Convert to DF ----
+  # ---- Collate Pkg Meta into DF ----
   #
   
   # Reduce package bundles down into a data.frame containing specific info
@@ -348,6 +347,7 @@ val_build <- function(
       x <- purrr::list_flatten(.x)
       # x$depends  <- if(all(is.na(x$depends)))  NA_character_ else paste(x$depends, collapse = ", ")
       # x$suggests <- if(all(is.na(x$suggests))) NA_character_ else paste(x$suggests, collapse = ", ")
+      # x$repos <- list(x$repos)
       x$depends <- list(x$depends)
       x$suggests <- list(x$suggests)
       x$rev_deps <- list(x$rev_deps)
@@ -356,10 +356,82 @@ val_build <- function(
     purrr::reduce(dplyr::bind_rows)
   
   
+  saveRDS(pkgs_df0, file.path(val_dir, "qual_evidence0.rds"))
+  cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
+  
   cat("\n--> Collated pkg metadata.\n")
   
   
+  #
+  # ---- Collate Assessment files into DF ----
+  #
   
+  # Start bundling rds files
+  assess_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
+    
+    # i <- 1 # for debugging
+    # # i <- which(pkgs == "class")
+    # pkg <- pkgs[i] # for debugging
+    # ver <- vers[i] # for debugging
+    pkg_v <- paste(pkg, ver, sep = "_")
+    pkg_assess_file <- file.path(assessed, glue::glue("{pkg_v}_assessments.rds"))
+    pkg_scores_file <- file.path(assessed, glue::glue("{pkg_v}_scores.rds"))
+      
+    if(file.exists(pkg_scores_file)) {
+      pkg_assessments <- readRDS(pkg_assess_file)
+      pkg_scores <- readRDS(pkg_scores_file)
+      cat("\n-->", pkg_v,"Using assessment previously stored.\n")
+      
+      # create a dataset that joins together the assessments and scores
+      names(pkg_scores)
+      pkg_assess_bundle <-
+        data.frame(
+          pkg = pkg,
+          ver = ver,
+          val_date = val_date,
+          # has_news = pkg_assessments$has_news,
+          # news_current = pkg_assessments$news_current,
+          # remote_checks = pkg_assessments$remote_checks,
+          # r_cmd_check = pkg_assessments$r_cmd_check,
+          # exported_namespace = pkg_assessments$exported_namespace,
+          # has_vignettes = pkg_assessments$has_vignettes,
+          # export_help = pkg_assessments$export_help,
+          # has_website = pkg_assessments$has_website,
+          # has_maintainer = pkg_assessments$has_maintainer,
+          # bugs_status = pkg_assessments$bugs_status,
+          # size_codebase = pkg_assessments$size_codebase,
+          # has_source_control = pkg_assessments$has_source_control,
+          # has_bug_reports_url = pkg_assessments$has_bug_reports_url,
+          # reverse_dependencies = pkg_assessments$reverse_dependencies,
+          # has_examples = pkg_assessments$has_examples,
+          # dependencies = pkg_assessments$dependencies,
+          # license = pkg_assessments$license,
+        )
+      
+    } 
+  }) |>
+    purrr::reduce(dplyr::bind_rows)
+  
+  # # Now do the same for the pkg assessment files
+  # pkgs_df0 <- purrr::map( pkg_bundles, ~ {
+  #   # .x <- pkg_bundles$askpass
+  #   x <- purrr::list_flatten(.x)
+  #   # x$depends  <- if(all(is.na(x$depends)))  NA_character_ else paste(x$depends, collapse = ", ")
+  #   # x$suggests <- if(all(is.na(x$suggests))) NA_character_ else paste(x$suggests, collapse = ", ")
+  #   # x$repos <- list(x$repos)
+  #   x$depends <- list(x$depends)
+  #   x$suggests <- list(x$suggests)
+  #   x$rev_deps <- list(x$rev_deps)
+  #   dplyr::as_tibble(x)
+  # }) |> 
+  #   purrr::reduce(dplyr::bind_rows)
+  # 
+  # 
+  # cat("\n--> Collated pkg metadata.\n")
+  # 
+  # 
+  # saveRDS(pkgs_df0, file.path(val_dir, "qual_evidence0.rds"))
+  # cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
   
   
   
@@ -463,8 +535,8 @@ val_build <- function(
   val_end_txt <- utils::capture.output(val_end - val_start)
   cat("\n--> Build", val_end_txt,"\n")
   
-  # saveRDS(pkgs_df, file.path(val_dir, "qual_evidence.rds"))
-  # cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
+  saveRDS(pkgs_df, file.path(val_dir, "qual_evidence.rds"))
+  cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
   
   # Return object 
   return(list(

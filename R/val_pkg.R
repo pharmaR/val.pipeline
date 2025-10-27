@@ -458,7 +458,7 @@ val_pkg <- function(
     pkg = pkg,
     ver = ver,
     r_ver = getRversion(),
-    sys_info = R.Version(),
+    sys_info = list(R.Version()),
     repos = repo_name, # A named character
     val_date = val_date,
     ref = ref,
