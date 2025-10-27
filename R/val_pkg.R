@@ -424,6 +424,8 @@ val_pkg <- function(
   
   cat("\n-->", pkg_v,"decision reason:\n---->", decision_reason, "\n")
   
+  
+  
   #
   # ---- Build Report ----
   #
@@ -447,6 +449,8 @@ val_pkg <- function(
   # pr
   
   cat("\n-->", pkg_v,"Report built.\n")
+  
+  
   
   
   #
