@@ -338,6 +338,25 @@ val_build <- function(
   
   
   #
+  # ---- Collate Assessment files into DF ----
+  #
+  
+  # # Start bundling rds files
+  assessment_bundle <- purrr::map2(pkgs, vers, function(pkg, ver){
+    # i <- 1 # for debugging
+    # pkg <- pkgs[i] # for debugging
+    # ver <- vers[i] # for debugging
+    pkg_v <- paste(pkg, ver, sep = "_")
+    pkg_assess_record_file <- file.path(assessed, glue::glue("{pkg_v}_assess_record.rds"))
+    if(file.exists(pkg_assess_record_file)) {
+      assess_record <- readRDS(pkg_assess_record_file)
+    }
+  }) |>
+    purrr::reduce(dplyr::bind_rows)
+  saveRDS(assessment_bundle, file.path(val_dir, "qual_assessments.rds"))
+  
+  
+  #
   # ---- Collate Pkg Meta into DF ----
   #
   
@@ -359,28 +378,9 @@ val_build <- function(
     purrr::reduce(dplyr::bind_rows)
   
   
-  saveRDS(pkgs_df0, file.path(val_dir, "qual_supplement0.rds"))
-  # cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
+  saveRDS(pkgs_df0, file.path(val_dir, "qual_supplemental.rds"))
+  # cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_supplemental.rds"), "\n"))
   
-  
-  
-  #
-  # ---- Collate Assessment files into DF ----
-  #
-  
-  # # Start bundling rds files
-  assessment_bundle <- purrr::map2(pkgs, vers, function(pkg, ver){
-    # i <- 1 # for debugging
-    # pkg <- pkgs[i] # for debugging
-    # ver <- vers[i] # for debugging
-    pkg_v <- paste(pkg, ver, sep = "_")
-    pkg_assess_record_file <- file.path(assessed, glue::glue("{pkg_v}_assess_record.rds"))
-    if(file.exists(pkg_assess_record_file)) {
-      assess_record <- readRDS(pkg_assess_record_file)
-    }
-  }) |>
-    purrr::reduce(dplyr::bind_rows)
-  saveRDS(assessment_bundle, file.path(val_dir, "qual_assessments.rds"))
   
   
   cat("\n--> Collated pkg metadata.\n")
@@ -485,8 +485,8 @@ val_build <- function(
   val_end_txt <- utils::capture.output(val_end - val_start)
   cat("\n--> Build", val_end_txt,"\n")
   
-  saveRDS(pkgs_df, file.path(val_dir, "qual_supplement.rds"))
-  cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
+  saveRDS(pkgs_df, file.path(val_dir, "qual_supplemental.rds"))
+  cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_supplemental.rds"), "\n"))
   
   # Return object 
   return(list(
