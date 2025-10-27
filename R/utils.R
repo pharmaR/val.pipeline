@@ -1,21 +1,4 @@
 
-#' Empty string Coalesce
-#'
-#' If x has zero characters (nzchar(x) is FALSE), return y; otherwise return x.
-#'
-#' @param x,y Two elements to test, one potentially empty
-#' 
-#' @export
-#'
-#' @examples
-#' "" %e% 1
-`%e%` <- function(x, y) {
-  if (!nzchar(x)) {
-    y
-  } else {
-    x
-  }
-}
 
 
 #' Get Repo Origin
@@ -409,7 +392,7 @@ build_decisions_df <- function(
     rule_lst <- figgy$rule_lst
   } else {
     cat(glue::glue("\n\n--> Building decision data.frame using rules from custom 'rule_lst'.\n"))
-    if(!"decision_lst" %in% names(rule_list)){
+    if(!"decision_lst" %in% names(rule_lst)){
       decision_lst <- pull_config(val = "decisions_lst", rule_type = "default")
     } else {
       decision_lst <- rule_lst$decision_lst
