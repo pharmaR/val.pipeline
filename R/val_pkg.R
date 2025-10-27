@@ -356,7 +356,7 @@ val_pkg <- function(
   )
   
   #
-  # ---- Save Assessment artifzc---- 
+  # ---- Save Assessment artifacts ---- 
   #
   
   assess_record_file <- file.path(assessed, glue::glue("{pkg_v}_assess_record.rds"))
