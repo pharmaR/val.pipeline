@@ -108,7 +108,7 @@ val_decision <- function(
   #
   # --- Secondary Metrics ----
   #
-  # FOR deubgging
+  # FOR debugging
   # repo_name <- "CRAN"
   # repo_name <- "BioC"
   # prime_decision <- "High"
