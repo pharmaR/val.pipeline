@@ -336,17 +336,28 @@ val_pkg <- function(
   cat("\n-->", pkg_v,"assessed.\n")
   cat("----> (", ass_mins_txt, ")\n")
   
-  
-  
+  # Create workable DF of assessments
+  assessment_record <- workable_assessments(
+    pkg = pkg,
+    ver = ver,
+    val_date = val_date,
+    metric_pkg = "riskmetric",
+    source = list(assessment = pkg_assessment, scores = pkg_scores),
+    src_ref = src_ref
+  )
   
   #
-  # ---- Save Assessment---- 
+  # ---- Save Assessment artifzc---- 
   #
   
+  assess_record_file <- file.path(assessed, glue::glue("{pkg_v}_assess_record.rds"))
   assessment_file <- file.path(assessed, glue::glue("{pkg_v}_assessments.rds"))
   scores_file <- file.path(assessed, glue::glue("{pkg_v}_scores.rds"))
+  
+  # assessment_record <- readRDS(assess_record_file) # for debugging
   # pkg_assessment <- readRDS(assessment_file) # for debugging
   # pkg_scores <- readRDS(scores_file) # for debugging
+  saveRDS(assessment_record, assess_record_file)
   saveRDS(pkg_assessment, assessment_file)
   saveRDS(pkg_scores, scores_file)
   cat("\n-->", pkg_v,"assessments & scores saved.\n")
@@ -392,7 +403,7 @@ val_pkg <- function(
   decision <- 
     val_decision( 
       pkg = pkg,
-      source = list(assessment = pkg_assessment, scores = pkg_scores), 
+      source_df = assessment_record, 
       excl_metrics = exclude_met, # Subset if desired
       decisions = decisions,
       else_cat = decisions[length(decisions)],

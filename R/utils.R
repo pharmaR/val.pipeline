@@ -36,7 +36,7 @@
 #' @keywords internal
 get_repo_origin <- function(repo_src = NULL, pkg_name = NULL, names_only = FALSE) {
   curr_repos <- getOption("repos")
-  repo_name <- curr_repos[curr_repos %in% repo_src] %>%
+  repo_name <- curr_repos[stringr::str_detect(repo_src, curr_repos)] %>%
     {if(names_only) names(.) else .}
   if(length(repo_name) == 0) repo_name <- "unknown"
   if(length(repo_name) > 1) {
@@ -556,240 +556,201 @@ build_decisions_df <- function(
 
 
 #' Prepare Workable Assessments DF
-#'
+#' 
+#' Helper function to extract workable fields from a package assessment
+#' for use in val_pkg() where val_decision() is called.
+#' 
+#' @param pkg The name of the package
+#' @param ver The version of the package
+#' @param val_date The validation date
+#' @param metric_pkg The package used to generate the package assessment.
+#'  Options are "riskmetric", "val.meter", or "risk.assessr"
+#' @param source The source object containing the package assessment.
+#'  Typically the output of pkg_assess() & pkg_score() from the `riskmetric`.
+#' @param src_ref A character string indicating the source reference,
+#' either "source" (local pkg_source) or "remote" (CRAN/pkg_remote)
+#' 
+#' @importFrom dplyr as_tibble
+#' 
+#' @return A data.frame/tibble with workable fields for a val_decision() call
 #' 
 #' @keywords internal
 workable_assessments <- function(
-    avail_pkgs = available.packages() |> as.data.frame()
+    pkg = NULL,
+    ver = NULL,
+    val_date = Sys.Date(),
+    metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
+    source = NULL,
+    src_ref = c("source", "remote")
     ) {
   
-  
-  
-  # Where did package come from?
-  # categorize Repository field to match names in options("repos")
-  curr_repos <- getOption("repos")
-  avail_pkgs$repo_name <-
-    purrr::map_chr(avail_pkgs$Repository, ~ {
-      if(is.null(.x)) NA_character_ else {
-        repo_src <- .x |> dirname() |> dirname() # remove '/src/contrib/` ending
-        repo_name <- curr_repos[stringr::str_detect(repo_src, curr_repos)] |> names()
-        if(length(repo_name) == 0) repo_name <- "unknown"
-        if(length(repo_name) > 1) {
-          repo_name <- repo_name[1]
-        }
-        repo_name
-      }
-    })
-  
+  match.arg(metric_pkg)
+  match.arg(src_ref)
   
   #
   # ---- Prepare workable fields to categorize  ----
   #
-  
-  # First, allow user to subset the metrics
-  # names(source$assessment)
-  decisions_df <- decisions_df |>
-    dplyr::filter(!(metric %in% excl_metrics))
-  
-  assessment <- source$assessment[!(names(source$assessment) %in% excl_metrics)]
-  scores <- source$scores[!(names(source$scores) %in% excl_metrics)]
-  
-  
-  # rm(pkgs_df)
-  pkgs_df <- data.frame(package = pkg)
-  
-  # names(assessment)
-  
-  # extract list values into a numeric vector
-  
-  # downloads_1yr
-  if("downloads_1yr" %in% decisions_df$metric &
-     "downloads_1yr" %in% names(assessment)) {
-    pkgs_df$downloads_1yr <- if(is.null(assessment$downloads_1yr)) NA_real_ else as.numeric(assessment$downloads_1yr)
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "downloads_1yr"))
-  }
-  # covr_coverage
-  if("covr_coverage" %in% decisions_df$metric &
-     "covr_coverage" %in% names(assessment)) {
-    if(!any(is.na(assessment$covr_coverage))) {
-      pkgs_df$covr_coverage <- if(is.null(assessment$covr_coverage$totalcoverage)) NA_real_ else as.numeric(assessment$covr_coverage$totalcoverage)
-    } else {
-      decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "covr_coverage"))
+  # by 'metric_pkg'
+  if(metric_pkg == "riskmetric"){
+    
+    # Verify args
+    # Use package metrics based on specified source
+    if(!inherits(source, "list")) stop("\nInvalid source specified. Must be a list")
+    
+    # Verify we have both the 'assessment' and 'scores' data.frames
+    if(!all(c("assessment", "scores") %in% names(source))) {
+      stop("\nInvalid source specified. Must be a list with elements 'assessment' and 'scores'")
     }
-    # filecoverage <- assessment$covr_coverage$filecoverage
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "covr_coverage"))
-  }
-  # r_cmd_check
-  if("r_cmd_check_errors" %in% decisions_df$metric &
-     "r_cmd_check" %in% names(assessment)) {
-    r_cmd_check <- assessment$r_cmd_check
-    # r_cmd_check[[2]]
-    if("pkg_metric_error" %in% class(assessment$r_cmd_check)) {
-      pkgs_df$r_cmd_check_errors <- NA_real_
-    } else {
-      # logic when not an error
-      pkgs_df$r_cmd_check_errors <- if(length(r_cmd_check) > 1){
-        if(is.null(r_cmd_check[[2]])) NA_real_ else r_cmd_check[[2]]
-      } else {
-        if(is.na(r_cmd_check)) NA_real_ else r_cmd_check
+    
+    # names(source$assessment)
+    assessment <- source$assessment
+    scores <- source$scores
+    
+    work_df <- data.frame(
+      package = pkg,
+      version = ver,
+      val_date = val_date,
+      riskmetric_version = as.character(packageVersion("riskmetric")),
+      ref = src_ref, # Simplified to 'source' or 'remote'
+      stringsAsFactors = FALSE
+      )
+    
+    # downloads_1yr
+    if("downloads_1yr" %in% names(assessment)) {
+      work_df$downloads_1yr <- if(is.null(assessment$downloads_1yr)) NA_real_ else as.numeric(assessment$downloads_1yr)
+    } 
+    
+    # covr_coverage
+    if("covr_coverage" %in% names(assessment)) {
+      if(!any(is.na(assessment$covr_coverage))) {
+        work_df$covr_coverage <- if(is.null(assessment$covr_coverage$totalcoverage)) NA_real_ else as.numeric(assessment$covr_coverage$totalcoverage)
       }
+      # filecoverage <- assessment$covr_coverage$filecoverage
+    } 
+    
+    # r_cmd_check Errors
+    if("r_cmd_check" %in% names(assessment)) {
+      r_cmd_check <- assessment$r_cmd_check
+      work_df$r_cmd_check <- list(r_cmd_check)
       
-    }
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "r_cmd_check_errors"))
-  }
-  # r_cmd_check
-  if("r_cmd_check_warnings" %in% decisions_df$metric &
-     "r_cmd_check" %in% names(assessment)) {
-    r_cmd_check <- assessment$r_cmd_check
-    if("pkg_metric_error" %in% class(assessment$r_cmd_check)) {
-      pkgs_df$r_cmd_check_warnings <- NA_real_
-    } else {
-      # logic when not an error
-      pkgs_df$r_cmd_check_warnings <-  if(length(r_cmd_check) > 1){
-        if(is.null(r_cmd_check[[3]])) NA_real_ else r_cmd_check[[3]]
+      # r_cmd_check[[2]]
+      if("pkg_metric_error" %in% class(assessment$r_cmd_check)) {
+        work_df$r_cmd_check_errors <- NA_real_
+        work_df$r_cmd_check_warnings <- NA_real_
       } else {
-        if(is.na(r_cmd_check)) NA_real_ else r_cmd_check
+        # Errors
+        work_df$r_cmd_check_errors <- if(length(r_cmd_check) > 1){
+          if(is.null(r_cmd_check[[2]])) NA_real_ else r_cmd_check[[2]]
+        } else {
+          if(is.na(r_cmd_check)) NA_real_ else r_cmd_check
+        }
+        
+        # Warnings
+        work_df$r_cmd_check_warnings <-  if(length(r_cmd_check) > 1){
+          if(is.null(r_cmd_check[[3]])) NA_real_ else r_cmd_check[[3]]
+        } else {
+          if(is.na(r_cmd_check)) NA_real_ else r_cmd_check
+        }
       }
     }
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "r_cmd_check_warnings"))
-  }
-  # reverse_dependencies
-  if("reverse_dependencies" %in% decisions_df$metric &
-     "reverse_dependencies" %in% names(assessment)) {
-    pkgs_df$reverse_dependencies <- if(is.null(assessment$reverse_dependencies)) NA_real_ else assessment$reverse_dependencies |> length()
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "reverse_dependencies"))
-  }
-  # dependencies
-  if("dependencies" %in% decisions_df$metric &
-     "dependencies" %in% names(assessment)) {
     
-    # eh, this doesn't include suggests
-    # assessment$dependencies |> nrow()
+    # reverse_dependencies
+    if("reverse_dependencies" %in% names(assessment)) {
+      work_df$reverse_dependencies <- if(is.null(assessment$reverse_dependencies)) NA_real_ else assessment$reverse_dependencies |> length()
+    } 
     
-    deppies <- tools::package_dependencies(
-      packages = pkg,
-      db = avail_pkgs |> as.matrix(),
-      which = c("Depends", "Imports", "LinkingTo"),
-      recursive = FALSE
-    ) |>
-      unlist(use.names = FALSE)
+    # dependencies
+    if("dependencies" %in% names(assessment)) {
+      # assessment$dependencies |> nrow() # eh, this doesn't include suggests
+      #   and it includes a bunch of base R pkgs, which we aren't interested in
+      
+      deppies <- tools::package_dependencies(
+        packages = pkg,
+        # db = available.packages(), # uses option('repos') by default
+        which = c("Depends", "Imports", "LinkingTo"),
+        recursive = FALSE
+      ) |>
+        unlist(use.names = FALSE)
+      
+      work_df$dependencies <- deppies |> length()
+    } 
     
-    # We don't really HAVE to store these deps here.
-    # paste & collapse them into a single string
-    # pkgs_df$deps <- if(length(deppies) == 0) NULL else paste(deppies, collapse = ", ")
-    pkgs_df$dependencies <- deppies |> length()
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "dependencies"))
-  }
-  # has_vignettes
-  if("has_vignettes" %in% decisions_df$metric &
-     "has_vignettes" %in% names(assessment)) {
-    pkgs_df$has_vignettes <- if(is.null(assessment$has_vignettes)) NA_real_ else as.numeric(assessment$has_vignettes)
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "has_vignettes"))
-  }
-  # has_source_control
-  if("has_source_control" %in% decisions_df$metric &
-     "has_source_control" %in% names(assessment)) {
-    pkgs_df$has_source_control <- if(is.null(assessment$has_source_control)) NA_real_ else assessment$has_source_control |> length()
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "has_source_control"))
-  }
-  # has_website
-  if("has_website" %in% decisions_df$metric &
-     "has_website" %in% names(assessment)) {
-    pkgs_df$has_website <- if(is.null(assessment$has_website)) NA_real_ else assessment$has_website |> length()
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "has_website"))
-  }
-  # has_news
-  if("has_news" %in% decisions_df$metric &
-     "has_news" %in% names(assessment)) {
-    pkgs_df$has_news <- if(is.null(assessment$has_news)) NA_real_ else as.numeric(assessment$has_news)
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "has_news"))
-  }
-  # news_current
-  if("news_current" %in% decisions_df$metric &
-     "news_current" %in% names(scores)) {
-    pkgs_df$news_current <- if(is.null(scores$news_current)) NA_real_ else as.numeric(scores$news_current)
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "news_current"))
-  }
-  # bugs_status
-  if("bugs_status" %in% decisions_df$metric &
-     "bugs_status" %in% names(scores)) {
-    pkgs_df$bugs_status <- if(is.null(scores$bugs_status)) NA_real_ else as.numeric(scores$bugs_status)
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "bugs_status"))
-  }
-  # remote_checks
-  if("remote_checks" %in% decisions_df$metric &
-     "remote_checks" %in% names(assessment)) {
-    pkgs_df$remote_checks <- if(is.null(assessment$remote_checks)) NA_real_ else as.numeric(assessment$remote_checks)
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "remote_checks"))
-  }
+    # has_vignettes
+    if("has_vignettes" %in% names(assessment)) {
+      work_df$has_vignettes <- if(is.null(assessment$has_vignettes)) NA_real_ else as.numeric(assessment$has_vignettes)
+    } 
+    
+    # has_source_control
+    if("has_source_control" %in% names(assessment)) {
+      work_df$has_source_control <- if(is.null(assessment$has_source_control)) NA_real_ else assessment$has_source_control |> length()
+    } 
+    
+    # has_website
+    if("has_website" %in% names(assessment)) {
+      work_df$has_website <- if(is.null(assessment$has_website)) NA_real_ else assessment$has_website |> length()
+    } 
+    
+    # has_news
+    if("has_news" %in% names(assessment)) {
+      work_df$has_news <- if(is.null(assessment$has_news)) NA_real_ else as.numeric(assessment$has_news)
+    } 
+    
+    # news_current
+    if("news_current" %in% names(scores)) {
+      work_df$news_current <- if(is.null(scores$news_current)) NA_real_ else as.numeric(scores$news_current)
+    } 
+    
+    # bugs_status
+    if("bugs_status" %in% names(scores)) {
+      work_df$bugs_status <- if(is.null(scores$bugs_status)) NA_real_ else as.numeric(scores$bugs_status)
+    } 
+    
+    # remote_checks
+    if("remote_checks" %in% names(assessment)) {
+      work_df$remote_checks <- if(is.null(assessment$remote_checks)) NA_real_ else as.numeric(assessment$remote_checks)
+    }
+    
+    # exported_namespace
+    if("exported_namespace" %in% names(assessment)) {
+      work_df$exported_namespace <- if(is.null(assessment$exported_namespace)) NA_real_ else assessment$exported_namespace |> length()
+    } 
+    # export_help
+    if("export_help" %in% names(scores)) {
+      work_df$export_help <- if(is.null(scores$export_help)) NA_real_ else as.numeric(scores$export_help) * 100
+    }
+    
+    # has_maintainer
+    if("has_maintainer" %in% names(assessment)) {
+      work_df$has_maintainer <- if(is.null(assessment$has_maintainer)) NA_real_ else assessment$has_maintainer |> length()
+    } 
+    
+    # size_codebase
+    if("size_codebase" %in% names(assessment)) {
+      work_df$size_codebase <- if(is.null(assessment$size_codebase)) NA_real_ else as.numeric(assessment$size_codebase)
+    } 
+    
+    # has_bug_reports_url
+    if("has_bug_reports_url" %in% names(assessment)) {
+      work_df$has_bug_reports_url <- if(is.null(assessment$has_bug_reports_url)) NA_real_ else assessment$has_bug_reports_url
+    } 
+    
+    # has_examples
+    if("has_examples" %in% names(scores)) {
+      work_df$has_examples <- if(is.null(scores$has_examples)) NA_real_ else as.numeric(scores$has_examples) * 100
+    } 
+    
+    # license
+    if("license" %in% names(assessment)) {
+      work_df$license <- if(is.null(assessment$license)) NA_real_ else assessment$license
+    } 
+    
+  } else if(metric_pkg == "val.meter") {
+    stop("Not yet implemented: workable_assessments() using 'val.meter' tooling")
+  } else if(metric_pkg == "risk.assessr") {
+    stop("Not yet implemented: workable_assessments() using 'risk.assessr' tooling")
+  } 
   
-  # exported_namespace
-  if("exported_namespace" %in% decisions_df$metric &
-     "exported_namespace" %in% names(assessment)) {
-    pkgs_df$exported_namespace <- if(is.null(assessment$exported_namespace)) NA_real_ else assessment$exported_namespace |> length()
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "exported_namespace"))
-  }
-  # export_help
-  if("export_help" %in% decisions_df$metric &
-     "export_help" %in% names(scores)) {
-    pkgs_df$export_help <- if(is.null(scores$export_help)) NA_real_ else as.numeric(scores$export_help) * 100
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "export_help"))
-  }
-  # has_maintainer
-  if("has_maintainer" %in% decisions_df$metric &
-     "has_maintainer" %in% names(assessment)) {
-    pkgs_df$has_maintainer <- if(is.null(assessment$has_maintainer)) NA_real_ else assessment$has_maintainer |> length()
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "has_maintainer"))
-  }
-  # size_codebase
-  if("size_codebase" %in% decisions_df$metric &
-     "size_codebase" %in% names(assessment)) {
-    pkgs_df$size_codebase <- if(is.null(assessment$size_codebase)) NA_real_ else as.numeric(assessment$size_codebase)
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "size_codebase"))
-  }
-  # has_bug_reports_url
-  if("has_bug_reports_url" %in% decisions_df$metric &
-     "has_bug_reports_url" %in% names(assessment)) {
-    pkgs_df$has_bug_reports_url <- if(is.null(assessment$has_bug_reports_url)) NA_real_ else assessment$has_bug_reports_url
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "has_bug_reports_url"))
-  }
-  # has_examples
-  if("has_examples" %in% decisions_df$metric &
-     "has_examples" %in% names(scores)) {
-    pkgs_df$has_examples <- if(is.null(scores$has_examples)) NA_real_ else as.numeric(scores$has_examples) * 100
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "has_examples"))
-  }
-  # license
-  if("license" %in% decisions_df$metric &
-     "license" %in% names(assessment)) {
-    pkgs_df$license <- if(is.null(assessment$license)) NA_real_ else assessment$license
-  } else {
-    decisions_df <- decisions_df |> dplyr::filter(!(metric %in% "license"))
-  }
-  
-  
-  
-  
-   
+  return(work_df) 
 }
   
   

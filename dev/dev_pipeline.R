@@ -52,6 +52,7 @@ qual <- readRDS(file.path(val_dir, "qual_evidence.rds")) |>
 # unknown repos
 unknown_repos <- qual |>
   dplyr::filter(repos == "unknown") 
+unknown_repos |> dplyr::select(pkg, repos)
 unknown_repos |> pull(pkg) |> length()
 
 # Decisions & final decisions
