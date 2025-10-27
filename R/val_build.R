@@ -366,51 +366,55 @@ val_build <- function(
   # ---- Collate Assessment files into DF ----
   #
   
-  # Start bundling rds files
-  assess_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
-    
-    # i <- 1 # for debugging
-    # # i <- which(pkgs == "class")
-    # pkg <- pkgs[i] # for debugging
-    # ver <- vers[i] # for debugging
-    pkg_v <- paste(pkg, ver, sep = "_")
-    pkg_assess_file <- file.path(assessed, glue::glue("{pkg_v}_assessments.rds"))
-    pkg_scores_file <- file.path(assessed, glue::glue("{pkg_v}_scores.rds"))
-      
-    if(file.exists(pkg_scores_file)) {
-      pkg_assessments <- readRDS(pkg_assess_file)
-      pkg_scores <- readRDS(pkg_scores_file)
-      cat("\n-->", pkg_v,"Using assessment previously stored.\n")
-      
-      # create a dataset that joins together the assessments and scores
-      names(pkg_scores)
-      pkg_assess_bundle <-
-        data.frame(
-          pkg = pkg,
-          ver = ver,
-          val_date = val_date,
-          # has_news = pkg_assessments$has_news,
-          # news_current = pkg_assessments$news_current,
-          # remote_checks = pkg_assessments$remote_checks,
-          # r_cmd_check = pkg_assessments$r_cmd_check,
-          # exported_namespace = pkg_assessments$exported_namespace,
-          # has_vignettes = pkg_assessments$has_vignettes,
-          # export_help = pkg_assessments$export_help,
-          # has_website = pkg_assessments$has_website,
-          # has_maintainer = pkg_assessments$has_maintainer,
-          # bugs_status = pkg_assessments$bugs_status,
-          # size_codebase = pkg_assessments$size_codebase,
-          # has_source_control = pkg_assessments$has_source_control,
-          # has_bug_reports_url = pkg_assessments$has_bug_reports_url,
-          # reverse_dependencies = pkg_assessments$reverse_dependencies,
-          # has_examples = pkg_assessments$has_examples,
-          # dependencies = pkg_assessments$dependencies,
-          # license = pkg_assessments$license,
-        )
-      
-    } 
-  }) |>
-    purrr::reduce(dplyr::bind_rows)
+  # # Start bundling rds files
+  # assess_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
+  #   
+  #   # i <- 1 # for debugging
+  #   # # i <- which(pkgs == "class")
+  #   # pkg <- pkgs[i] # for debugging
+  #   # ver <- vers[i] # for debugging
+  #   pkg_v <- paste(pkg, ver, sep = "_")
+  #   pkg_assess_file <- file.path(assessed, glue::glue("{pkg_v}_assessments.rds"))
+  #   pkg_scores_file <- file.path(assessed, glue::glue("{pkg_v}_scores.rds"))
+  #     
+  #   if(file.exists(pkg_scores_file)) {
+  #     pkg_assessments <- readRDS(pkg_assess_file)
+  #     pkg_scores <- readRDS(pkg_scores_file)
+  #     cat("\n-->", pkg_v,"Using assessment previously stored.\n")
+  #     
+  #     # create a dataset that joins together the assessments and scores
+  #     names(pkg_scores)
+  #     pkg_assess_bundle <-
+  #       data.frame(
+  #         pkg = pkg,
+  #         ver = ver,
+  #         val_date = val_date,
+  #         downloads_1yr = pkg_assessments$downloads_1yr,
+  #         totalcoverage = pkg_assessments$covr_coverage$totalcoverage,
+  #         r_cmd_check_errors = pkg_assessments$r_cmd_check,
+  # 
+  #         # has_news = pkg_assessments$has_news,
+  #         # news_current = pkg_assessments$news_current,
+  #         # remote_checks = pkg_assessments$remote_checks,
+  #         # exported_namespace = pkg_assessments$exported_namespace,
+  #         # has_vignettes = pkg_assessments$has_vignettes,
+  #         # export_help = pkg_assessments$export_help,
+  #         # has_website = pkg_assessments$has_website,
+  #         # has_maintainer = pkg_assessments$has_maintainer,
+  #         # bugs_status = pkg_assessments$bugs_status,
+  #         # size_codebase = pkg_assessments$size_codebase,
+  #         # has_source_control = pkg_assessments$has_source_control,
+  #         # has_bug_reports_url = pkg_assessments$has_bug_reports_url,
+  #         # reverse_dependencies = pkg_assessments$reverse_dependencies,
+  #         # has_examples = pkg_assessments$has_examples,
+  #         # dependencies = pkg_assessments$dependencies,
+  #         # license = pkg_assessments$license,
+  #       )
+  #     
+  #   } 
+  # }) |>
+  #   purrr::reduce(dplyr::bind_rows)
+  
   
   # # Now do the same for the pkg assessment files
   # pkgs_df0 <- purrr::map( pkg_bundles, ~ {
