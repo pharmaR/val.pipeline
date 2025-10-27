@@ -7,6 +7,8 @@ specified in `val.pipeline::val_pipeline()` (#3).
 * "Engage" secondary metric logic for non-CRAN pkgs
 * Customized `riskreports` package report template
 * Added a significant amount of `testthat` tests
+* Exported assessment records for compilation / summary
+* Corrected issue where some packages repos URL were "unknown"
 
 # val.pipline 0.0.0
 
