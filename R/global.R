@@ -9,5 +9,5 @@ utils::globalVariables(c(
   "met_dec_id", "metric", "metric_type", "news_curr", "news_current",
   "package", "primary_risk_category", "repo_name", "reverse_dependencies",
   "sug_failed", "suggests",
-  "dec_id_df", "decisions", "secondary_risk_category"
+  "dec_id_df", "decisions", "secondary_risk_category", "rule_lst"
 ))

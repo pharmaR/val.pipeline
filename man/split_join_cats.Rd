@@ -8,7 +8,7 @@ for only CRAN pkgs}
 split_join_cats(
   pkgs_data = NULL,
   dec_df = build_decisions_df(rule_type = "remote_reduce"),
-  decisions = unique(dec_df$decision),
+  decisions = pull_config(val = "decisions_lst", rule_type = "default"),
   else_cat = decisions[length(decisions)],
   label = "Primary"
 )

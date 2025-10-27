@@ -289,17 +289,24 @@ val_decision <- function(
     decisions = decisions,
     else_cat = else_cat
   )
-  prime_decision <- primed_pkgs$final_risk_cat
+  prime_decision <- if(is.na(primed_pkgs$final_risk_cat)) "unknown" else primed_pkgs$final_risk_cat
 
   #
   # --- Secondary Metrics ----
   #
+  # FOR deubgging
+  # repo_name <- "CRAN"
+  # repo_name <- "BioC"
+  # prime_decision <- "High"
+  # prime_decision <- "Low"
+  # prime_decision <- "unknown"
   
-  # If not from CRAN, then make decision using secondary metric conditions
-  if(tolower(repo_name) != "cran" &
-     (is.na(prime_decision) | prime_decision == decisions[1])) {
-  
-    cat(glue::glue("\n\n\n--> Package '{pkg}' appears to come from repo: '{repo_name}' ({repo_src}) which requires secondary metric assessments.\n\n"))
+
+  # If pkg is not from CRAN & either decision is 'low' or "unknown", then make decision using secondary metric conditions
+  if((prime_decision == "unknown") |
+     (tolower(repo_name) != "cran" & prime_decision != decisions[1])
+     ) {
+    cat(glue::glue("\n\n\n--> Package '{pkg}' needs secondary metric assessments.\n\n"))
     #
     # ---- Perform 'Secondary' Checks ----
     #
@@ -313,7 +320,7 @@ val_decision <- function(
       decisions = decisions,
       else_cat = else_cat
     )
-      
+    # pkgs_sec_cats$final_risk_cat |> class()
 
     #
     # ---- Generate Final Decision ----
@@ -321,6 +328,7 @@ val_decision <- function(
     dec_id_df <- unique(decisions_df[,c("decision", "decision_id")])
     
     # Combine Primary & Secondary into final decision
+    
     pkgs_final <- pkgs_sec_cats |>
       dplyr::rename(secondary_risk_category = final_risk_cat) |>
 
@@ -349,10 +357,8 @@ val_decision <- function(
     
     
   } else {
-    if(primed_pkgs$final_risk_cat != decisions[1]) {
-      cat(glue::glue("\n\n--> Package '{pkg}' has been categorized as '{primed_pkgs$final_risk_cat}' risk based on Primary metrics alone. No Secondary metrics needed.\n"))
-    }
-    # Secondary metrics not needed because it's a CRAN pkg or pkg 'failed'
+     # else CRAN or not CRAN but decision == "low", then no need to continue
+    cat(glue::glue("\n\n\n--> Package '{pkg}' does NOT need secondary metric assessments.\n\n")) 
     pkgs_final <- primed_pkgs |>
       dplyr::select(
         package, final_risk = final_risk_cat,
@@ -711,6 +717,7 @@ val_categorize <- function(
     #     primed_pkgs |>
     #       dplyr::rename(primary_risk_category = final_risk_cat) |>
     #       dplyr::select(-c(dplyr::ends_with("_cat"), dplyr::ends_with("_cataa"))),
+    #   decisions = decisions,
     #   else_cat = else_cat
     #   ) |>
     #   dplyr::rename(exception_risk_category = final_risk_cat)

@@ -1,21 +1,4 @@
 
-#' Empty string Coalesce
-#'
-#' If x has zero characters (nzchar(x) is FALSE), return y; otherwise return x.
-#'
-#' @param x,y Two elements to test, one potentially empty
-#' 
-#' @export
-#'
-#' @examples
-#' "" %e% 1
-`%e%` <- function(x, y) {
-  if (!nzchar(x)) {
-    y
-  } else {
-    x
-  }
-}
 
 
 #' Get Repo Origin
@@ -276,7 +259,7 @@ pull_config <- function(
 ) {
 
   rule_type <- match.arg(rule_type)
-  
+
   configgy <- config::get(
     value = val, # NULL means grab everything
     config = rule_type,
@@ -287,13 +270,18 @@ pull_config <- function(
   if(!is.null(val)) {
     return(configgy)
   }
-  
+
   # 
   # ---- Pull ----
   #
   fig_names <- names(configgy)
   decisions_pos <- which(fig_names == "decisions_lst")[1] # grab first time 'decisions_lst' shows up
   default_names <- fig_names[1:decisions_pos] 
+  # if is.null(value) & rule_type is 'default', make sure to stop here & return the default config elements
+    if(is.null(val) & rule_type == 'default') {
+      return(configgy[default_names])
+    }
+
   rule_names <- fig_names[(decisions_pos + 1): length(fig_names)]
   rule_names <- rule_names[rule_names != "inherits"]
   
@@ -345,13 +333,12 @@ pull_config <- function(
 #' val_filter() that includes columns "metric", "decision", "condition",
 #' "metric_type", and "accept_condition".
 #'
-#' @param rule_type A character string indicating whether the decision
-#'   categories are used to "categorize" risk levels (e.g., "Low", "Medium",
-#'   "High") via val_categorize() or val_decision(). The difference being that
-#'   "categorize" is going to be used to filter the initial list of packages
-#'   using a remote pkg_ref() assessment, whereas "decision" is used to filter
-#'   the final list of packages after a 'pkg_source' pkg_ref() assessment is
-#'   produced locally on the GxP system of interest.
+#' @param rule_type A character string indicating whether to use
+#'   val_categorize() or val_decision(). The difference being that
+#'   "remote_reduce" is going to be used to filter the initial list of packages
+#'   using a "pkg_remote" based pkg_ref() assessment and conversely, the
+#'   "decide" rule_type is used to categorize the risk of a 'pkg_source'
+#'   pkg_ref() assessment on the GxP system of interest.
 #' @param rule_lst A named list of lists, where each sub-list contains:
 #' - cond: A named list of formulas, where the names correspond to decision
 #'   categories in `decision_lst`, and the formulas define the conditions for
@@ -363,10 +350,10 @@ pull_config <- function(
 #' - min_value: (Optional) A numeric value indicating the minimum acceptable
 #'   value for the primary metric(s).
 #' - auto_accept: (Optional) A formula that defines a condition under which the
-#'  package can be automatically accepted, regardless of other conditions.
+#'   package can be automatically accepted, regardless of other conditions.
 #' @param viable_metrics An optional character vector of metric names that are
-#'  considered viable for the chosen pkg_source. If provided, any metrics in
-#'  `rule_lst` that are not in `viable_metrics` will be dropped.
+#'   considered viable for the chosen pkg_source. If provided, any metrics in
+#'   `rule_lst` that are not in `viable_metrics` will be dropped.
 #'
 #' @importFrom rlang expr_text is_empty
 #' @importFrom dplyr mutate select row_number left_join filter distinct tibble
@@ -386,10 +373,13 @@ pull_config <- function(
 #'
 #' @export
 build_decisions_df <- function(
-    rule_type = c("default", "remote_reduce", "decide"),
+    rule_type = c("remote_reduce", "decide"),
     rule_lst = NULL, # could input custom rules list here
     viable_metrics = NULL
   ) {
+  # rule_type = "remote_reduce"
+  # rule_lst = NULL
+  # viable_metrics = NULL
 
   rule_type <- match.arg(rule_type)
   
@@ -399,10 +389,17 @@ build_decisions_df <- function(
     figgy <- pull_config(rule_type = rule_type)
     decision_lst <- figgy$default_lst$decisions_lst
     rule_lst <- figgy$rule_lst
+  } else {
+    cat(glue::glue("\n\n--> Building decision data.frame using rules from custom 'rule_lst'.\n"))
+    if(!"decision_lst" %in% names(rule_lst)){
+      decision_lst <- pull_config(val = "decisions_lst", rule_type = "default")
+    } else {
+      decision_lst <- rule_lst$decision_lst
+    }
   }
     
   #
-  # Remove metrics from rule_lst that aren't in 'metrics'
+  # Remove metrics from rule_lst that aren't in 'viable_metrics'
   if(!is.null(viable_metrics)) {
     keep_rules <- names(rule_lst) %in% viable_metrics
     if(any(!keep_rules)) {
@@ -414,7 +411,7 @@ build_decisions_df <- function(
     rule_lst <- rule_lst[keep_rules]
     if(length(rule_lst) == 0) {
       # probably need something else other than stop()?
-      stop(glue::glue("\n\n--> None of the metrics in 'rule_lst' are viable. Please check your 'metrics' inputs.\n"))
+      stop(glue::glue("\n\n--> None of the metrics in 'rule_lst' are viable. Please check your 'viable_metrics' inputs.\n"))
     }
   }
   
@@ -569,13 +566,20 @@ build_decisions_df <- function(
 get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_accept = FALSE) {
   
   # for debugging
-  # met_dec_df <- build_decisions_df() |> dplyr::mutate(derived_col = metric)
+  # met_dec_df <- build_decisions_df(rule_type = "decide") |> dplyr::mutate(derived_col = metric)
+  # class(met_dec_df$decision) # verify
   # met_names <- c("dwnlds")
   # else_cat <- "High"
   # ids <- FALSE
   # ids <- TRUE
   # auto_accept <- TRUE
   # auto_accept <- FALSE
+
+  # verify that met_dec_df$decision is a factor
+  if(!is.factor(met_dec_df$decision)) {
+    decisions <- pull_config(val = "decisions_lst", rule_type = "default")
+    met_dec_df$decision <- factor(met_dec_df$decision, levels = decisions)
+  }
   
   # If auto_accept is TRUE, Then set ids to FALSE
   if(auto_accept) {
@@ -592,9 +596,10 @@ get_case_whens <- function(met_dec_df, met_names, else_cat, ids = FALSE, auto_ac
       dplyr::filter(derived_col == .x)
     
     # if else_cat is character & ids is TRUE, we need to convert else_cat to decision_id
-    if(ids & is.character(else_cat)) {
-      if(else_cat %in% met_dec_df$decision) {
-        else_cat <- met_dec_df$decision_id[which(met_dec_df$decision == else_cat)] |> unique()
+      if(ids & is.character(else_cat)) {
+      if(else_cat %in% levels(met_dec_df$decision)) {
+        else_cat <- which(else_cat == levels(met_dec_df$decision))
+          # met_dec_df$decision_id[which(met_dec_df$decision == else_cat)] |> unique()
       } 
     }
     
@@ -722,7 +727,7 @@ rip_cats_by_pkg <- function(
     dec_df = build_decisions_df(rule_type = "decide"),
     pkgs_df = NULL,
     decisions = pull_config(val = "decisions_lst", rule_type = "default"),
-    else_cat = NULL
+    else_cat = decisions[length(decisions)]
 ) {
   
   # verify pkgs_df & else_cat is not NULL
@@ -739,7 +744,12 @@ rip_cats_by_pkg <- function(
   
   # Which metrics are available?
   all_mets <- dec_df$metric |> unique()
-  dec_id_df <- unique(dec_df[,c("decision", "decision_id")])
+  decisions_fct <- factor(decisions, levels = decisions)
+  dec_id_df <- data.frame(
+    decision = decisions,
+    decision_id = decisions_fct |> as.integer()
+  )
+  # dec_id_df <- unique(dec_df[,c("decision", "decision_id")])
   
   #
   # --- Subset Metrics ----
@@ -807,7 +817,9 @@ rip_cats_by_pkg <- function(
           is.finite(max_catid) ~ max_catid,
           .default = as.integer(NA) # if this happens, need to investigate!
         ),
-        final_risk_cat = decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid)
+        final_risk_cat = factor(
+          decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid),
+          levels = decisions)
       ) |>
       dplyr::select(-c(ends_with("_catid"), "final_risk_cataa"))
     
@@ -839,6 +851,8 @@ rip_cats_by_pkg <- function(
 #'   build_decisions_df()
 #' @param pkgs_df A data.frame of package metrics, typically created by
 #'   available.packages()
+#' @param decisions A character vector of decision categories, typically
+#'   obtained from pull_config()
 #' @param else_cat A character string indicating the default category to assign
 #'   when none of the conditions are met.
 #'
@@ -850,12 +864,13 @@ rip_cats_by_pkg <- function(
 #' @examples
 #' # rip_cats(
 #' #   build_decisions_df() |> dplyr::mutate(derived_col = metric),
-#' #   available.packages() |> 
-#' #     as.data.frame() |> 
+#' #   available.packages() |>
+#' #     as.data.frame() |>
 #' #     dplyr::select(
-#' #       pkg, 
+#' #       pkg,
 #' #       downloads_1yr = dplyr::starts_with("downloads_1yr")
 #' #     ),
+#' #   c("Low", "Medium", "High"),
 #' #   "High"
 #' # )
 #'
@@ -863,98 +878,117 @@ rip_cats_by_pkg <- function(
 rip_cats <- function(
     met_dec_df,
     pkgs_df,
-    else_cat
+    decisions = pull_config(val = "decisions_lst", rule_type = "default"),
+    else_cat = decisions[length(decisions)]
 ) {
   
   met_der <- met_dec_df |>
-    dplyr::distinct(metric, derived_col)
+    dplyr::distinct(metric, derived_col) |>
+    dplyr::filter(derived_col %in% names(pkgs_df))
   
-  purrr::pwalk(list(
-    met_der$metric,
-    met_der$derived_col 
-  ), \(met, der) {
-    
-    # for debugging
-    # met <- met_der$metric[1]
-    # der <- met_der$derived_col[1]
-    
-    
-    
-    cat(glue::glue("\n\n--> Decisions based off '{met}' metric:\n\n"))
-    cond_exprs <- get_case_whens(met_dec_df, der, else_cat)
-    cond_exprs_ids <- get_case_whens(met_dec_df, der, else_cat, ids = TRUE)
-    mn <- met_dec_df |> dplyr::filter(!is.na(auto_accept)) |> distinct(derived_col) |> pull(derived_col)
-    cond_exprs_aa <- get_case_whens(met_dec_df, mn, else_cat, auto_accept = TRUE)
-    
-    # else_cat <- "High" # for debugging
-    # pkgs_df$dwnlds_cat <- NULL
-    pkgs_df <<- pkgs_df |>
-      dplyr::rowwise() |>
-      dplyr::mutate(!!! cond_exprs) |>
-      dplyr::mutate(!!! cond_exprs_ids) %>%
-      {if(length(cond_exprs_aa) > 0) dplyr::mutate(., !!! cond_exprs_aa) else .} |>
-      dplyr::ungroup()
-    
-    
-    # Report of changes for  alone
-    # metric_lab <- "" # Could add a label
-    Var1 <- pkgs_df[[glue::glue("{der}_cat")]]
-    print(
-      Var1 |>
-        factor(levels = levels(met_dec_df$decision)) |>
-        table() |>
-        as.data.frame() |>
-        dplyr::left_join(
-          {round(prop.table(table(Var1)), 3) * 100} |>
-            as.data.frame(),
-          by = "Var1"
-        ) |>
-        dplyr::select(Risk = Var1, Cnt = Freq.x, Pct = Freq.y)
-    )
-  })
-  # pkgs$dwnlds_cat <- NULL
-  
-  dec_id_df <- unique(met_dec_df[c("decision", "decision_id")])
-  
-  return_pkgs <- pkgs_df |>
-    dplyr::mutate(
-      # convert cat vars into factors
-      across(ends_with("_cat"), ~ factor(.x, levels = levels(met_dec_df$decision))),
+  if(nrow(met_der) > 0) {
+    purrr::pwalk(list(
+      met_der$metric,
+      met_der$derived_col 
+    ), \(met, der) {
       
-      # if any column ending in "_cataa" is TRUE, then set final_risk_catid to 1 (Low)
-      final_risk_cataa = ifelse(rowSums(across(ends_with("_cataa"), ~ .x), na.rm = TRUE) > 0, 1, NA_integer_),
+      # for debugging
+      # met <- met_der$metric[1]
+      # der <- met_der$derived_col[1]
       
-      # higher risk trumps lower risk amongst all _cat vars (e.g., High > Medium > Low)
-      max_catid = pmax(!!!rlang::syms(paste0(met_der$derived_col, "_catid")), na.rm = TRUE) |> as.integer(),
-      final_risk_catid = dplyr::case_when(
-        !is.na(final_risk_cataa) ~ final_risk_cataa,
-        is.finite(max_catid) ~ max_catid,
-        .default = as.integer(NA) # if this happens, need to investigate!
-      ),
-      final_risk_cat = decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid) 
-    ) |>
-    dplyr::select(-c(ends_with("_catid"), "final_risk_cataa"))
-  
-  # which(is.na(return_pkgs$final_risk_catid))
-  rm(pkgs_df) # verify we don't accidentally use it later
-  
-  # Report of changes for primary risk alone
-  if(nrow(met_der) > 1) {
-    cat(glue::glue("\n\n--> Decisions based off {nrow(met_der)} '{label}' risk metric(s):\n\n"))
-    Var1 <- return_pkgs[["final_risk_cat"]]
-    print(
-      Var1 |>
-        factor(levels = levels(met_dec_df$decision)) |>
-        table() |>
-        as.data.frame() |>
-        dplyr::left_join(
-          {round(prop.table(table(Var1)), 3) * 100} |>
-            as.data.frame(),
-          by = "Var1"
-        ) |>
-        dplyr::select(Risk = Var1, Cnt = Freq.x, Pct = Freq.y)
+      
+      
+      cat(glue::glue("\n\n--> Decisions based off '{met}' metric:\n\n"))
+      cond_exprs <- get_case_whens(met_dec_df, der, else_cat)
+      cond_exprs_ids <- get_case_whens(met_dec_df, der, else_cat, ids = TRUE)
+      mn <- met_dec_df |> dplyr::filter(!is.na(auto_accept)) |> distinct(derived_col) |> pull(derived_col)
+      cond_exprs_aa <- get_case_whens(met_dec_df, mn, else_cat, auto_accept = TRUE)
+      
+      # else_cat <- "High" # for debugging
+      # pkgs_df$dwnlds_cat <- NULL
+      pkgs_df <<- pkgs_df |>
+        dplyr::rowwise() |>
+        dplyr::mutate(!!! cond_exprs) |>
+        dplyr::mutate(!!! cond_exprs_ids) %>%
+        {if(length(cond_exprs_aa) > 0) dplyr::mutate(., !!! cond_exprs_aa) else .} |>
+        dplyr::ungroup()
+      
+      
+      # Report of changes for  alone
+      # metric_lab <- "" # Could add a label
+      Var1 <- pkgs_df[[glue::glue("{der}_cat")]]
+      print(
+        Var1 |>
+          factor(levels = decisions) |>
+          table() |>
+          as.data.frame() |>
+          dplyr::left_join(
+            {round(prop.table(table(Var1)), 3) * 100} |>
+              as.data.frame(),
+            by = "Var1"
+          ) |>
+          dplyr::select(Risk = Var1, Cnt = Freq.x, Pct = Freq.y)
+      )
+    })
+    # pkgs$dwnlds_cat <- NULL
+    
+    # dec_id_df <- unique(met_dec_df[c("decision", "decision_id")])
+    decisions_fct <- factor(decisions, levels = decisions)
+    dec_id_df <- data.frame(
+      decision = decisions,
+      decision_id = decisions_fct |> as.integer()
     )
+    
+    
+    return_pkgs <- pkgs_df |>
+      dplyr::mutate(
+        # convert cat vars into factors
+        across(ends_with("_cat"), ~ factor(.x, levels = decisions)),
+        
+        # if any column ending in "_cataa" is TRUE, then set final_risk_catid to 1 (Low)
+        final_risk_cataa = ifelse(rowSums(across(ends_with("_cataa"), ~ .x), na.rm = TRUE) > 0, 1, NA_integer_),
+        
+        # higher risk trumps lower risk amongst all _cat vars (e.g., High > Medium > Low)
+        max_catid = pmax(!!!rlang::syms(paste0(met_der$derived_col, "_catid")), na.rm = TRUE) |> as.integer(),
+        final_risk_catid = dplyr::case_when(
+          !is.na(final_risk_cataa) ~ final_risk_cataa,
+          is.finite(max_catid) ~ max_catid,
+          .default = as.integer(NA) # if this happens, need to investigate!
+        ),
+        final_risk_cat = factor(
+          decision_to_id_v(dec_id_df, rev = TRUE, final_risk_catid),
+          levels = decisions
+        )
+      ) %>%
+      dplyr::select(-c(ends_with("_catid"), "final_risk_cataa"))
+    # {if(cleanup) dplyr::select(., -c(ends_with("_catid"), "final_risk_cataa")) else .}
+    
+    # which(is.na(return_pkgs$final_risk_catid))
+    rm(pkgs_df) # verify we don't accidentally use it later
+    
+    # Report of changes for primary risk alone
+    if(nrow(met_der) > 1) {
+      cat(glue::glue("\n\n--> Decisions based off {nrow(met_der)} risk metric(s):\n\n"))
+      Var1 <- return_pkgs[["final_risk_cat"]]
+      print(
+        Var1 |>
+          factor(levels = decisions) |>
+          table() |>
+          as.data.frame() |>
+          dplyr::left_join(
+            {round(prop.table(table(Var1)), 3) * 100} |>
+              as.data.frame(),
+            by = "Var1"
+          ) |>
+          dplyr::select(Risk = Var1, Cnt = Freq.x, Pct = Freq.y)
+      )
+    }
+  } else {
+    cat(glue::glue("\n\n--> No metrics found in 'met_dec_df' that are present in 'pkgs_df'.\n"))
+    return_pkgs <- pkgs_df |>
+      dplyr::mutate(final_risk_cat = factor(NA, levels = decisions))
   }
+  
   return(return_pkgs)
 }
 
@@ -987,7 +1021,7 @@ rip_cats <- function(
 split_join_cats <- function(
     pkgs_data = NULL,
     dec_df = build_decisions_df(rule_type = "remote_reduce"),
-    decisions = dec_df$decision |> unique(),
+    decisions = pull_config(val = "decisions_lst", rule_type = "default"),
     else_cat = decisions[length(decisions)],
     label = "Primary"
   ) {
@@ -1000,40 +1034,45 @@ split_join_cats <- function(
   # Create metric-based risk categories decision columns, splitting the logic
   # Special logic for 'downloads_1yr' b/c it may not be applicable for
   # non-CRAN pkgs
-  dwnld_metrics <- dec_df |> dplyr::filter(tolower(metric) == "downloads_1yr")
+  # dwnld_metrics <- dec_df |> dplyr::filter(tolower(metric) == "downloads_1yr")
   sans_dwnld_metrics <- dec_df |> dplyr::filter(!(tolower(metric) %in% "downloads_1yr"))
   cran_pkgs <- pkgs_data |> dplyr::filter(toupper(repo_name) == "CRAN")
   non_cran_pkgs <- pkgs_data |> dplyr::filter(!(toupper(repo_name) %in% "CRAN"))
   
-  if((nrow(dwnld_metrics) > 0 & nrow(cran_pkgs) > 0) | 
+  if((nrow(dec_df) > 0 & nrow(cran_pkgs) > 0) | 
      (nrow(sans_dwnld_metrics) > 0 & nrow(non_cran_pkgs) > 0)
   ) {
     met_len <- dec_df$metric |> unique() |> length()
     cat(glue::glue("\n\n--> Applying Decisions Categories for {met_len} '{label}' risk metric(s).\n\n"))
     cat("\n---->", paste(dec_df$metric |> unique(), collapse = '\n----> '), "\n\n")
     
-    if(nrow(dwnld_metrics) > 0 & nrow(cran_pkgs) > 0) {
-      pkgs_dwnlds <- rip_cats(
-        met_dec_df = dwnld_metrics,
+    # All metrics for CRAN pkgs only
+    if(nrow(dec_df) > 0 & nrow(cran_pkgs) > 0) {
+      cran_pkgs_all_metrics <- rip_cats(
+        met_dec_df = dec_df, # dwnld_metrics,
         pkgs_df = cran_pkgs,
+        decisions = decisions,
         else_cat = else_cat
       )
     } else {
-      pkgs_dwnlds <- cran_pkgs
+      cran_pkgs_all_metrics <- cran_pkgs
     }
-    
-    # Now Sans dwnlds
+
+    # All other metrics (Sans dwnlds) for Non CRAN Pkgs
     if(nrow(sans_dwnld_metrics) > 0 & nrow(non_cran_pkgs) > 0) {
-      pkgs_sans_dwnlds <- rip_cats(
+      non_cran_sans_dwnlds <- rip_cats(
         met_dec_df = sans_dwnld_metrics,
         pkgs_df = non_cran_pkgs,
+        decisions = decisions,
         else_cat = else_cat
       )
     } else {
-      pkgs_sans_dwnlds <- non_cran_pkgs
+      non_cran_sans_dwnlds <- non_cran_pkgs
     }
-    # Combine
-    pkgs_return <- dplyr::bind_rows(pkgs_dwnlds, pkgs_sans_dwnlds)
+    
+    # Then, bind cran & non-cran
+    pkgs_return <- dplyr::bind_rows(cran_pkgs_all_metrics, non_cran_sans_dwnlds) 
+    
   } else {
     cat(glue::glue("\n--> No applicable '{label}' metrics found for pkg repo source(s).\n"))
     pkgs_return <- pkgs_data |>

@@ -6,6 +6,7 @@ specified in `val.pipeline::val_pipeline()` (#3).
 * Bug fix ensuring tar files are downloaded for BioConductor packages.
 * "Engage" secondary metric logic for non-CRAN pkgs
 * Customized `riskreports` package report template
+* Added a significant amount of `testthat` tests
 
 # val.pipline 0.0.0
 
