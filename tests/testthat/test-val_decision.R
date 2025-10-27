@@ -10,14 +10,14 @@ test_that("val_decision() requires pkg parameter", {
 
 test_that("val_decision() requires valid source", {
   expect_error(
-    val_decision(pkg = "test", source = "invalid"),
-    "Invalid source specified.*list"
+    val_decision(pkg = "test", source_df = "invalid"),
+    "Invalid source specified.*data.frame"
   )
 })
 
 test_that("val_decision() requires source with assessment and scores", {
   expect_error(
-    val_decision(pkg = "test", source = list(wrong = "data")),
+    val_decision(pkg = "test", source_df = list(wrong = "data")),
     "Invalid source.*assessment.*scores"
   )
 })
@@ -28,7 +28,7 @@ test_that("val_decision() validates decisions_df structure", {
   expect_error(
     val_decision(
       pkg = "test",
-      source = list(assessment = list(), scores = list()),
+      source_df = list(assessment = list(), scores = list()),
       decisions_df = invalid_df
     ),
     "decisions_df.*not compliant"
@@ -36,15 +36,13 @@ test_that("val_decision() validates decisions_df structure", {
 })
 
 test_that("val_decision() processes package with minimal data", {
-  mock_source <- list(
-    assessment = list(
+  mock_source <- 
+    data.frame(
+      package = "testpkg",
+      reverse_dependencies = 5,
       downloads_1yr = 1000,
-      reverse_dependencies = c("pkg1", "pkg2")
-    ),
-    scores = list(
       news_current = 0.8
     )
-  )
   
   mock_avail <- data.frame(
     Package = "testpkg",
@@ -60,7 +58,7 @@ test_that("val_decision() processes package with minimal data", {
   expect_output(
     result <- val_decision(
       pkg = "testpkg",
-      source = mock_source,
+      source_df = mock_source,
       avail_pkgs = mock_avail
     )
   ,"Final Risk Summary"
@@ -75,19 +73,17 @@ test_that("val_decision() processes package with minimal data", {
 
   
   # Try a really high download count, to see if final_risk and "_cataa" vars change
-  mock_source <- list(
-    assessment = list(
+  mock_source <- 
+    data.frame(
+      package = "testpkg",
+      reverse_dependencies = 5,
       downloads_1yr = 8000000,
-      reverse_dependencies = c("pkg1", "pkg2")
-    ),
-    scores = list(
       news_current = 0.8
     )
-  )
   expect_output(
     result <- val_decision(
         pkg = "testpkg",
-        source = mock_source,
+        source_df = mock_source,
         avail_pkgs = mock_avail
       )
     ,"Final Risk Summary"
@@ -99,13 +95,11 @@ test_that("val_decision() processes package with minimal data", {
 })
 
 test_that("val_decision() handles NA values in assessment", {
-  mock_source <- list(
-    assessment = list(
-      downloads_1yr = NA,
-      reverse_dependencies = NULL
-    ),
-    scores = list()
-  )
+  mock_source <- 
+    data.frame(
+      package = "testpkg",
+      downloads_1yr = NA
+    )
   
   mock_avail <- data.frame(
     Package = "testpkg",
@@ -121,7 +115,7 @@ test_that("val_decision() handles NA values in assessment", {
   expect_output(
     result <- val_decision(
       pkg = "testpkg",
-      source = mock_source,
+      source_df = mock_source,
       avail_pkgs = mock_avail
     )
   ,
@@ -134,13 +128,12 @@ test_that("val_decision() handles NA values in assessment", {
 
 
 test_that("val_decision() excludes specified metrics", {
-  mock_source <- list(
-    assessment = list(
+  mock_source <- 
+    data.frame(
+      package = "testpkg",
       downloads_1yr = 1000,
-      reverse_dependencies = c("pkg1")
-    ),
-    scores = list()
-  )
+      reverse_dependencies = 1
+    )
   
   mock_avail <- data.frame(
     Package = "testpkg",
@@ -156,7 +149,7 @@ test_that("val_decision() excludes specified metrics", {
   expect_output(
       result <- val_decision(
         pkg = "testpkg",
-        source = mock_source,
+        source_df = mock_source,
         avail_pkgs = mock_avail,
         excl_metrics = "downloads_1yr"
       )
