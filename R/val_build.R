@@ -7,14 +7,14 @@
 #' structured directory. The cherry on top is that this build will use logic
 #' from val_decision() to not only apply risk decisions too all packages
 #' assessed, but goes back around and will re-categorize decisions based on
-#' whether any dependencies were categorized as "High Risk" / "Rejected". It 
-#' also is intelligent enough to sort the list of packages to run those with the 
-#' most dependencies first, so that if a package fails, it doesn't waste any 
-#' time running it's reverse dependence. 
-#' After the pipeline applies a decision onto each package using criteria 
-#' provided in a config file, it even generates a report detailing specifics of 
-#' the assessment as supporting evidence. The end result is a directory 
-#' containing the assessment results and reports for each package evaluated.
+#' whether any dependencies were categorized as "High Risk" / "Rejected". It
+#' also is intelligent enough to sort the list of packages to run those with the
+#' most dependencies first, so that if a package fails, it doesn't waste any
+#' time running it's reverse dependence. After the pipeline applies a decision
+#' onto each package using criteria provided in a config file, it even generates
+#' a report detailing specifics of the assessment as supporting evidence. The
+#' end result is a directory containing the assessment results and reports for
+#' each package evaluated.
 #'
 #' @param pkg_names Character vector of package names to assess. If NULL
 #'   (default), all packages available from the specified repository will be
@@ -50,8 +50,10 @@
 #'
 #' @return A list containing:
 #' - val_dir: The directory where the validation build results are stored.
-#' - pkgs_df: A data frame summarizing the risk assessment results for all packages assessed,
-#'   including their dependencies and final risk decisions.
+#' - pkg_meta: A data frame summarizing the risk assessment results for all 
+#'   packages assessed, including their dependencies and final risk decisions.
+#' - pkg_assess: A data frame containing detailed (`riskmetric`) assessment
+#'   records for each package.
 #'
 #' @export
 #' 
@@ -346,19 +348,20 @@ val_build <- function(
       x <- purrr::list_flatten(.x)
       # x$depends  <- if(all(is.na(x$depends)))  NA_character_ else paste(x$depends, collapse = ", ")
       # x$suggests <- if(all(is.na(x$suggests))) NA_character_ else paste(x$suggests, collapse = ", ")
-      # x$repos <- list(x$repos)
+      
       x$depends <- list(x$depends)
       x$suggests <- list(x$suggests)
       x$rev_deps <- list(x$rev_deps)
+      x$sys_info <- list(x$sys_info)
+      # x$repos <- list(x$repos)
       dplyr::as_tibble(x)
     }) |> 
     purrr::reduce(dplyr::bind_rows)
   
   
-  saveRDS(pkgs_df0, file.path(val_dir, "qual_evidence0.rds"))
-  cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
+  saveRDS(pkgs_df0, file.path(val_dir, "qual_supplement0.rds"))
+  # cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
   
-  cat("\n--> Collated pkg metadata.\n")
   
   
   #
@@ -366,77 +369,21 @@ val_build <- function(
   #
   
   # # Start bundling rds files
-  # assess_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
-  #   
-  #   # i <- 1 # for debugging
-  #   # # i <- which(pkgs == "class")
-  #   # pkg <- pkgs[i] # for debugging
-  #   # ver <- vers[i] # for debugging
-  #   pkg_v <- paste(pkg, ver, sep = "_")
-  #   pkg_assess_file <- file.path(assessed, glue::glue("{pkg_v}_assessments.rds"))
-  #   pkg_scores_file <- file.path(assessed, glue::glue("{pkg_v}_scores.rds"))
-  #     
-  #   if(file.exists(pkg_scores_file)) {
-  #     pkg_assessments <- readRDS(pkg_assess_file)
-  #     pkg_scores <- readRDS(pkg_scores_file)
-  #     cat("\n-->", pkg_v,"Using assessment previously stored.\n")
-  #     
-  #     # create a dataset that joins together the assessments and scores
-  #     names(pkg_scores)
-  #     pkg_assess_bundle <-
-  #       data.frame(
-  #         pkg = pkg,
-  #         ver = ver,
-  #         val_date = val_date,
-  #         downloads_1yr = pkg_assessments$downloads_1yr,
-  #         totalcoverage = pkg_assessments$covr_coverage$totalcoverage,
-  #         r_cmd_check_errors = pkg_assessments$r_cmd_check,
-  # 
-  #         # has_news = pkg_assessments$has_news,
-  #         # news_current = pkg_assessments$news_current,
-  #         # remote_checks = pkg_assessments$remote_checks,
-  #         # exported_namespace = pkg_assessments$exported_namespace,
-  #         # has_vignettes = pkg_assessments$has_vignettes,
-  #         # export_help = pkg_assessments$export_help,
-  #         # has_website = pkg_assessments$has_website,
-  #         # has_maintainer = pkg_assessments$has_maintainer,
-  #         # bugs_status = pkg_assessments$bugs_status,
-  #         # size_codebase = pkg_assessments$size_codebase,
-  #         # has_source_control = pkg_assessments$has_source_control,
-  #         # has_bug_reports_url = pkg_assessments$has_bug_reports_url,
-  #         # reverse_dependencies = pkg_assessments$reverse_dependencies,
-  #         # has_examples = pkg_assessments$has_examples,
-  #         # dependencies = pkg_assessments$dependencies,
-  #         # license = pkg_assessments$license,
-  #       )
-  #     
-  #   } 
-  # }) |>
-  #   purrr::reduce(dplyr::bind_rows)
+  assessment_bundle <- purrr::map2(pkgs, vers, function(pkg, ver){
+    # i <- 1 # for debugging
+    # pkg <- pkgs[i] # for debugging
+    # ver <- vers[i] # for debugging
+    pkg_v <- paste(pkg, ver, sep = "_")
+    pkg_assess_record_file <- file.path(assessed, glue::glue("{pkg_v}_assess_record.rds"))
+    if(file.exists(pkg_assess_record_file)) {
+      assess_record <- readRDS(pkg_assess_record_file)
+    }
+  }) |>
+    purrr::reduce(dplyr::bind_rows)
+  saveRDS(assessment_bundle, file.path(val_dir, "qual_assessments.rds"))
   
   
-  # # Now do the same for the pkg assessment files
-  # pkgs_df0 <- purrr::map( pkg_bundles, ~ {
-  #   # .x <- pkg_bundles$askpass
-  #   x <- purrr::list_flatten(.x)
-  #   # x$depends  <- if(all(is.na(x$depends)))  NA_character_ else paste(x$depends, collapse = ", ")
-  #   # x$suggests <- if(all(is.na(x$suggests))) NA_character_ else paste(x$suggests, collapse = ", ")
-  #   # x$repos <- list(x$repos)
-  #   x$depends <- list(x$depends)
-  #   x$suggests <- list(x$suggests)
-  #   x$rev_deps <- list(x$rev_deps)
-  #   dplyr::as_tibble(x)
-  # }) |> 
-  #   purrr::reduce(dplyr::bind_rows)
-  # 
-  # 
-  # cat("\n--> Collated pkg metadata.\n")
-  # 
-  # 
-  # saveRDS(pkgs_df0, file.path(val_dir, "qual_evidence0.rds"))
-  # cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
-  
-  
+  cat("\n--> Collated pkg metadata.\n")
   
   #
   # ---- Update final decisions ----
@@ -538,13 +485,14 @@ val_build <- function(
   val_end_txt <- utils::capture.output(val_end - val_start)
   cat("\n--> Build", val_end_txt,"\n")
   
-  saveRDS(pkgs_df, file.path(val_dir, "qual_evidence.rds"))
+  saveRDS(pkgs_df, file.path(val_dir, "qual_supplement.rds"))
   cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
   
   # Return object 
   return(list(
     val_dir = val_dir,
-    pkgs_df = pkgs_df
+    pkg_meta = pkgs_df,
+    pkg_assess = assessment_bundle
   ))
 }
 
