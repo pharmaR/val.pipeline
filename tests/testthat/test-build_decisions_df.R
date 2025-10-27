@@ -42,3 +42,38 @@ test_that("build_decisions_df() handles invalid rule types", {
   )
 })
 
+# Create a test that leverages custom configuration using the rule_lst arg
+test_that("build_decisions_df() works with custom rule_lst", {
+  
+  custom_rule_lst <- list(
+    metric1 = list(
+      cond = list(
+        High = "~ is.na(.x)",
+        Medium = "~ .x < 5",
+        Low = "~ .x >= 5"
+      ),
+      type = "primary",
+      accept_cats = c("Low", "Medium"),
+      auto_accept = "~ .x > 20"
+    ),
+    metric2 = list(
+      cond = list(
+        High = "~ is.na(.x)",
+        Medium = "~ .x < 15",
+        Low = "~ .x >= 15"
+      ),
+      type = "secondary",
+      accept_cats = c("Low")
+    )
+  )
+  
+  expect_output(
+    result <- build_decisions_df(rule_type = "remote_reduce", rule_lst = custom_rule_lst)
+  ,"Building decision data.frame"
+  )
+  
+  expect_s3_class(result, "data.frame")
+  expect_equal(nrow(result), 6)
+  expect_true(all(result$metric %in% names(custom_rule_lst)))
+})
+  

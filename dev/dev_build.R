@@ -30,9 +30,10 @@ pkgs <- stringr::word(meta_files, sep = "_", start = 1)
 # See the full dependency tree before running val_build()
 # these_pkgs <- "withr"  # messes with the entire process
 # these_pkgs <- "matrix" # takes 5 mins to install
-these_pkgs <- "askpass"
+# these_pkgs <- "askpass"
 # these_pkgs <- c("Biobase", "BiocGenerics")
 # these_pkgs <- pkgs
+these_pkgs <- c("Biobase", "BiocGenerics", "xlsx", "askpass", "dplyr", "signal")
 # these_pkgs <- build_pkgs
 
 tree <- tools::package_dependencies(
@@ -63,8 +64,8 @@ qual <- val_build(
   metric_pkg = "riskmetric", 
   # deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
   deps = NULL,
-  deps_recursive = TRUE,
-  # deps_recursive = FALSE,
+  # deps_recursive = TRUE,
+  deps_recursive = FALSE,
   val_date = Sys.Date(),
   # val_date = as.Date("2025-10-07"),
   replace = FALSE, 
