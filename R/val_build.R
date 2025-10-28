@@ -236,6 +236,10 @@ val_build <- function(
     # pkg <- pkgs[i] # for debugging
     # ver <- vers[i] # for debugging
     
+    # output a message letting users know where we are
+    pkg_cnt <- which(pkgs == pkg)
+    cat(paste0("\n\n#", pkg_cnt, " of ", pkgs_length, ":"))
+    
     pkg_v <- paste(pkg, ver, sep = "_")
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
     

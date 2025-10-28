@@ -52,7 +52,7 @@ val_pkg <- function(
   pkg_v <- paste(pkg, ver, sep = "_")
   start <- Sys.time()
   start_txt <- format(start, '%H:%M:%S', tz = 'US/Eastern', usetz = TRUE)
-  cat(paste0("\n\n\nNew Package: ", pkg, " v", ver," @ ", start_txt,"\n"))
+  cat(paste0("\nNew Package: ", pkg, " v", ver," @ ", start_txt,"\n"))
   
   #
   # ---- Setup ----
@@ -369,7 +369,7 @@ val_pkg <- function(
   saveRDS(assessment_record, assess_record_file)
   saveRDS(pkg_assessment, assessment_file)
   saveRDS(pkg_scores, scores_file)
-  cat("\n-->", pkg_v,"assessments & scores saved.\n")
+  # cat("\n-->", pkg_v,"assessments & scores saved.\n")
   
   
   

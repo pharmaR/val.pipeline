@@ -385,7 +385,7 @@ build_decisions_df <- function(
   rule_type <- match.arg(rule_type)
   
   if (is.null(rule_lst)) {
-    cat(glue::glue("\n\n--> Building decision data.frame using rules from '{rule_type}' decision type.\n"))
+    # cat(glue::glue("\n\n--> Building decision data.frame using rules from '{rule_type}' decision type.\n"))
     
     figgy <- pull_config(rule_type = rule_type)
     decision_lst <- figgy$default_lst$decisions_lst
@@ -405,8 +405,8 @@ build_decisions_df <- function(
     keep_rules <- names(rule_lst) %in% viable_metrics
     if(any(!keep_rules)) {
       dropped_rules <- names(rule_lst)[which(!keep_rules)]
-      cat(glue::glue("\n\n--> Dropping rules for non-viable metrics for chosen pkg_source:\n"))
-      cat("\n---->", paste(dropped_rules, collapse = '\n----> '), "\n")
+      # cat(glue::glue("\n\n--> Dropping rules for non-viable metrics for chosen pkg_source:\n"))
+      # cat("\n---->", paste(dropped_rules, collapse = '\n----> '), "\n")
     }
     # drop 'em
     rule_lst <- rule_lst[keep_rules]
@@ -425,10 +425,6 @@ build_decisions_df <- function(
     purrr::set_names(rule_metric_nm)
     
   
-  # Inform the user of which rules can & will be evaluated
-  # message("\n--> Building decision data.frame using the 'rule sets' for the following metrics:\n")
-  # cat("\n---->", paste(rule_metric_nm, collapse = '\n----> '), "\n")
-
   # Extract possible values of "metric_type"
   types <- purrr::map_chr(rule_metric_nm, ~ rule_lst[[.x]][["type"]]) |> unique()
   
@@ -1034,8 +1030,8 @@ rip_cats_by_pkg <- function(
   # Share a note about primary metrics being used
   met_len <- subset_metrics$metric |> unique() |> length()
   if(met_len > 0) {
-    cat(glue::glue("\n\n--> Applying Decisions Categories for {met_len} '{label}' risk metric(s).\n\n"))
-    cat("\n---->", paste(subset_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
+    # cat(glue::glue("\n\n--> Applying Decisions Categories for {met_len} '{label}' risk metric(s).\n\n"))
+    # cat("\n---->", paste(subset_metrics$metric |> unique(), collapse = '\n----> '), "\n\n")
     
     # else_cat <- "High" # for debugging
     
@@ -1306,8 +1302,8 @@ split_join_cats <- function(
      (nrow(sans_dwnld_metrics) > 0 & nrow(non_cran_pkgs) > 0)
   ) {
     met_len <- dec_df$metric |> unique() |> length()
-    cat(glue::glue("\n\n--> Applying Decisions Categories for {met_len} '{label}' risk metric(s).\n\n"))
-    cat("\n---->", paste(dec_df$metric |> unique(), collapse = '\n----> '), "\n\n")
+    # cat(glue::glue("\n\n--> Applying Decisions Categories for {met_len} '{label}' risk metric(s).\n\n"))
+    # cat("\n---->", paste(dec_df$metric |> unique(), collapse = '\n----> '), "\n\n")
     
     # All metrics for CRAN pkgs only
     if(nrow(dec_df) > 0 & nrow(cran_pkgs) > 0) {

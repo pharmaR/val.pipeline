@@ -172,7 +172,7 @@ val_decision <- function(
     
   } else {
      # else CRAN or not CRAN but decision == "low", then no need to continue
-    cat(glue::glue("\n\n\n--> Package '{pkg}' does NOT need secondary metric assessments.\n\n")) 
+    cat(glue::glue("\n\n--> Package '{pkg}' does NOT need secondary metric assessments.\n")) 
     pkgs_final <- primed_pkgs |>
       dplyr::select(
         package, final_risk = final_risk_cat,
@@ -183,14 +183,15 @@ val_decision <- function(
   #
   # ---- Return data for filtering (presumably)
   # 
-  cat("\n\n--> Final Risk Summary for package '", pkg, "':\n", sep = "")
-  print(
-    pkgs_final$final_risk |>
-      # factor(levels = c("Low", "Medium", "High")) |> # not needed
-      table() |>
-      as.data.frame() |>
-      dplyr::rename("Final Risk" = Var1, Cnt = Freq)
-  )
+  cat("\n\n--> Risk Decision for package '", pkg, "': ",
+      as.character(pkgs_final$final_risk), "\n", sep = "")
+  # print(
+  #   pkgs_final$final_risk |>
+  #     # factor(levels = c("Low", "Medium", "High")) |> # not needed
+  #     table() |>
+  #     as.data.frame() |>
+  #     dplyr::rename("Final Risk" = Var1, Cnt = Freq)
+  # )
   
   return(pkgs_final)
 }
