@@ -16,61 +16,64 @@ qual <- val_pipeline(
 
 # 
 # Quick run
+# # 
 # 
-
 # ref = "source"
 # metric_pkg = "riskmetric"
 # deps = "depends" # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
 # deps_recursive = TRUE
-# val_date = Sys.Date()
-# # val_date = as.Date("2025-10-07")
+# # val_date = Sys.Date()
+# val_date = as.Date("2025-10-27")
 # replace = FALSE
 # out = Sys.getenv("RISK_OUTPATH", unset = getwd())
-
+# 
+# opt_repos = 
+#   c(CRAN = "https://packagemanager.posit.co/cran/latest",
+#     BioC = 'https://bioconductor.org/packages/3.21/bioc')
 
 
 #
 # Inspect the assessment dir
 #
 
-val_date_txt <- gsub("-", "", val_date)
-val_dir <- file.path(
-  Sys.getenv("RISK_OUTPATH", unset = getwd()),
-  glue::glue('R_{getRversion()}'),
-  val_date_txt
-  )
-
-
-# review qual df
-
-decisions <- pull_config(val = "decisions_lst", rule_type = "default")
-qual <- readRDS(file.path(val_dir, "qual_evidence.rds")) |>
-  dplyr::mutate(decision = factor(decision, levels = decisions),
-                final_decision = factor(final_decision, levels = decisions)
-                )
-
-# unknown repos
-unknown_repos <- qual |>
-  dplyr::filter(repos == "unknown")
-unknown_repos |> dplyr::select(pkg, repos)
-unknown_repos |> pull(pkg) |> length()
-
-# Decisions & final decisions
-dec <- table(qual$decision_reason, qual$decision)
-dec
-findec <- table(qual$final_decision_reason, qual$final_decision)
-findec
-diff <- findec - dec
-diff
-
-slow <- qual |>
-  dplyr::filter(assessment_runtime_mins > 45)
-slow |> dplyr::select(pkg, assessment_runtime_txt)
-
-assessed <- file.path(val_dir, "assessed")
-ass_files <- list.files(assessed, pattern = "_assessments.rds$")
-ass_files |> length() # assessment file count
-round((ass_files |> length()) / nrow(qual) * 100, 2) # percent of total
+# val_date_txt <- gsub("-", "", val_date)
+# val_dir <- file.path(
+#   Sys.getenv("RISK_OUTPATH", unset = getwd()),
+#   glue::glue('R_{getRversion()}'),
+#   val_date_txt
+#   )
+# 
+# 
+# # review qual df
+# 
+# decisions <- pull_config(val = "decisions_lst", rule_type = "default")
+# qual <- readRDS(file.path(val_dir, "qual_evidence.rds")) |>
+#   dplyr::mutate(decision = factor(decision, levels = decisions),
+#                 final_decision = factor(final_decision, levels = decisions)
+#                 )
+# 
+# # unknown repos
+# unknown_repos <- qual |>
+#   dplyr::filter(repos == "unknown")
+# unknown_repos |> dplyr::select(pkg, repos)
+# unknown_repos |> pull(pkg) |> length()
+# 
+# # Decisions & final decisions
+# dec <- table(qual$decision_reason, qual$decision)
+# dec
+# findec <- table(qual$final_decision_reason, qual$final_decision)
+# findec
+# diff <- findec - dec
+# diff
+# 
+# slow <- qual |>
+#   dplyr::filter(assessment_runtime_mins > 45)
+# slow |> dplyr::select(pkg, assessment_runtime_txt)
+# 
+# assessed <- file.path(val_dir, "assessed")
+# ass_files <- list.files(assessed, pattern = "_assessments.rds$")
+# ass_files |> length() # assessment file count
+# round((ass_files |> length()) / nrow(qual) * 100, 2) # percent of total
 
 
 # # choose a pkg

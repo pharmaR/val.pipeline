@@ -3,8 +3,8 @@
 devtools::load_all()
 
 
-val_date <- Sys.Date()
-# val_date <- "2025-10-23"
+# val_date <- Sys.Date()
+val_date <- "2025-10-27"
 val_date_txt <- gsub("-", "", val_date)
 val_dir <- file.path(
   Sys.getenv("RISK_OUTPATH", unset = getwd()),
@@ -26,14 +26,14 @@ pkgs <- stringr::word(meta_files, sep = "_", start = 1)
 
 
 # Create qualified pkg data.frame
-# source("dev/pkg_lists.R") # build_pkgs & pkgs for CRAN only
+source("dev/pkg_lists.R") # build_pkgs & pkgs for CRAN only
 # See the full dependency tree before running val_build()
 # these_pkgs <- "withr"  # messes with the entire process
 # these_pkgs <- "matrix" # takes 5 mins to install
 # these_pkgs <- "askpass"
 # these_pkgs <- c("Biobase", "BiocGenerics")
 # these_pkgs <- pkgs
-these_pkgs <- c("Biobase", "BiocGenerics", "xlsx", "askpass", "dplyr", "signal")
+# these_pkgs <- c("Biobase", "BiocGenerics", "xlsx", "askpass", "dplyr", "signal")
 # these_pkgs <- build_pkgs
 
 tree <- tools::package_dependencies(
