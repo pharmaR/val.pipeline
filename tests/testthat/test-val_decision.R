@@ -61,7 +61,7 @@ test_that("val_decision() processes package with minimal data", {
       source_df = mock_source,
       avail_pkgs = mock_avail
     )
-  ,"Final Risk Summary"
+    ,"Risk Decision"
   )
   
   expect_s3_class(result, "data.frame")
@@ -86,7 +86,7 @@ test_that("val_decision() processes package with minimal data", {
         source_df = mock_source,
         avail_pkgs = mock_avail
       )
-    ,"Final Risk Summary"
+    ,"Risk Decision"
   )
     
   expect_true(result$downloads_1yr_cataa == TRUE) 
@@ -119,7 +119,7 @@ test_that("val_decision() handles NA values in assessment", {
       avail_pkgs = mock_avail
     )
   ,
-    "Final Risk Summary"
+    "Risk Decision"
   )
   
   expect_s3_class(result, "data.frame")
@@ -153,7 +153,7 @@ test_that("val_decision() excludes specified metrics", {
         avail_pkgs = mock_avail,
         excl_metrics = "downloads_1yr"
       )
-    ,"Final Risk Summary"
+    ,"Risk Decision"
   )
   
   expect_true(result$final_risk == "High")
