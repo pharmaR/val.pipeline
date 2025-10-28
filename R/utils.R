@@ -772,7 +772,7 @@ workable_assessments <- function(
     if("license" %in% names(assessment)) {
       work_df$license <- 
         if(rlang::is_empty(assessment$license %e% NULL)) NA_character_ else
-          assessment$license
+          assessment$license |> as.character()
     } 
     
   } else if(metric_pkg == "val.meter") {
