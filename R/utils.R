@@ -545,8 +545,6 @@ build_decisions_df <- function(
 #' 
 #' @export
 #'
-#' @examples
-#' "" %e% 1
 `%e%` <- function(x, y) {
   if("pkg_metric_error" %in% class(x)) {
     y

@@ -12,6 +12,3 @@ x \%e\% y
 \description{
 If x has class 'pkg_metric_error', return y; otherwise return x.
 }
-\examples{
-"" \%e\% 1
-}
