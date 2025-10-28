@@ -26,7 +26,7 @@ test_that("strip_recording removes .recording attribute from list elements", {
     strip_recording()
 
   expect_null(attr(result2$has_news, ".recording"))
-  expect_null(attr(result$downloads_1yr, ".recording"))
+  expect_null(attr(result2$downloads_1yr, ".recording"))
   expect_true("list_of_pkg_metric" %in% class(result2))
   expect_true("list" %in% class(result2))
   expect_false("with_eval_recording" %in% class(result2$has_news))

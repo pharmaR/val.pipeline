@@ -400,7 +400,7 @@ build_decisions_df <- function(
   }
     
   #
-  # Remove metrics from rule_lst that aren't in 'viable_metrics'
+  # Filter rule_lst to only include metrics in viable_metrics, if provided
   if(!is.null(viable_metrics)) {
     keep_rules <- names(rule_lst) %in% viable_metrics
     if(any(!keep_rules)) {
