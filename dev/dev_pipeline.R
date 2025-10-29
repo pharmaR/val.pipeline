@@ -36,7 +36,7 @@ qual <- val_pipeline(
 # Inspect the assessment dir
 #
 
-val_date = as.Date("2025-10-23")
+val_date = as.Date("2025-10-28")
 val_date_txt <- gsub("-", "", val_date)
 val_dir <- file.path(
   Sys.getenv("RISK_OUTPATH", unset = getwd()),
@@ -77,7 +77,7 @@ slow |> dplyr::select(pkg, assessment_runtime_txt)
 assessed <- file.path(val_dir, "assessed")
 ass_files <- list.files(assessed, pattern = "_assessments.rds$")
 ass_length <- ass_files |> length() # assessment file count
-round((ass_files |> length()) / nrow(qual) * 100, 2) # percent of total
+round((ass_files |> length()) / nrow(qual) * 100, 2) # 74.77 percent of total
 
 
 # Start bundling rds files from assessment & score Rds
@@ -106,7 +106,7 @@ assessment_bundle <- purrr::map(ass_files, function(file){
 }) |>
   purrr::reduce(dplyr::bind_rows)
 saveRDS(assessment_bundle, file.path(val_dir, "qual_assessments.rds"))
-saveRDS(assessment_bundle, file.path("dev", "qual_assessments_20251023.rds"))
+saveRDS(assessment_bundle, file.path("dev", "qual_assessments_20251028.rds"))
 # assessment_bundle <- readRDS(file.path("dev", "qual_assessments_20251023.rds"))
 
 # count how many r_cmd_check_errors there are

@@ -758,7 +758,7 @@ workable_assessments <- function(
     if("has_bug_reports_url" %in% names(assessment)) {
       work_df$has_bug_reports_url <-
         if(rlang::is_empty(assessment$has_bug_reports_url %e% NULL)) NA_real_ else
-          assessment$has_bug_reports_url
+          as.integer(assessment$has_bug_reports_url)
     } 
     
     # has_examples

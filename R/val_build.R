@@ -346,15 +346,11 @@ val_build <- function(
   #
   
   # # Start bundling rds files
-  assessment_bundle <- purrr::map2(pkgs, vers, function(pkg, ver){
-    # i <- 1 # for debugging
-    # pkg <- pkgs[i] # for debugging
-    # ver <- vers[i] # for debugging
-    pkg_v <- paste(pkg, ver, sep = "_")
-    pkg_assess_record_file <- file.path(assessed, glue::glue("{pkg_v}_assess_record.rds"))
-    if(file.exists(pkg_assess_record_file)) {
-      assess_record <- readRDS(pkg_assess_record_file)
-    }
+  record_files <- list.files(assessed, pattern = "_assess_record.rds$")
+  record_length <- record_files |> length() # assessment file count
+  assessment_bundle <- purrr::map(record_files, function(file){
+    # file <- record_files[1] # for debugging
+    readRDS(file.path(assessed, file))
   }) |>
     purrr::reduce(dplyr::bind_rows)
   saveRDS(assessment_bundle, file.path(val_dir, "qual_assessments.rds"))
