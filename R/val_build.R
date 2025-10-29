@@ -258,7 +258,7 @@ val_build <- function(
           out_dir = val_dir,
           val_date = val_date)
       } else {
-        cat(paste0("\n\n\nAttempted New Package: ", pkg, " v", ver,", but already assessed.\n\n"))
+        cat(paste0("\nAttempted New Package: ", pkg, " v", ver,", but already assessed.\n\n"))
         pkg_meta <- readRDS(pkg_meta_file)
         
         cat("\n-->", pkg_v,"Using assessment previously stored.\n")
@@ -273,7 +273,7 @@ val_build <- function(
       
     } else {
       # ---- Pkg is in 'dont_run'! ----
-      cat(paste0("\n\n\nAttempted New Package: ", pkg, " v", ver,", but one of it's dependencies already failed so skipping assessment and marking risk as '", decisions[length(decisions)], "'.\n\n"))
+      cat(paste0("\nAttempted New Package: ", pkg, " v", ver,", but one of it's dependencies already failed so skipping assessment and marking risk as '", decisions[length(decisions)], "'.\n\n"))
       
       # grab depends
       depends <- 
