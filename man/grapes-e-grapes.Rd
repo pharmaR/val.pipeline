@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{\%e\%}
 \alias{\%e\%}
-\title{Empty string Coalesce}
+\title{'pkg_metric_error' Coalesce}
 \usage{
 x \%e\% y
 }
@@ -10,8 +10,5 @@ x \%e\% y
 \item{x, y}{Two elements to test, one potentially empty}
 }
 \description{
-If x has zero characters (nzchar(x) is FALSE), return y; otherwise return x.
-}
-\examples{
-"" \%e\% 1
+If x has class 'pkg_metric_error', return y; otherwise return x.
 }

@@ -6,7 +6,14 @@ Authors@R:
     person(
       "Aaron", "Clark",
       email = "clark.aaronchris@gmail.com",
-      role = c("aut", "cre")
+      role = c("aut", "cre"),
+      comment = c(ORCID = "0000-0002-0123-0970")
+    ),
+    person(
+      "Jeff", "Thompson",
+      email = "jthompson@arcusbio.com",
+      role = c("aut"),
+      comment = c(ORCID = "0009-0007-3640-1075")
     ),
     person(
       "R Validation Hub",

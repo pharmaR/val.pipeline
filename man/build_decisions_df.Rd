@@ -5,19 +5,18 @@
 \title{Build Decisions Data.Frame}
 \usage{
 build_decisions_df(
-  rule_type = c("default", "remote_reduce", "decide"),
+  rule_type = c("remote_reduce", "decide"),
   rule_lst = NULL,
   viable_metrics = NULL
 )
 }
 \arguments{
-\item{rule_type}{A character string indicating whether the decision
-categories are used to "categorize" risk levels (e.g., "Low", "Medium",
-"High") via val_categorize() or val_decision(). The difference being that
-"categorize" is going to be used to filter the initial list of packages
-using a remote pkg_ref() assessment, whereas "decision" is used to filter
-the final list of packages after a 'pkg_source' pkg_ref() assessment is
-produced locally on the GxP system of interest.}
+\item{rule_type}{A character string indicating whether to use
+val_categorize() or val_decision(). The difference being that
+"remote_reduce" is going to be used to filter the initial list of packages
+using a "pkg_remote" based pkg_ref() assessment and conversely, the
+"decide" rule_type is used to categorize the risk of a 'pkg_source'
+pkg_ref() assessment on the GxP system of interest.}
 
 \item{rule_lst}{A named list of lists, where each sub-list contains:
 \itemize{

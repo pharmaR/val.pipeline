@@ -1,9 +1,9 @@
 default:
-  remote_only: [withr, VGAM, shinyBS] # withr - crashes, VGAM ran 10 hrs, shinyBS 5 hrs
+  remote_only: [withr, VGAM, shinyBS, fitdistrplus, collapse, gamlss.dist, gss, segmented] # withr - crashes, VGAM 10h, shinyBS 5h, collapse 1.6h, fitdistrplus 1.7h, gamlss.dist 52m, gss 52m, segmented 45m
   approved_pkgs: [] # packages that have been approved manually outside of {val.pipeline} workflow
   decisions_lst: [Low, Medium, High]
   opt_repos: 
-    CRAN: #https://packagemanager.posit.co/cran/latest
+    CRAN: https://packagemanager.posit.co/cran/latest
     BioC: https://bioconductor.org/packages/3.21/bioc #https://packagemanager.posit.co/bioconductor/latest 
     
 remote_reduce:

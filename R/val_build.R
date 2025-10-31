@@ -7,14 +7,14 @@
 #' structured directory. The cherry on top is that this build will use logic
 #' from val_decision() to not only apply risk decisions too all packages
 #' assessed, but goes back around and will re-categorize decisions based on
-#' whether any dependencies were categorized as "High Risk" / "Rejected". It 
-#' also is intelligent enough to sort the list of packages to run those with the 
-#' most dependencies first, so that if a package fails, it doesn't waste any 
-#' time running it's reverse dependence. 
-#' After the pipeline applies a decision onto each package using criteria 
-#' provided in a config file, it even generates a report detailing specifics of 
-#' the assessment as supporting evidence. The end result is a directory 
-#' containing the assessment results and reports for each package evaluated.
+#' whether any dependencies were categorized as "High Risk" / "Rejected". It
+#' also is intelligent enough to sort the list of packages to run those with the
+#' most dependencies first, so that if a package fails, it doesn't waste any
+#' time running it's reverse dependence. After the pipeline applies a decision
+#' onto each package using criteria provided in a config file, it even generates
+#' a report detailing specifics of the assessment as supporting evidence. The
+#' end result is a directory containing the assessment results and reports for
+#' each package evaluated.
 #'
 #' @param pkg_names Character vector of package names to assess. If NULL
 #'   (default), all packages available from the specified repository will be
@@ -50,8 +50,10 @@
 #'
 #' @return A list containing:
 #' - val_dir: The directory where the validation build results are stored.
-#' - pkgs_df: A data frame summarizing the risk assessment results for all packages assessed,
-#'   including their dependencies and final risk decisions.
+#' - pkg_meta: A data frame summarizing the risk assessment results for all 
+#'   packages assessed, including their dependencies and final risk decisions.
+#' - pkg_assess: A data frame containing detailed (`riskmetric`) assessment
+#'   records for each package.
 #'
 #' @export
 #' 
@@ -65,7 +67,7 @@ val_build <- function(
     out = 'riskassessment',
     replace = FALSE,
     opt_repos = 
-    c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()),
+    c(CRAN = "https://packagemanager.posit.co/cran/latest",
       BioC = 'https://bioconductor.org/packages/3.21/bioc')
     ){
   
@@ -108,6 +110,11 @@ val_build <- function(
   # ---- Setup ----
   #
   
+  # Pull in some config variables
+  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
+  remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
+  # opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
+  
   old <- options()
   on.exit(function() options(old))
   if(ref == 'source') {
@@ -115,11 +122,7 @@ val_build <- function(
   } else {
     options(repos = opt_repos) # , rlang_interactive = FALSE
   }
-  
-  # Pull in some config variables
-  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
-  remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
-  
+  # options("repos")
   
   #
   # ---- Which pkgs, ordered ----
@@ -230,9 +233,12 @@ val_build <- function(
   pkg_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
     
     # i <- 1 # for debugging
-    # # i <- which(pkgs == "class")
     # pkg <- pkgs[i] # for debugging
     # ver <- vers[i] # for debugging
+    
+    # output a message letting users know where we are
+    pkg_cnt <- which(pkgs == pkg)
+    cat(paste0("\n\n#", pkg_cnt, " of ", pkgs_length, ":"))
     
     pkg_v <- paste(pkg, ver, sep = "_")
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
@@ -252,7 +258,7 @@ val_build <- function(
           out_dir = val_dir,
           val_date = val_date)
       } else {
-        cat(paste0("\n\n\nAttempted New Package: ", pkg, " v", ver,", but already assessed.\n\n"))
+        cat(paste0("\nAttempted New Package: ", pkg, " v", ver,", but already assessed.\n\n"))
         pkg_meta <- readRDS(pkg_meta_file)
         
         cat("\n-->", pkg_v,"Using assessment previously stored.\n")
@@ -267,7 +273,7 @@ val_build <- function(
       
     } else {
       # ---- Pkg is in 'dont_run'! ----
-      cat(paste0("\n\n\nAttempted New Package: ", pkg, " v", ver,", but one of it's dependencies already failed so skipping assessment and marking risk as '", decisions[length(decisions)], "'.\n\n"))
+      cat(paste0("\nAttempted New Package: ", pkg, " v", ver,", but one of it's dependencies already failed so skipping assessment and marking risk as '", decisions[length(decisions)], "'.\n\n"))
       
       # grab depends
       depends <- 
@@ -302,7 +308,7 @@ val_build <- function(
         pkg = pkg,
         ver = ver,
         r_ver = getRversion(),
-        sys_info = R.Version(),
+        sys_info = list(R.Version()),
         repos = repo_name,
         val_date = val_date,
         ref = NA_character_,
@@ -335,10 +341,23 @@ val_build <- function(
   
   
   
+  #
+  # ---- Collate Assessment files into DF ----
+  #
+  
+  # # Start bundling rds files
+  record_files <- list.files(assessed, pattern = "_assess_record.rds$")
+  record_length <- record_files |> length() # assessment file count
+  assessment_bundle <- purrr::map(record_files, function(file){
+    # file <- record_files[1] # for debugging
+    readRDS(file.path(assessed, file))
+  }) |>
+    purrr::reduce(dplyr::bind_rows)
+  saveRDS(assessment_bundle, file.path(val_dir, "qual_assessments.rds"))
   
   
   #
-  # ---- Convert to DF ----
+  # ---- Collate Pkg Meta into DF ----
   #
   
   # Reduce package bundles down into a data.frame containing specific info
@@ -348,20 +367,23 @@ val_build <- function(
       x <- purrr::list_flatten(.x)
       # x$depends  <- if(all(is.na(x$depends)))  NA_character_ else paste(x$depends, collapse = ", ")
       # x$suggests <- if(all(is.na(x$suggests))) NA_character_ else paste(x$suggests, collapse = ", ")
+      
       x$depends <- list(x$depends)
       x$suggests <- list(x$suggests)
       x$rev_deps <- list(x$rev_deps)
+      x$sys_info <- list(x$sys_info)
+      # x$repos <- list(x$repos)
       dplyr::as_tibble(x)
     }) |> 
     purrr::reduce(dplyr::bind_rows)
   
   
+  saveRDS(pkgs_df0, file.path(val_dir, "qual_supplemental.rds"))
+  # cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_supplemental.rds"), "\n"))
+  
+  
+  
   cat("\n--> Collated pkg metadata.\n")
-  
-  
-  
-  
-  
   
   #
   # ---- Update final decisions ----
@@ -463,13 +485,14 @@ val_build <- function(
   val_end_txt <- utils::capture.output(val_end - val_start)
   cat("\n--> Build", val_end_txt,"\n")
   
-  # saveRDS(pkgs_df, file.path(val_dir, "qual_evidence.rds"))
-  # cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_evidence.rds"), "\n"))
+  saveRDS(pkgs_df, file.path(val_dir, "qual_supplemental.rds"))
+  cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_supplemental.rds"), "\n"))
   
   # Return object 
   return(list(
     val_dir = val_dir,
-    pkgs_df = pkgs_df
+    pkg_meta = pkgs_df,
+    pkg_assess = assessment_bundle
   ))
 }
 

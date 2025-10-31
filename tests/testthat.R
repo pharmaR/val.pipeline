@@ -9,4 +9,17 @@
 library(testthat)
 library(val.pipeline)
 
+# Static option:
+# options(repos = c(
+#   CRAN = 'https://packagemanager.posit.co/cran/latest',
+#   BioC = 'https://bioconductor.org/packages/3.21/bioc'
+# ))
+
+# Config
+opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
+
+# Set
+options(repos = opt_repos, pkgType = "source", scipen = 999)
+# options("repos")
+
 test_check("val.pipeline")

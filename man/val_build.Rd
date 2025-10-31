@@ -13,8 +13,8 @@ val_build(
   val_date = Sys.Date(),
   out = "riskassessment",
   replace = FALSE,
-  opt_repos = c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()), BioC
-    = "https://bioconductor.org/packages/3.21/bioc")
+  opt_repos = c(CRAN = "https://packagemanager.posit.co/cran/latest", BioC =
+    "https://bioconductor.org/packages/3.21/bioc")
 )
 }
 \arguments{
@@ -54,8 +54,10 @@ package installation. Default is CRAN.}
 A list containing:
 \itemize{
 \item val_dir: The directory where the validation build results are stored.
-\item pkgs_df: A data frame summarizing the risk assessment results for all packages assessed,
-including their dependencies and final risk decisions.
+\item pkg_meta: A data frame summarizing the risk assessment results for all
+packages assessed, including their dependencies and final risk decisions.
+\item pkg_assess: A data frame containing detailed (\code{riskmetric}) assessment
+records for each package.
 }
 }
 \description{
@@ -68,9 +70,9 @@ assessed, but goes back around and will re-categorize decisions based on
 whether any dependencies were categorized as "High Risk" / "Rejected". It
 also is intelligent enough to sort the list of packages to run those with the
 most dependencies first, so that if a package fails, it doesn't waste any
-time running it's reverse dependence.
-After the pipeline applies a decision onto each package using criteria
-provided in a config file, it even generates a report detailing specifics of
-the assessment as supporting evidence. The end result is a directory
-containing the assessment results and reports for each package evaluated.
+time running it's reverse dependence. After the pipeline applies a decision
+onto each package using criteria provided in a config file, it even generates
+a report detailing specifics of the assessment as supporting evidence. The
+end result is a directory containing the assessment results and reports for
+each package evaluated.
 }
