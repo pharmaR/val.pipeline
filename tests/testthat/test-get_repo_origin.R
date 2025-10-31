@@ -57,7 +57,8 @@ test_that("get_repo_origin handles empty repos option", {
   mock_repos <- c()
   old_repos <- getOption("repos"); on.exit(options(repos = old_repos)); options(repos = mock_repos)
   
-  result <- get_repo_origin("https://cran.r-project.org", "testpkg")
+  result <- get_repo_origin(
+    repo_src = "https://cran.r-project.org", pkg_name =  "testpkg")
   expect_equal(result, "unknown")
 })
 

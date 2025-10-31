@@ -52,7 +52,7 @@ val_pkg <- function(
   pkg_v <- paste(pkg, ver, sep = "_")
   start <- Sys.time()
   start_txt <- format(start, '%H:%M:%S', tz = 'US/Eastern', usetz = TRUE)
-  cat(paste0("\n\n\nNew Package: ", pkg, " v", ver," @ ", start_txt,"\n"))
+  cat(paste0("\nNew Package: ", pkg, " v", ver," @ ", start_txt,"\n"))
   
   #
   # ---- Setup ----
@@ -208,6 +208,16 @@ val_pkg <- function(
     cat("----> (", init_ass_mins_txt, ")\n")
     
     
+    # Create workable DF of assessments
+    init_assessment_record <- workable_assessments(
+      pkg = pkg,
+      ver = ver,
+      val_date = val_date,
+      metric_pkg = metric_pkg,
+      source = list(assessment = init_pkg_assessment, scores = init_pkg_scores),
+      source_ref = "remote"
+    )
+    
     # 
     #### Initial Decision
     #
@@ -225,11 +235,10 @@ val_pkg <- function(
       init_viable_metrics <- c(init_vm, "r_cmd_check_warnings", "r_cmd_check_errors")
     }
     
-    # pkg_assessment$downloads_1yr |> prettyNum(big.mark = ",")
     init_decision <- 
       val_decision( 
         pkg = pkg,
-        source = list(assessment = init_pkg_assessment, scores = init_pkg_scores), # include both
+        source_df = init_assessment_record,
         excl_metrics = NULL, # "covr_coverage", # Subset not really necessary
         decisions = decisions,
         else_cat = decisions[length(decisions)],
@@ -336,20 +345,31 @@ val_pkg <- function(
   cat("\n-->", pkg_v,"assessed.\n")
   cat("----> (", ass_mins_txt, ")\n")
   
-  
-  
+  # Create workable DF of assessments
+  assessment_record <- workable_assessments(
+    pkg = pkg,
+    ver = ver,
+    val_date = val_date,
+    metric_pkg = metric_pkg,
+    source = list(assessment = pkg_assessment, scores = pkg_scores),
+    source_ref = ref
+  )
   
   #
-  # ---- Save Assessment---- 
+  # ---- Save Assessment artifacts ---- 
   #
   
+  assess_record_file <- file.path(assessed, glue::glue("{pkg_v}_assess_record.rds"))
   assessment_file <- file.path(assessed, glue::glue("{pkg_v}_assessments.rds"))
   scores_file <- file.path(assessed, glue::glue("{pkg_v}_scores.rds"))
+  
+  # assessment_record <- readRDS(assess_record_file) # for debugging
   # pkg_assessment <- readRDS(assessment_file) # for debugging
   # pkg_scores <- readRDS(scores_file) # for debugging
+  saveRDS(assessment_record, assess_record_file)
   saveRDS(pkg_assessment, assessment_file)
   saveRDS(pkg_scores, scores_file)
-  cat("\n-->", pkg_v,"assessments & scores saved.\n")
+  # cat("\n-->", pkg_v,"assessments & scores saved.\n")
   
   
   
@@ -392,7 +412,7 @@ val_pkg <- function(
   decision <- 
     val_decision( 
       pkg = pkg,
-      source = list(assessment = pkg_assessment, scores = pkg_scores), 
+      source_df = assessment_record, 
       excl_metrics = exclude_met, # Subset if desired
       decisions = decisions,
       else_cat = decisions[length(decisions)],
@@ -424,6 +444,8 @@ val_pkg <- function(
   
   cat("\n-->", pkg_v,"decision reason:\n---->", decision_reason, "\n")
   
+  
+  
   #
   # ---- Build Report ----
   #
@@ -449,6 +471,8 @@ val_pkg <- function(
   cat("\n-->", pkg_v,"Report built.\n")
   
   
+  
+  
   #
   # ---- Save Pkg Meta Bundle ---- 
   #
@@ -458,7 +482,7 @@ val_pkg <- function(
     pkg = pkg,
     ver = ver,
     r_ver = getRversion(),
-    sys_info = R.Version(),
+    sys_info = list(R.Version()),
     repos = repo_name, # A named character
     val_date = val_date,
     ref = ref,

@@ -111,32 +111,33 @@ test_that("val_build() creates directory structure", {
   if (dir.exists(test_dir)) {
     unlink(test_dir, recursive = TRUE)
   }
-  
-  expect_no_error({
-    tryCatch({
-      val_build(
-        pkg_names = c("nonexistent_pkg"),
-        ref = "remote",
-        metric_pkg = "riskmetric",
-        deps = NULL,
-        val_date = as.Date("2024-01-01"),
-        out = test_dir
-      )
-    }, error = function(e) {
-      # Function should create directories before failing
-      r_ver <- getRversion()
-      expected_dir <- file.path(test_dir, paste0("R_", r_ver), "20240101")
-      
-      # Check if directories were created
-      if (dir.exists(test_dir) && dir.exists(file.path(test_dir, paste0("R_", r_ver)))) {
-        # Directories created successfully, error is expected due to missing packages
-        return()
-      }
-      
-      # If directories weren't created, re-throw the error
-      if (!grepl("available.packages|val_pkg", e$message)) {
-        stop(e)
-      }
+  expect_output(
+    expect_no_error({
+      tryCatch({
+        val_build(
+          pkg_names = c("nonexistent_pkg"),
+          ref = "remote",
+          metric_pkg = "riskmetric",
+          deps = NULL,
+          val_date = as.Date("2024-01-01"),
+          out = test_dir
+        )
+      }, error = function(e) {
+        # Function should create directories before failing
+        r_ver <- getRversion()
+        expected_dir <- file.path(test_dir, paste0("R_", r_ver), "20240101")
+        
+        # Check if directories were created
+        if (dir.exists(test_dir) && dir.exists(file.path(test_dir, paste0("R_", r_ver)))) {
+          # Directories created successfully, error is expected due to missing packages
+          return()
+        }
+        
+        # If directories weren't created, re-throw the error
+        if (!grepl("available.packages|val_pkg", e$message)) {
+          stop(e)
+        }
+      })
     })
-  })
+  )
 })

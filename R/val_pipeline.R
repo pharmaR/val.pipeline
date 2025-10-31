@@ -54,9 +54,7 @@ val_pipeline <- function(
 
   # Since running this script is such a computationally intensive process, the
   # start of this script would actually begin by filtering packages
-  # based on pkg downloads, and then we'd feed that list to pkg_names...
-  # Eventually, this 'dev' script will become a new function called val_pipeline()
-  
+  # based on primarily pkg downloads, and then we'd feed that list to pkg_names.
   
   
   
@@ -138,9 +136,7 @@ val_pipeline <- function(
         viable_metrics = viable_metrics
         )
       )
-  # see <-
-  #   pre_filtered_pkg_metrics |>
-  #     dplyr::filter(dwnlds > 1000000) 
+  # see <- pre_filtered_pkg_metrics |> dplyr::filter(dwnlds > 1000000) 
   
   
   
@@ -150,12 +146,13 @@ val_pipeline <- function(
   
   opt_repos <- update_opt_repos(val_date = val_date, opt_repos = opt_repos)
   options(repos = opt_repos, pkgType = "source", scipen = 999)
-  # options("repos") # verify
+    # options("repos") # verify
   
   
   #
   # ---- Filter / Reduce pkgs ----
   #
+  
   # Note: has to be decisions[1] ("Low") only because of the way we allowed
   # 'High' risk pkgs to get promoted to "Medium" in `pre_filtered_pkg_metrics`.
   # Specifically, a 'High' Risk pkg could have a severly low annual downloads #.
@@ -185,36 +182,8 @@ val_pipeline <- function(
   # ---- val_build() ----
   #
   
-  # See the full dependency tree before running val_build()
-  #
-  # these_pkgs <- "withr"  # messes with the entire process
-  # these_pkgs <- "matrix" # takes 5 mins to install
-  # these_pkgs <- "askpass"
-  # these_pkgs <- "codetools"
-  # these_pkgs <- build_pkgs
-  # tree <- tools::package_dependencies(
-  #   packages = these_pkgs,
-  #   db = available.packages(),
-  #   # which = c("Suggests"),
-  #   which = "strong", #c("Depends", "Imports", "LinkingTo"),
-  #   # which = c("Depends", "Imports", "LinkingTo", "Suggests"), # prod
-  #   recursive = TRUE
-  #   # recursive = FALSE
-  # ) |>
-  #   unlist(use.names = FALSE) |>
-  #   unique()
-  # # How many? # 621 pkgs -->  When recursive: 2,570. Only 744 when you don't include Suggests
-  # full_tree <- c(these_pkgs, tree) |> unique()
-  # full_tree |> length()
-  
-  
-  
   # Validation build
   outtie <- val_build(
-    # pkg_names = 'rlang',
-    # pkg_names = 'askpass', # 2.5 - 3 mins when deps, 2 pkgs, no prompts
-    # pkg_names = 'withr',
-    # pkg_names = 'codetools',
     pkg_names = build_pkgs, # Not sorted
     
     # everything else
