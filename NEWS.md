@@ -1,5 +1,9 @@
 # val.pipeline (development version)
 
+- Found out that Posit provides their own validation documentation for several
+co-horts of packages they develop, so we've added them to the config's
+`approved_pkgs` config element by default. (#42)
+
 # val.pipeline 0.0.1
 
 * Dynamically change the packagemanager date used for `CRAN` repo to reflect the
