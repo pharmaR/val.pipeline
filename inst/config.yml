@@ -4,7 +4,8 @@ default:
     tidyverse, ggplot2, dplyr, tidyr, readr, purrr, tibble, stringr, forcats, lubridate,
     DBI, haven, httr, readxl, googlesheets4, googledrive, rvest, jsonlite, xml2,
     hms, blob, dbplyr, dtplyr,
-    magrittr, glue
+    magrittr, glue,
+    readxl, vroom, 
     
     tidymodels, rsample, parsnip, recipes, workflows, tune, yardstick, broom, dials,
     
