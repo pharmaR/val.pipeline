@@ -56,3 +56,5 @@ Remotes:
     pharmaR/riskreports,
     Sanofi-Public/risk.assessr,
     pharmar/riskscore
+Depends: 
+    R (>= 4.1.0)
