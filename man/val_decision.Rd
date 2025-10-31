@@ -6,18 +6,19 @@
 \usage{
 val_decision(
   pkg = NULL,
-  source = NULL,
+  source_df = NULL,
   excl_metrics = NULL,
   decisions = c("Low", "Medium", "High"),
   else_cat = "High",
+  avail_pkgs = as.data.frame(available.packages()),
   decisions_df = build_decisions_df(rule_type = "decide")
 )
 }
 \arguments{
 \item{pkg}{character, the package name to assess}
 
-\item{source}{character, either "riskscore" (default), "PACKAGES", or a
-data.frame.}
+\item{source_df}{data.frame, comprised of \code{riskmetric} assessments & scores,
+usually the output of \code{workable_assessments()}.}
 
 \item{excl_metrics}{character vector, allow users to subset metrics as needed
 without changing the config}
@@ -27,13 +28,14 @@ without changing the config}
 \item{else_cat}{character, the default risk category if no conditions are
 met.}
 
+\item{avail_pkgs}{data.frame, the output of available.packages()}
+
 \item{decisions_df}{data.frame, the output of build_decisions_df()}
 }
 \description{
-First whack at attempting to filter packages based on org-level criterion
-used to set thresholds (and later update final decision (if not already 'high
-risk')) AND filter packages before running val_build(). Note: If PACKAGES
-file had assessments, we'd be using that (paired with {val.filter}), but
-instead, we're going to use riskscore::cran_assessed_20250812 for the time
-being
+Categorize packages based on org-level criterion / thresholds at the
+package-level. This function applies the decision rules to a single package
+and returns the risk category along with the relevant metrics used to make
+the decision. This function assumes that the package metrics have already
+been computed and are available in the \code{source} parameter.#'
 }

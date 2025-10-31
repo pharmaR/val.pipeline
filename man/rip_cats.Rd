@@ -4,7 +4,12 @@
 \alias{rip_cats}
 \title{Generate Decision Category Assignments}
 \usage{
-rip_cats(met_dec_df, pkgs_df, else_cat)
+rip_cats(
+  met_dec_df,
+  pkgs_df,
+  decisions = pull_config(val = "decisions_lst", rule_type = "default"),
+  else_cat = decisions[length(decisions)]
+)
 }
 \arguments{
 \item{met_dec_df}{A data.frame of decisions, typically created by
@@ -12,6 +17,9 @@ build_decisions_df()}
 
 \item{pkgs_df}{A data.frame of package metrics, typically created by
 available.packages()}
+
+\item{decisions}{A character vector of decision categories, typically
+obtained from pull_config()}
 
 \item{else_cat}{A character string indicating the default category to assign
 when none of the conditions are met.}
@@ -24,7 +32,13 @@ with the decision categories for each metric.
 \examples{
 # rip_cats(
 #   build_decisions_df() |> dplyr::mutate(derived_col = metric),
-#   available.packages() |> as.data.frame() |> dplyr::select(pkg, downloads_1yr = dplyr::starts_with("downloads_1yr")),
+#   available.packages() |>
+#     as.data.frame() |>
+#     dplyr::select(
+#       pkg,
+#       downloads_1yr = dplyr::starts_with("downloads_1yr")
+#     ),
+#   c("Low", "Medium", "High"),
 #   "High"
 # )
 

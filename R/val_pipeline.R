@@ -5,7 +5,7 @@
 #' A pipeline to validate R packages using specific metrics and criteria,
 #' spelled out in the package's config file. This function orchestrates the
 #' reduction of a large set of packages delivered through various sources
-#' (either {riskscore} or a user-provided data set) based one primary &
+#' (either \{riskscore\} or a user-provided data set) based one primary &
 #' 'exception' criteria. Then, it builds the assessment co-hort using
 #' val_build(), returning a qualified list of packages and all required evidence
 #' needed for provisioning to PPM.
@@ -22,38 +22,39 @@
 #' @param replace Logical. Whether to replace existing assessments. Default is
 #'   FALSE.
 #' @param out Character. Output directory for assessments. Default is
-#'   'dev/riskassessments'.
+#'   Sys.getenv("RISK_OUTPATH", unset = getwd()).
 #' @param opt_repos Named character vector. Repositories to use. Default is
 #'   opt_repos from config.
 #' @return A list containing the validation directory and a data frame of
 #'   package assessments.
 #'
+#' @importFrom dplyr as_tibble filter pull select
+#' @importFrom tibble rownames_to_column
+#'
 #' @export
 #' 
 val_pipeline <- function(
-  ref = c("source", "remote")[1],
-  metric_pkg = "riskmetric", 
+  ref = c("source", "remote"),
+  metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
   # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
   deps = c("depends", "suggests")[1], 
   deps_recursive = TRUE,
   val_date = Sys.Date(),
   replace = FALSE, 
-  out = 'dev/riskassessments',
+  out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
   opt_repos = 
-    c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()),
+    c(CRAN = "https://packagemanager.posit.co/cran/latest",
       BioC = 'https://bioconductor.org/packages/3.21/bioc')
   ){
 
   # Assess args
-  if(!metric_pkg %in% c('risk.assessr', 'riskmetric')) stop("'metric_pkg' arg must be either 'riskmetric' or 'risk.assessr' but '", metric_pkg, "' was given.")
-  if(!ref %in% c('source', 'remote')) stop("'ref' arg must be either 'source' or 'remote' but '", ref, "' was given.")
+  ref <- match.arg(ref)
+  metric_pkg <- match.arg(metric_pkg)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
 
   # Since running this script is such a computationally intensive process, the
   # start of this script would actually begin by filtering packages
-  # based on pkg downloads, and then we'd feed that list to pkg_names...
-  # Eventually, this 'dev' script will become a new function called val_pipeline()
-  
+  # based on primarily pkg downloads, and then we'd feed that list to pkg_names.
   
   
   
@@ -86,14 +87,38 @@ val_pipeline <- function(
   #
   # ---- Set capture 'old' options ----
   #
-  
-  # TO-DO: this should be moved inside val_categorize()
   old <- options()
   on.exit(function() options(old))
-
+  
+  # set the options
+  options(repos = opt_repos)
+  # options('repos')
+  
   #
   # ---- val_categorize() ----
-  #
+  #.
+  
+  # Assess the 'dplyr' pkg to identify which metrics are available for
+  # 'pkg_cran_remote' Need one pkg from CRAN & one from BioConductor in case our
+  # config only specifies one.
+  viable_metrics <- c("dplyr", "Biobase") |>
+    riskmetric::pkg_ref(source = "pkg_cran_remote") |>
+    dplyr::as_tibble() |>
+    dplyr::filter(!is.na(version)) |> # remove either pkg if not found
+    riskmetric::pkg_assess() |>
+    riskmetric::pkg_score() |>
+    dplyr::select(-c(package, version, pkg_ref, pkg_score)) |>
+    t() |>
+    as.data.frame() |>
+    dplyr::filter(!is.na(V1)) |>
+    # make rownames a column
+    tibble::rownames_to_column(var = "metric") |>
+    dplyr::pull(metric)
+  
+  if("r_cmd_check" %in% viable_metrics){
+    vm <- viable_metrics[which(viable_metrics != "r_cmd_check")]
+    viable_metrics <- c(vm, "r_cmd_check_warnings", "r_cmd_check_errors")
+  }
   
   # "filter" packages 
   # > 22k here (on CRAN alone). Eventually, want to use PACKAGES file here For
@@ -106,11 +131,12 @@ val_pipeline <- function(
       # avail_pkgs = available.packages() |> as.data.frame(),
       decisions = decisions,
       else_cat = decisions[length(decisions)],
-      decisions_df = build_decisions_df(rule_type = "remote_reduce")
+      decisions_df = build_decisions_df(
+        rule_type = "remote_reduce",
+        viable_metrics = viable_metrics
+        )
       )
-  # see <-
-  #   pre_filtered_pkg_metrics |>
-  #     dplyr::filter(dwnlds > 1000000) 
+  # see <- pre_filtered_pkg_metrics |> dplyr::filter(dwnlds > 1000000) 
   
   
   
@@ -120,12 +146,13 @@ val_pipeline <- function(
   
   opt_repos <- update_opt_repos(val_date = val_date, opt_repos = opt_repos)
   options(repos = opt_repos, pkgType = "source", scipen = 999)
-  # options("repos") # verify
+    # options("repos") # verify
   
   
   #
   # ---- Filter / Reduce pkgs ----
   #
+  
   # Note: has to be decisions[1] ("Low") only because of the way we allowed
   # 'High' risk pkgs to get promoted to "Medium" in `pre_filtered_pkg_metrics`.
   # Specifically, a 'High' Risk pkg could have a severly low annual downloads #.
@@ -155,36 +182,8 @@ val_pipeline <- function(
   # ---- val_build() ----
   #
   
-  # See the full dependency tree before running val_build()
-  #
-  # these_pkgs <- "withr"  # messes with the entire process
-  # these_pkgs <- "matrix" # takes 5 mins to install
-  # these_pkgs <- "askpass"
-  # these_pkgs <- "codetools"
-  # these_pkgs <- build_pkgs
-  # tree <- tools::package_dependencies(
-  #   packages = these_pkgs,
-  #   db = available.packages(),
-  #   # which = c("Suggests"),
-  #   which = "strong", #c("Depends", "Imports", "LinkingTo"),
-  #   # which = c("Depends", "Imports", "LinkingTo", "Suggests"), # prod
-  #   recursive = TRUE
-  #   # recursive = FALSE
-  # ) |>
-  #   unlist(use.names = FALSE) |>
-  #   unique()
-  # # How many? # 621 pkgs -->  When recursive: 2,570. Only 744 when you don't include Suggests
-  # full_tree <- c(these_pkgs, tree) |> unique()
-  # full_tree |> length()
-  
-  
-  
   # Validation build
   outtie <- val_build(
-    # pkg_names = 'rlang',
-    # pkg_names = 'askpass', # 2.5 - 3 mins when deps, 2 pkgs, no prompts
-    # pkg_names = 'withr',
-    # pkg_names = 'codetools',
     pkg_names = build_pkgs, # Not sorted
     
     # everything else
@@ -208,7 +207,6 @@ val_pipeline <- function(
   
   # nrow(qual)
   saveRDS(qual, file.path(outtie$val_dir, paste0("qual_evidence_", val_date_txt, ".rds")))
-  
   
   # # Inspect the assessment dir
   # # valdate <- gsub("-", "", Sys.Date())
@@ -234,6 +232,7 @@ val_pipeline <- function(
   # names(ass)
   # ass$covr_coverage$totalcoverage
   # ass$downloads_1yr |> prettyNum(big.mark = ",")
+  
   # 
   # # val_build(pkg_names = c('aamatch'), deps = NULL) # No coverage
   

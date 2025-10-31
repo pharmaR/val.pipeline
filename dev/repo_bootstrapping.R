@@ -1,4 +1,6 @@
 
+usethis::use_package("R", type = "Depends", min_version = "4.1.0") # because of |> pipe
+
 # Add pkg deps
 utils::install.packages("pak")
 pak::pak("usethis")

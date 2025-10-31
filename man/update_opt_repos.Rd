@@ -19,5 +19,7 @@ repo.
 }
 \description{
 Helper function to update the "CRAN" repo from \code{options("repos")} to use the
-user-specified validation date.
+user-specified validation date. Two big assumptions with this function at the
+moment: (1) that the "CRAN" repo is a Posit Package Manager URL, and (2) that
+the date is at the end of the URL in "YYYY-MM-DD" format.
 }

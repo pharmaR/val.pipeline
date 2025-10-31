@@ -21,7 +21,7 @@
 #' @param val_date Date. Date of validation. Default is current date.
 #'
 #' @importFrom glue glue
-#' @importFrom utils download.file untar
+#' @importFrom utils download.file untar capture.output
 #' @importFrom riskmetric pkg_ref pkg_assess pkg_score all_assessments
 #' @importFrom riskreports package_report
 #' @importFrom dplyr filter pull select arrange as_tibble
@@ -35,8 +35,8 @@ val_pkg <- function(
     pkg,
     ver,
     avail_pkgs,
-    ref = "source",
-    metric_pkg = "riskmetric",
+    ref = c("source", "remote"),
+    metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
     out_dir,
     val_date = Sys.Date()
 ) {
@@ -45,18 +45,20 @@ val_pkg <- function(
   # ver <- vers[i] # for debugging
   
   # assess args
-  if(!metric_pkg %in% c('risk.assessr', 'riskmetric', 'val.meter')) stop("'metric_pkg' arg must be either 'riskmetric', 'val.meter', or 'risk.assessr' but '", metric_pkg, "' was given.")
-  if(!ref %in% c('source', 'remote')) stop("'ref' arg must be either 'source' or 'remote' but '", ref, "' was given.")
+  ref <- match.arg(ref)
+  metric_pkg <- match.arg(metric_pkg)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
   
   pkg_v <- paste(pkg, ver, sep = "_")
   start <- Sys.time()
   start_txt <- format(start, '%H:%M:%S', tz = 'US/Eastern', usetz = TRUE)
-  cat(paste0("\n\n\nNew Package: ", pkg, " v", ver," @ ", start_txt,"\n"))
+  cat(paste0("\nNew Package: ", pkg, " v", ver," @ ", start_txt,"\n"))
   
   #
-  # ---- Setup Dirs ----
+  # ---- Setup ----
   #
+  
+  # Dirs
   if(ref == "source"){
     tarballs <- file.path(out_dir, 'tarballs')
     sourced <- file.path(out_dir, 'sourced')
@@ -71,12 +73,22 @@ val_pkg <- function(
   if(!dir.exists(assessed)) dir.create(assessed)
   if(!dir.exists(reports)) dir.create(reports)
   
+  # Where did package come from?
+  repo_src_contrib <- avail_pkgs |>
+    dplyr::filter(Package %in% pkg) |> 
+    dplyr::pull(Repository)  # keep '/src/contrib/` ending
+  repo_src <- repo_src_contrib |> dirname() |> dirname() # trim off '/src/contrib'
+  repo_name <- get_repo_origin(repo_src = repo_src, pkg_name = pkg)
+  
+  # Decisions
+  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
+  
   if(ref == "source") {
     
     #
     # ---- Download Tarball ----
     #
-    tarball_url <- paste0("https://cran.r-project.org/src/contrib/", pkg_v,".tar.gz")
+    tarball_url <- file.path(repo_src_contrib, paste0(pkg_v,".tar.gz"))
     dwn_ld <- try(utils::download.file(tarball_url,
                                        file.path(tarballs, basename(tarball_url)), 
                                        quiet = TRUE, mode = "wb"),
@@ -108,7 +120,7 @@ val_pkg <- function(
   depends <- 
     tools::package_dependencies(
       packages = pkg,
-      db = available.packages(),
+      db = avail_pkgs |> as.matrix(),
       which = c("Depends", "Imports", "LinkingTo"),
       recursive = TRUE
     ) |>
@@ -118,83 +130,11 @@ val_pkg <- function(
   suggests <- 
     tools::package_dependencies(
       packages = pkg,
-      db = available.packages(),
+      db = avail_pkgs |> as.matrix(),
       which = "Suggests",
       recursive = TRUE # this really blows up for almost any pkg
     ) |>
     unlist(use.names = FALSE) 
-  
-  
-  # ---- Can Install? ----
-  # Make sure we can install cleanly first, else don't with assessment, return meta
-  # if(pkg != "withr") {
-  #   inst_out <- tryCatch({
-  #     if(ref == "source"){
-  #       utils::install.packages(
-  #         file.path(sourced, pkg),
-  #         lib = installed,
-  #         repos = NULL
-  #       )
-  #     } else { # ref == 'remote'
-  #       utils::install.packages(
-  #         pkg,
-  #         lib = installed
-  #       )
-  #     }
-  #   },
-  #   warning = function(w) return(paste("Warning:", w$message)),
-  #   error = function(e) return(paste("Error:", e$message))
-  #   )
-  # } else {
-    inst_out <- NULL
-  # }
-  
-  # Looks like installing pkgs may prove tricky for us... because of {withr}.
-  # And since we are only doing this to see if there are any warnings or notes,
-  # we could potentially skip it, since we get that info directly from the
-  # assessment step anyhow. Also, some packages take a really long time to
-  # install like Matrix & arrow, so this could really slow us down
-  # unnecessarily.
-  #
-  # Note: It was initially set up to help us skip assessing that package if it
-  # didn't install cleanly, but I shouldn't assume I'm doing this better than
-  # the {riskmetric} team, and would rather rely on their logic
-  
-  clean_install <- if(is.null(inst_out) # & pkg %in% list.files(installed)
-    ) TRUE else FALSE
-  
-  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
-  
-  if(!clean_install) {
-    # save metadata
-    meta_list <- list(
-      pkg = pkg,
-      ver = ver,
-      r_ver = getRversion(),
-      sys_info = R.Version(), 
-      repos = list(options("repos")),
-      val_date = val_date,
-      clean_install = clean_install,
-      ref = ref,
-      metric_pkg = metric_pkg,
-      # metrics = pkg_assessment, # saved separately for {riskreports}
-      decision = decisions[length(decisions)],
-      decision_reason = "Failed 'clean_install' step",
-      final_decision = decisions[length(decisions)],
-      final_decision_reason = "Failed 'clean_install' step",
-      depends = if(identical(depends, character(0))) NA_character_ else depends,
-      suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
-      rev_deps = NA_character_,
-      assessment_runtime = list(txt = NA_character_, mins = NA)
-    )
-    saveRDS(meta_list, file.path(meta_list, glue::glue("{pkg_v}_meta.rds")))
-    cat("\n-->", pkg_v,"didn't install cleanly.")
-    cat("\n--> Install Output:\n", paste(inst_out, collapse = "\n"),"\n")
-    cat("\n-->", pkg_v,"meta bundle saved.\n")
-    return(meta_list)
-  } else {
-    cat("\n-->", pkg_v,"installed cleanly.\n")
-  }
   
   
   #
@@ -227,7 +167,8 @@ val_pkg <- function(
     # "covr_coverage") so that if any primary metrics have an auto_accept
     # condition, we can then run again with a "pkg_source" ref while excluding
     # "covr_coverage" for final output. However, 
-    init_pkg_ref <- riskmetric::pkg_ref(pkg, source = "pkg_cran_remote")
+    init_pkg_ref <- riskmetric::pkg_ref(pkg, source = 
+        if(stringr::str_detect(tolower(repo_name), "bioc")) "pkg_bioc_remote" else "pkg_cran_remote")
     cat("\n-->", pkg_v, "initial reference complete.\n")
     
     # Pull available {riskmetric} assessments
@@ -262,24 +203,49 @@ val_pkg <- function(
     
     init_assessed_end <- Sys.time()
     init_ass_mins <- difftime(init_assessed_end, start, units = "mins")
-    init_ass_mins_txt <- capture.output(init_assessed_end - start)
+    init_ass_mins_txt <- utils::capture.output(init_assessed_end - start)
     cat("\n-->", pkg_v, "initial assessment complete.\n")
     cat("----> (", init_ass_mins_txt, ")\n")
     
     
+    # Create workable DF of assessments
+    init_assessment_record <- workable_assessments(
+      pkg = pkg,
+      ver = ver,
+      val_date = val_date,
+      metric_pkg = metric_pkg,
+      source = list(assessment = init_pkg_assessment, scores = init_pkg_scores),
+      source_ref = "remote"
+    )
+    
     # 
     #### Initial Decision
     #
+    init_viable_metrics <- init_pkg_scores |>
+      dplyr::as_tibble() |>
+      t() |>
+      as.data.frame() |>
+      dplyr::filter(!is.na(V1)) |>
+      # make rownames a column
+      tibble::rownames_to_column(var = "metric") |>
+      dplyr::pull(metric)
     
-    # pkg_assessment$downloads_1yr |> prettyNum(big.mark = ",")
+    if("r_cmd_check" %in% init_viable_metrics){
+      init_vm <- init_viable_metrics[which(init_viable_metrics != "r_cmd_check")]
+      init_viable_metrics <- c(init_vm, "r_cmd_check_warnings", "r_cmd_check_errors")
+    }
+    
     init_decision <- 
       val_decision( 
         pkg = pkg,
-        source = list(assessment = init_pkg_assessment, scores = init_pkg_scores), # include both
+        source_df = init_assessment_record,
         excl_metrics = NULL, # "covr_coverage", # Subset not really necessary
         decisions = decisions,
         else_cat = decisions[length(decisions)],
-        decisions_df = build_decisions_df(rule_type = "decide")
+        decisions_df = build_decisions_df(
+          rule_type = "decide",
+          viable_metrics = init_viable_metrics
+          )
       )
     
     auto_accepted <-
@@ -375,24 +341,35 @@ val_pkg <- function(
   
   assessed_end <- Sys.time()
   ass_mins <- difftime(assessed_end, start, units = "mins")
-  ass_mins_txt <- capture.output(assessed_end - start)
+  ass_mins_txt <- utils::capture.output(assessed_end - start)
   cat("\n-->", pkg_v,"assessed.\n")
   cat("----> (", ass_mins_txt, ")\n")
   
-  
-  
+  # Create workable DF of assessments
+  assessment_record <- workable_assessments(
+    pkg = pkg,
+    ver = ver,
+    val_date = val_date,
+    metric_pkg = metric_pkg,
+    source = list(assessment = pkg_assessment, scores = pkg_scores),
+    source_ref = ref
+  )
   
   #
-  # ---- Save Assessment---- 
+  # ---- Save Assessment artifacts ---- 
   #
   
+  assess_record_file <- file.path(assessed, glue::glue("{pkg_v}_assess_record.rds"))
   assessment_file <- file.path(assessed, glue::glue("{pkg_v}_assessments.rds"))
   scores_file <- file.path(assessed, glue::glue("{pkg_v}_scores.rds"))
+  
+  # assessment_record <- readRDS(assess_record_file) # for debugging
   # pkg_assessment <- readRDS(assessment_file) # for debugging
   # pkg_scores <- readRDS(scores_file) # for debugging
+  saveRDS(assessment_record, assess_record_file)
   saveRDS(pkg_assessment, assessment_file)
   saveRDS(pkg_scores, scores_file)
-  cat("\n-->", pkg_v,"assessments & scores saved.\n")
+  # cat("\n-->", pkg_v,"assessments & scores saved.\n")
   
   
   
@@ -416,16 +393,57 @@ val_pkg <- function(
   # pkg_assessment <- readRDS(assessment_file)
   # pkg_scores <- readRDS(scores_file)
   
+  # riskmetric doesn't pick up certain metrics for pkg_ref(source = "pkg_cran_remote")
+  # What metrics do we need to remove for the decisioning process?
+  viable_metrics <- pkg_scores |>
+    dplyr::as_tibble() |>
+    t() |>
+    as.data.frame() |>
+    dplyr::filter(!is.na(V1)) |>
+    # make rownames a column
+    tibble::rownames_to_column(var = "metric") |>
+    dplyr::pull(metric)
+  
+  if("r_cmd_check" %in% viable_metrics){
+    vm <- viable_metrics[which(viable_metrics != "r_cmd_check")]
+    viable_metrics <- c(vm, "r_cmd_check_warnings", "r_cmd_check_errors")
+  }
+  
   decision <- 
     val_decision( 
       pkg = pkg,
-      source = list(assessment = pkg_assessment, scores = pkg_scores), # include both
+      source_df = assessment_record, 
       excl_metrics = exclude_met, # Subset if desired
       decisions = decisions,
       else_cat = decisions[length(decisions)],
-      decisions_df = build_decisions_df(rule_type = "decide")
+      avail_pkgs = avail_pkgs,
+      decisions_df = build_decisions_df(
+        rule_type = "decide",
+        viable_metrics = viable_metrics
+        )
     )
+  decision_aa <- decision |>
+    dplyr::select(dplyr::ends_with("cataa")) |>
+    as.vector() |> unlist() |> any()
+  
+  if(decision_aa) {
+    approved_pkgs <- pull_config(val = "approved_pkgs", rule_type = "default")
+    aa_metrics <- decision |>
+      dplyr::select(dplyr::ends_with("cataa")) |>
+      names() %>%
+      gsub("_cataa", "", .)
 
+    decision_reason <- dplyr::case_when(
+      pkg %in% approved_pkgs ~ "Pre-Approved package",
+      length(aa_metrics) > 0 ~ paste("Met auto-accepted metric threshold(s) for:", paste(aa_metrics, collapse = ", ")),
+      TRUE ~ "Risk Assessment"
+    ) 
+  } else {
+    decision_reason <- "Risk Assessment"
+  }
+  
+  cat("\n-->", pkg_v,"decision reason:\n---->", decision_reason, "\n")
+  
   
   
   #
@@ -437,19 +455,22 @@ val_pkg <- function(
   pr <- riskreports::package_report(
     package_name = pkg,
     package_version = ver,
-    # template_path = file.path(getwd(), "riskassessment"),
-    output_format = "html", #"md", "pdf", "all",
+    template_path = system.file("report/package", package = "val.pipeline"),
+    output_format = "typst", # Options include html, gfm, and typst. Supplying 'all' does all 3
     # params list: https://github.com/pharmaR/riskreports/blob/main/inst/report/package/pkg_template.qmd
     params = list(
       assessment_path = assessment_file,
       hide_reverse_deps = 'false',
-      source = src_ref # defined above
+      source = src_ref, # defined above
+      val_date = as.character(val_date)
     ),
-    quiet = TRUE # To silence quarto output for readability
+    quiet = TRUE, # To silence quarto output for readability
   )
   # pr
   
   cat("\n-->", pkg_v,"Report built.\n")
+  
+  
   
   
   #
@@ -461,15 +482,14 @@ val_pkg <- function(
     pkg = pkg,
     ver = ver,
     r_ver = getRversion(),
-    sys_info = R.Version(),
-    repos = list(options("repos")),
+    sys_info = list(R.Version()),
+    repos = repo_name, # A named character
     val_date = val_date,
-    clean_install = clean_install,
     ref = ref,
     metric_pkg = metric_pkg,
     # metrics = pkg_assessment, # saved separately for {riskreports}
     decision = decision$final_risk,
-    decision_reason = "Assessment",
+    decision_reason = decision_reason,
     final_decision = NA_character_, # Will be set later
     final_decision_reason = NA_character_, # Will be set later
     depends = if(identical(depends, character(0))) NA_character_ else depends,

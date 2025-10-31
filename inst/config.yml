@@ -1,10 +1,10 @@
 default:
-  remote_only: [withr, VGAM, shinyBS] # withr - crashes, VGAM ran 10 hrs, shinyBS 5 hrs
+  remote_only: [withr, VGAM, shinyBS, fitdistrplus, collapse, gamlss.dist, gss, segmented] # withr - crashes, VGAM 10h, shinyBS 5h, collapse 1.6h, fitdistrplus 1.7h, gamlss.dist 52m, gss 52m, segmented 45m
   approved_pkgs: [] # packages that have been approved manually outside of {val.pipeline} workflow
   decisions_lst: [Low, Medium, High]
   opt_repos: 
     CRAN: https://packagemanager.posit.co/cran/latest
-    BioC: https://bioconductor.org/packages/3.21/bioc
+    BioC: https://bioconductor.org/packages/3.21/bioc #https://packagemanager.posit.co/bioconductor/latest 
     
 remote_reduce:
   inherits: default
@@ -22,25 +22,25 @@ remote_reduce:
     cond:
       # High: ~ is.na(.x)
       High: ~ .x < 2
-      Medium: ~ dplyr::between(.x, 2, 7)
-      Low: ~ .x > 7
-    type: exception
-    accept_cats: [Low, Medium]
-    auto_accept: ~ .x > 100 # anything above this is 'gold' & doesn't need to hit all the rules
+      Medium: ~ dplyr::between(.x, 2, 10)
+      Low: ~ .x > 10
+    type: secondary
+    accept_cats: [Low]
+    auto_accept: ~ .x > 50 # anything above this is 'gold' & doesn't need to hit all the rules
   dependencies:
     cond:
       # High: ~ is.na(.x)
       High: ~ .x > 8
       Medium: ~ dplyr::between(.x, 4, 8)
       Low: ~ .x < 4
-    type: exception
+    type: secondary
     accept_cats: [Low, Medium]
   news_current:
     cond:
       # High: ~ is.na(.x)
       High: ~ .x != 1
       Low: ~ .x == 1
-    type: exception
+    type: secondary
     accept_cats: Low
   has_vignettes:
     cond:
@@ -48,20 +48,20 @@ remote_reduce:
       High: ~ .x < 1
       Medium: ~ .x == 1
       Low: ~ .x > 1
-    type: exception
+    type: secondary
     accept_cats: Low
   has_source_control:
     cond:
       # High: ~ is.na(.x)
       High: ~ .x == 0
       Low: ~ .x > 0
-    type: exception
+    type: secondary
     accept_cats: Low
   has_website:
     cond:
       High: ~ .x == 0
       Low: ~ .x > 0
-    type: exception
+    type: secondary
     accept_cats: Low
 
 
@@ -78,13 +78,13 @@ decide:
     cond:
       High: ~ is.na(.x) | .x > 1
       Low: ~ .x == 0
-    type: secondary
+    type: primary
     accept_cats: Low
   r_cmd_check_warnings: # Pointless as a primary check since CRAN insures no warnings / errors
     cond:
       High: ~ is.na(.x) | .x > 1
       Low: ~ .x == 0
-    type: secondary
+    type: primary
     accept_cats: Low
   has_examples:
     cond:

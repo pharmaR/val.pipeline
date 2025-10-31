@@ -1,0 +1,143 @@
+/*-- scss:defaults --*/
+$link-color: #4697d2 !default;
+$card-color: #2a424e;
+$card-header-color: #cdcdcd;
+$foldable-color: #0f0f0f;
+
+$code-color: var(--bs-body-color) !default;
+$code-bg: $card-color !default;
+$btn-code-copy-color: $link-color !default;
+$btn-code-copy-color-active: white !default;
+
+/*-- scss:rules --*/
+
+#quarto-content {
+    padding-top: 2rem;
+}
+
+.top-page {
+    display: flex;
+    padding: 15px 15px 15px 45px;
+    gap: 1rem;
+    box-shadow: 0px 5px 75px var(--bs-black);
+    align-items: center;
+   
+    .btn {
+        margin-top: 5px;
+    }
+
+    p   {
+        font-weight: bold;
+        font-size: larger;
+        margin-top: 1.2rem;
+    }
+}
+
+.card {
+    background-color: $card-color;
+    border-radius: 15px;
+    padding-bottom: 10px;
+    margin-bottom: 0.5em;
+
+    .card-header {
+        display: flex;
+        gap: 1em;
+        border-bottom: unset;
+        background-color: unset;
+        color: $card-header-color;
+        margin-left: 5px;
+
+        i {
+            color: $link-color;
+            padding-top: 0.15em;
+            font-size: 27px;
+        }
+    }
+
+    .card-title {
+        padding-left: 0.75em;
+    }
+
+    .card-text {
+        color: $card-header-color;
+        padding-left: 1em;
+    }
+
+
+}
+
+.top-card {
+    display: flex;
+    gap: 1em;
+
+    .top-left-card {
+        .card-title {
+            margin-top: 0.5rem;
+        }
+    }
+
+    .top-right-card {
+        display: flex;
+        flex: 1 2;
+
+        .left-card {
+            border-radius: 15px 0px 0px 15px;
+            border-right: unset;
+            width: 100%;
+        }
+
+        .right-card {
+            border-radius: 0% 15px 15px 0;
+            width: 100%;
+            border-left: unset;
+        }
+    }
+}
+
+.bottom-card {
+    display: flex;
+    flex-direction: row;
+
+    .card-title {
+        margin-top: 10px;
+        padding-top: 10px;
+
+    }
+
+    .card-header {
+        flex: 1;
+        margin-top: 10px
+    }
+}
+
+.metrics-table {
+    color: $card-header-color;
+    border-color: $card-header-color;
+    background-color: var(--bs-body-bg) !important;
+
+    .rt-expander::after {
+        border-top: 7px solid $card-header-color;
+    }
+}
+
+
+details > summary {
+    color: $card-header-color;
+    background-color: $foldable-color;
+    padding: 10px 1rem 10px 1rem;
+    border-bottom: 2px solid $link-color;
+    border-radius: 10px 10px 0px 0px;
+    font-weight: bold;
+    font-size: medium;
+}
+
+pre.details {
+    color: $link-color;
+    background-color: $foldable-color;
+    border-radius: 0px;
+    padding: 10px 1rem 10px 1rem;
+
+    code {
+        overflow:auto;
+    }
+}

@@ -5,18 +5,18 @@
 \title{Build Decisions Data.Frame}
 \usage{
 build_decisions_df(
-  rule_type = c("default", "remote_reduce", "decide")[1],
-  rule_lst = NULL
+  rule_type = c("remote_reduce", "decide"),
+  rule_lst = NULL,
+  viable_metrics = NULL
 )
 }
 \arguments{
-\item{rule_type}{A character string indicating whether the decision
-categories are used to "categorize" risk levels (e.g., "Low", "Medium",
-"High") via val_categorize() or val_decision(). The difference being that
-"categorize" is going to be used to filter the initial list of packages
-using a remote pkg_ref() assessment, whereas "decision" is used to filter
-the final list of packages after a 'pkg_source' pkg_ref() assessment is
-produced locally on the GxP system of interest.}
+\item{rule_type}{A character string indicating whether to use
+val_categorize() or val_decision(). The difference being that
+"remote_reduce" is going to be used to filter the initial list of packages
+using a "pkg_remote" based pkg_ref() assessment and conversely, the
+"decide" rule_type is used to categorize the risk of a 'pkg_source'
+pkg_ref() assessment on the GxP system of interest.}
 
 \item{rule_lst}{A named list of lists, where each sub-list contains:
 \itemize{
@@ -29,10 +29,13 @@ each category.
 that are acceptable for this metric.
 \item min_value: (Optional) A numeric value indicating the minimum acceptable
 value for the primary metric(s).
+\item auto_accept: (Optional) A formula that defines a condition under which the
+package can be automatically accepted, regardless of other conditions.
 }}
 
-\item{decision_lst}{A character vector of decision categories, ordered from
-highest risk to lowest risk.opt_repos}
+\item{viable_metrics}{An optional character vector of metric names that are
+considered viable for the chosen pkg_source. If provided, any metrics in
+\code{rule_lst} that are not in \code{viable_metrics} will be dropped.}
 }
 \value{
 A data.frame with columns:
@@ -52,6 +55,6 @@ val_filter() that includes columns "metric", "decision", "condition",
 "metric_type", and "accept_condition".
 }
 \examples{
-build_decisions_df()
+build_decisions_df("remote_reduce")
 
 }

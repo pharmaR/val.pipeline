@@ -5,15 +5,15 @@
 \title{Validation: Execute an Assessment Pipeline}
 \usage{
 val_pipeline(
-  ref = c("source", "remote")[1],
-  metric_pkg = "riskmetric",
+  ref = c("source", "remote"),
+  metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
   deps = c("depends", "suggests")[1],
   deps_recursive = TRUE,
   val_date = Sys.Date(),
   replace = FALSE,
-  out = "dev/riskassessments",
-  opt_repos = c(CRAN = paste0("https://packagemanager.posit.co/cran/", Sys.Date()), BioC
-    = "https://bioconductor.org/packages/3.21/bioc")
+  out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
+  opt_repos = c(CRAN = "https://packagemanager.posit.co/cran/latest", BioC =
+    "https://bioconductor.org/packages/3.21/bioc")
 )
 }
 \arguments{
@@ -35,7 +35,7 @@ Default is TRUE.}
 FALSE.}
 
 \item{out}{Character. Output directory for assessments. Default is
-'dev/riskassessments'.}
+Sys.getenv("RISK_OUTPATH", unset = getwd()).}
 
 \item{opt_repos}{Named character vector. Repositories to use. Default is
 opt_repos from config.}
@@ -48,7 +48,7 @@ package assessments.
 A pipeline to validate R packages using specific metrics and criteria,
 spelled out in the package's config file. This function orchestrates the
 reduction of a large set of packages delivered through various sources
-(either {riskscore} or a user-provided data set) based one primary &
+(either \{riskscore\} or a user-provided data set) based one primary &
 'exception' criteria. Then, it builds the assessment co-hort using
 val_build(), returning a qualified list of packages and all required evidence
 needed for provisioning to PPM.

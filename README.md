@@ -2,6 +2,7 @@
 
 <!-- badges: start -->
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![R-CMD-check](https://github.com/pharmaR/val.pipeline/actions/workflows/R-CMD-check-dev.yaml/badge.svg)](https://github.com/pharmaR/val.pipeline/actions/workflows/R-CMD-check-dev.yaml)
 <!-- badges: end -->
 
 ## Purpose
@@ -81,7 +82,7 @@ qualification_results <- val_pipeline(
   deps_recursive = TRUE,
   val_date = Sys.Date(),
   replace = FALSE, 
-  out = 'dev/riskassessments'
+  out = Sys.getenv("RISK_OUTPATH", unset = getwd())
 )
 ```
 

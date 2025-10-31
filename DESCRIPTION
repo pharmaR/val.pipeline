@@ -1,12 +1,19 @@
 Package: val.pipeline
 Title: Validation Pipeline Example
-Version: 0.0.0.9001
+Version: 0.0.1
 Authors@R: 
   c(
     person(
       "Aaron", "Clark",
-      email = "clark.aaronchris@gmail.com"
+      email = "clark.aaronchris@gmail.com",
       role = c("aut", "cre"),
+      comment = c(ORCID = "0000-0002-0123-0970")
+    ),
+    person(
+      "Jeff", "Thompson",
+      email = "jthompson@arcusbio.com",
+      role = c("aut"),
+      comment = c(ORCID = "0009-0007-3640-1075")
     ),
     person(
       "R Validation Hub",
@@ -25,7 +32,7 @@ BugReports:
     https://github.com/pharmaR/val.pipeline/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Suggests: 
     risk.assessr (>= 2.0.0),
     riskscore (>= 0.0.1),
@@ -39,7 +46,9 @@ Imports:
     purrr,
     riskmetric (>= 0.2.5),
     riskreports (>= 0.0.0.9006),
+    rlang,
     stringr,
+    tibble,
     tidyr,
     tools
 Remotes: 
@@ -47,3 +56,5 @@ Remotes:
     pharmaR/riskreports,
     Sanofi-Public/risk.assessr,
     pharmar/riskscore
+Depends: 
+    R (>= 4.1.0)
