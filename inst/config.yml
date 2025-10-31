@@ -9,7 +9,8 @@ default:
     
     tidymodels, rsample, parsnip, recipes, workflows, tune, yardstick, broom, dials,
     
-    devtools, lintr, pak, cli, roxygen2, testthat, usethis, pkgdown, httr2, rlang, xml2, progress, scales, here, R6, fs, remotes, covr,
+    devtools, lintr, pak, cli, roxygen2, testthat, usethis, pkgdown, httr2, rlang,
+    xml2, progress, scales, here, R6, fs, remotes, covr, rcmdcheck,
     
     shiny, rmarkdown,
     
