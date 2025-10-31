@@ -1,4 +1,4 @@
-# val.pipeline (development version)
+# val.pipeline 0.0.1
 
 * Dynamically change the packagemanager date used for `CRAN` repo to reflect the
 data source at hand. For example, the `riskscore` assessment date or the val_date
