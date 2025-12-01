@@ -45,7 +45,7 @@ knitr::opts_chunk$set(
 )
 library("tools")
 library("knitr")
-library("riskreports")
+library("val.report")
 ```
 
 # Context
@@ -85,18 +85,18 @@ for (field in missing_fields) {
 
 ```{r create_r_riskmetric, warning=FALSE}
 # Assesment produces a data.frame with one row
-r_riskmetric <- riskreports::assessment(d_riskmetric)
+r_riskmetric <- val.report::assessment(d_riskmetric)
 is_na <- sapply(r_riskmetric, function(x) {
   is.na(x) || (is.character(x) && startsWith(x, "no applicable"))
 })
-r_riskmetric$origin <- riskreports:::get_pkg_origin(params$source)
+r_riskmetric$origin <- val.report:::get_pkg_origin(params$source)
 ```
 
 
 ::: {.content-visible when-format="html"}
 
 ```{r info_cards}
-riskreports:::create_metrics_cards(r_riskmetric)
+val.report:::create_metrics_cards(r_riskmetric)
 ```
 
 :::
@@ -118,7 +118,7 @@ knitr::kable(simple_cards)
 :::
 
 ```{r prepare_tables_namespace}
-namespace_table <- riskreports:::prepare_namespace_table(d_riskmetric)
+namespace_table <- val.report:::prepare_namespace_table(d_riskmetric)
 ```
 
 
@@ -238,32 +238,32 @@ if (isTRUE(is_html)) {
 }
 ```
 
-```{r license, eval=!riskreports::is_risk_error(d_riskmetric$license) && !is.null(d_riskmetric$license), results='asis'}
+```{r license, eval=!val.report::is_risk_error(d_riskmetric$license) && !is.null(d_riskmetric$license), results='asis'}
 cat("## License", "\n")
 
 cat("The package uses ", d_riskmetric$license, ".", sep = "")
 ```
 
 
-```{r, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]) || !riskreports::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
+```{r, eval=!val.report::is_risk_error(d_riskmetric[["r_cmd_check"]]) || !val.report::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
 cat("## Code checks", "\n")
 
 cat("Code checks for this package:", "\n")
 ```
 
-```{r r_cmd_check, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]), results='asis'}
+```{r r_cmd_check, eval=!val.report::is_risk_error(d_riskmetric[["r_cmd_check"]]), results='asis'}
 r_cmd <- d_riskmetric[["r_cmd_check"]]
 cat("R CMD check: ", paste(stringr::str_to_title(names(r_cmd)), r_cmd, sep = " - "))
 ```
 
 
 
-```{r remote_checks, eval=!riskreports::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
+```{r remote_checks, eval=!val.report::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
 cat("Remote checks: ", d_riskmetric[["remote_checks"]])
 ```
 
 
-```{r covr_coverage, eval=!riskreports::is_risk_error(d_riskmetric[["covr_coverage"]]), results='asis'}
+```{r covr_coverage, eval=!val.report::is_risk_error(d_riskmetric[["covr_coverage"]]), results='asis'}
 cat("## Code coverage", "\n")
 
 cat("Code coverage for this package: ", d_riskmetric[["covr_coverage"]])
@@ -333,7 +333,7 @@ RNGkind()
 Environmental and options variables affect how package checks and software in it might behave.
 
 ```{r computing, attr.output='.details summary="Environmental variables when running this report"'}
-riskreports::environ_report(exclude = c("GITHUB_PAT", "APPDATA", 
+val.report::environ_report(exclude = c("GITHUB_PAT", "APPDATA", 
                                         "GITHUB", "GITLAB_PAT", "GITLAB",
                                         "ProgramFiles", "ProgramFiles(x86)",
                                         "R_USER", "USERNAME", "USERPROFILE", 
@@ -343,5 +343,5 @@ riskreports::environ_report(exclude = c("GITHUB_PAT", "APPDATA",
 ```
 
 ```{r options, attr.output='.details summary="These are the options set to generate the report"'}
-riskreports::options_report(exclude = c("usethis.full_name", "usethis.description", "usethis.destdir"))
+val.report::options_report(exclude = c("usethis.full_name", "usethis.description", "usethis.destdir"))
 ```
