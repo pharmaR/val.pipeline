@@ -23,7 +23,7 @@
 #' @importFrom glue glue
 #' @importFrom utils download.file untar capture.output
 #' @importFrom riskmetric pkg_ref pkg_assess pkg_score all_assessments
-#' @importFrom riskreports package_report
+#' @importFrom val.report package_report
 #' @importFrom dplyr filter pull select arrange as_tibble
 #' @importFrom tools package_dependencies
 #'
@@ -450,14 +450,14 @@ val_pkg <- function(
   # ---- Build Report ----
   #
   
-  # file.edit(system.file("report/package/pkg_template.qmd", package = "riskreports"))
-  options(riskreports_output_dir = reports)
-  pr <- riskreports::package_report(
+  # file.edit(system.file("report/package/pkg_template.qmd", package = "val.report"))
+  options(valreport_output_dir = reports)
+  pr <- val.report::package_report(
     package_name = pkg,
     package_version = ver,
     template_path = system.file("report/package", package = "val.pipeline"),
     output_format = "typst", # Options include html, gfm, and typst. Supplying 'all' does all 3
-    # params list: https://github.com/pharmaR/riskreports/blob/main/inst/report/package/pkg_template.qmd
+    # params list: https://github.com/pharmaR/val.report/blob/main/inst/report/package/pkg_template.qmd
     params = list(
       assessment_path = assessment_file,
       hide_reverse_deps = 'false',
@@ -487,7 +487,7 @@ val_pkg <- function(
     val_date = val_date,
     ref = ref,
     metric_pkg = metric_pkg,
-    # metrics = pkg_assessment, # saved separately for {riskreports}
+    # metrics = pkg_assessment, # saved separately for {val.report}
     decision = decision$final_risk,
     decision_reason = decision_reason,
     final_decision = NA_character_, # Will be set later

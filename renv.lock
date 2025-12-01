@@ -3087,49 +3087,6 @@
       "RemoteRef": "master",
       "RemoteSha": "960b4a29d8d0f69b3630b9805b7da39d516c2f67"
     },
-    "riskreports": {
-      "Package": "riskreports",
-      "Version": "0.0.0.9006",
-      "Source": "GitHub",
-      "Title": "Package Validation Reports",
-      "Authors@R": "c( person(\"Lluís\", \"Revilla Sancho\", , \"lluis.revilla_sancho@roche.com\", role = c(\"aut\", \"cre\"), comment = c(ORCID = \"0000-0001-9747-2570\")), person(\"R Validation Hub\", role = \"cph\", email = \"r-val-hub-maintainers@lists.r-consortium.org\") )",
-      "Description": "Documents package checks for validation in a pharmaceutic  context.",
-      "License": "MIT + file LICENSE",
-      "URL": "https://github.com/pharmaR/riskreports, https://pharmar.github.io/riskreports/",
-      "BugReports": "https://github.com/pharmaR/riskreports/issues",
-      "Depends": [
-        "R (>= 4.3.0)"
-      ],
-      "Imports": [
-        "methods",
-        "htmltools",
-        "quarto (>= 1.4.4)",
-        "reactable"
-      ],
-      "Suggests": [
-        "knitr",
-        "riskmetric (>= 0.2.4)",
-        "rmarkdown",
-        "spelling",
-        "testthat (>= 3.0.0)",
-        "withr (>= 3.0.2)"
-      ],
-      "VignetteBuilder": "knitr",
-      "Config/testthat/edition": "3",
-      "Encoding": "UTF-8",
-      "Language": "en-US",
-      "Roxygen": "list(markdown = TRUE)",
-      "RoxygenNote": "7.3.3",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteRepo": "riskreports",
-      "RemoteUsername": "pharmaR",
-      "RemoteRef": "HEAD",
-      "RemoteSha": "684454d9ed11c0f8dca01fc50d828a4800d5a3c9",
-      "NeedsCompilation": "no",
-      "Author": "Lluís Revilla Sancho [aut, cre] (ORCID: <https://orcid.org/0000-0001-9747-2570>), R Validation Hub [cph]",
-      "Maintainer": "Lluís Revilla Sancho <lluis.revilla_sancho@roche.com>"
-    },
     "riskscore": {
       "Package": "riskscore",
       "Version": "0.0.3",
@@ -4190,6 +4147,48 @@
       "Author": "Patrick O. Perry [aut, cph], Kirill Müller [cre] (ORCID: <https://orcid.org/0000-0002-1416-3412>), Unicode, Inc. [cph, dtc] (Unicode Character Database)",
       "Maintainer": "Kirill Müller <kirill@cynkra.com>",
       "Repository": "RSPM"
+    },
+    "val.report": {
+      "Package": "val.report",
+      "Version": "0.0.0.9006",
+      "Source": "GitHub",
+      "Title": "Validation Reports",
+      "Authors@R": "c( person(\"Lluís\", \"Revilla Sancho\", , \"lluis.revilla_sancho@roche.com\", role = c(\"aut\", \"cre\"), comment = c(ORCID = \"0000-0001-9747-2570\")), person(\"R Validation Hub\", role = \"cph\", email = \"r-val-hub-maintainers@lists.r-consortium.org\") )",
+      "Description": "Documents package checks for validation in a pharmaceutic  context.",
+      "License": "MIT + file LICENSE",
+      "URL": "https://github.com/pharmaR/val.report, https://pharmar.github.io/val.report/",
+      "BugReports": "https://github.com/pharmaR/val.report/issues",
+      "Depends": [
+        "R (>= 4.3.0)"
+      ],
+      "Imports": [
+        "methods",
+        "htmltools",
+        "quarto (>= 1.4.4)",
+        "reactable"
+      ],
+      "Suggests": [
+        "knitr",
+        "riskmetric (>= 0.2.4)",
+        "rmarkdown",
+        "spelling",
+        "testthat (>= 3.0.0)",
+        "withr (>= 3.0.2)"
+      ],
+      "VignetteBuilder": "knitr",
+      "Config/testthat/edition": "3",
+      "Encoding": "UTF-8",
+      "Language": "en-US",
+      "Roxygen": "list(markdown = TRUE)",
+      "RoxygenNote": "7.3.3",
+      "Author": "Lluís Revilla Sancho [aut, cre] (ORCID: <https://orcid.org/0000-0001-9747-2570>), R Validation Hub [cph]",
+      "Maintainer": "Lluís Revilla Sancho <lluis.revilla_sancho@roche.com>",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "pharmaR",
+      "RemoteRepo": "val.report",
+      "RemoteRef": "main",
+      "RemoteSha": "ee5963ae7be0e2baf7bf86c85a2f01f4095ff70c"
     },
     "vctrs": {
       "Package": "vctrs",

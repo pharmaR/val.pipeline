@@ -45,16 +45,16 @@ Imports:
     magrittr,
     purrr,
     riskmetric (>= 0.2.5),
-    riskreports (>= 0.0.0.9006),
     rlang,
     stringr,
     tibble,
     tidyr,
-    tools
+    tools,
+    val.report (>= 0.0.0.9006)
 Remotes: 
-    pharmaR/riskmetric,
-    pharmaR/riskreports,
-    Sanofi-Public/risk.assessr,
-    pharmar/riskscore
+    riskmetric=pharmaR/riskmetric,
+    val.report=pharmaR/val.report,
+    risk.assessr=Sanofi-Public/risk.assessr,
+    riskscore=pharmar/riskscore
 Depends: 
     R (>= 4.1.0)
