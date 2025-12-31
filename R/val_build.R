@@ -378,8 +378,8 @@ val_build <- function(
     purrr::reduce(dplyr::bind_rows)
   
   
-  saveRDS(pkgs_df0, file.path(val_dir, "qual_supplemental.rds"))
-  # cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_supplemental.rds"), "\n"))
+  saveRDS(pkgs_df0, file.path(val_dir, "qual_metadata.rds"))
+  # cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_metadata.rds"), "\n"))
   
   
   
@@ -485,8 +485,8 @@ val_build <- function(
   val_end_txt <- utils::capture.output(val_end - val_start)
   cat("\n--> Build", val_end_txt,"\n")
   
-  saveRDS(pkgs_df, file.path(val_dir, "qual_supplemental.rds"))
-  cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_supplemental.rds"), "\n"))
+  saveRDS(pkgs_df, file.path(val_dir, "qual_metadata.rds"))
+  cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_metadata.rds"), "\n"))
   
   # Return object 
   return(list(
