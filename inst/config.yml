@@ -1,6 +1,21 @@
 default:
   remote_only: [withr, VGAM, shinyBS, fitdistrplus, collapse, gamlss.dist, gss, segmented] # withr - crashes, VGAM 10h, shinyBS 5h, collapse 1.6h, fitdistrplus 1.7h, gamlss.dist 52m, gss 52m, segmented 45m
-  approved_pkgs: [] # packages that have been approved manually outside of {val.pipeline} workflow
+  approved_pkgs: [
+    tidyverse, ggplot2, dplyr, tidyr, readr, purrr, tibble, stringr, forcats, lubridate,
+    DBI, haven, httr, readxl, googlesheets4, googledrive, rvest, jsonlite, xml2,
+    hms, blob, dbplyr, dtplyr,
+    magrittr, glue,
+    readxl, vroom, 
+    
+    tidymodels, rsample, parsnip, recipes, workflows, tune, yardstick, broom, dials,
+    
+    devtools, lintr, pak, cli, roxygen2, testthat, usethis, pkgdown, httr2, rlang,
+    xml2, progress, scales, here, R6, fs, remotes, covr, rcmdcheck,
+    
+    shiny, rmarkdown,
+    
+    gt
+  ] # packages that have been approved manually outside of {val.pipeline} workflow
   decisions_lst: [Low, Medium, High]
   opt_repos: 
     CRAN: https://packagemanager.posit.co/cran/latest
