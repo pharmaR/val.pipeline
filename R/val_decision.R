@@ -205,7 +205,7 @@ val_decision <- function(
 #' used to set thresholds (and later update final decision (if not already 'high
 #' risk')) AND filter packages before running val_build(). Note: If PACKAGES
 #' file had assessments, we'd be using that (paired with \{val.filter\}), but
-#' instead, we're going to use riskscore::cran_assessed_20250812 for the time
+#' instead, we're going to use riskscore::cran_assessed_latest for the time
 #' being
 #'
 #' @param source character, either "riskscore" (default), "PACKAGES", or a
@@ -227,7 +227,7 @@ val_categorize <- function(
     else_cat = "High",
     decisions_df = build_decisions_df(rule_type = "remote_reduce")
 ) {
-  # @importFrom riskscore cran_assessed_20250812 cran_scored_20250812
+  # @importFrom riskscore cran_assessed_lastest cran_scored_lastest
   
   # verify decisions_df is compliant
   if(!all(c("metric", "decision", "condition", "metric_type", "accept_condition") %in% colnames(decisions_df))) {
@@ -242,8 +242,8 @@ val_categorize <- function(
     requireNamespace("riskscore", quietly = TRUE)
     # Use "pkg_cran_remote" data from riskscore::cran_assessed_latest
     # remotes::install_github("pharmar/riskscore", force = TRUE,
-    #                         ref = "main")
-    pv <- utils::packageVersion("riskscore") # verify ‘v0.0.3'
+    #                         ref = "latest")
+    pv <- utils::packageVersion("riskscore") # verify ‘v0.1.0'
     riskscore_run_date <- riskscore::assessed_latest$riskmetric_run_date |> unique()
     cat(paste0("\n--> Using {riskscore} Version: 'v", pv, "', last compiled on '",
                riskscore_run_date,"'.\n"))
