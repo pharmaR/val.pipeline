@@ -3,8 +3,8 @@
 devtools::load_all()
 
 
-# val_date <- Sys.Date()
-val_date <- "2025-10-27"
+val_date <- Sys.Date()
+# val_date <- "2025-10-27"
 val_date_txt <- gsub("-", "", val_date)
 val_dir <- file.path(
   Sys.getenv("RISK_OUTPATH", unset = getwd()),
@@ -30,7 +30,7 @@ source("dev/pkg_lists.R") # build_pkgs & pkgs for CRAN only
 # See the full dependency tree before running val_build()
 # these_pkgs <- "withr"  # messes with the entire process
 # these_pkgs <- "matrix" # takes 5 mins to install
-# these_pkgs <- "askpass"
+these_pkgs <- "askpass"
 # these_pkgs <- "boot"
 # these_pkgs <- c("Biobase", "BiocGenerics")
 # these_pkgs <- pkgs
@@ -43,15 +43,15 @@ tree <- tools::package_dependencies(
   # which = c("Suggests"),
   which = "strong", #c("Depends", "Imports", "LinkingTo"),
   # which = c("Depends", "Imports", "LinkingTo", "Suggests"), # prod
-  recursive = TRUE
-  # recursive = FALSE
+  # recursive = TRUE
+  recursive = FALSE
 ) |>
   unlist(use.names = FALSE) |>
   unique()
 # How many? # 621 pkgs -->  When recursive: 2,570. Only 744 when you don't include Suggests
 full_tree <- c(these_pkgs, tree) |> unique()
 full_tree |> length()
-pkgs |> length()
+# pkgs |> length()
 
 # temporary until we can figure out what's gone haywire with this pkg
 # build_pkgs <- build_pkgs[build_pkgs != "withr"]
@@ -67,8 +67,8 @@ qual <- val_build(
   deps = NULL,
   # deps_recursive = TRUE,
   deps_recursive = FALSE,
-  # val_date = Sys.Date(),
-  val_date = as.Date("2025-10-27"),
+  val_date = Sys.Date(),
+  # val_date = as.Date("2025-10-27"),
   replace = FALSE, 
   # use a env var for the out path
   out = Sys.getenv("RISK_OUTPATH", unset = getwd())
