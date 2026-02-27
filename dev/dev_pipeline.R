@@ -6,9 +6,9 @@ devtools::load_all()
 qual <- val_pipeline(
   ref = "source",
   metric_pkg = "riskmetric", 
-  deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+  deps = c("depends", "suggests"), # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
   deps_recursive = TRUE,
-  val_date = Sys.Date(),
+  val_date = as.Date('2026-02-24'), #Sys.Date(),
   # val_date = as.Date("2025-10-07"),
   replace = FALSE, 
   out = Sys.getenv("RISK_OUTPATH", unset = getwd())

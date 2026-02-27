@@ -19,7 +19,7 @@ default:
   decisions_lst: [Low, Medium, High]
   opt_repos: 
     CRAN: https://packagemanager.posit.co/cran/latest
-    BioC: https://bioconductor.org/packages/3.21/bioc #https://packagemanager.posit.co/bioconductor/latest 
+    BioC: https://bioconductor.org/packages/3.22/bioc #https://packagemanager.posit.co/bioconductor/latest 
     
 remote_reduce:
   inherits: default
