@@ -85,22 +85,30 @@ decide:
   covr_coverage:
     cond:
       High: ~ is.na(.x) | .x < 35
-      Medium: ~ dplyr::between(.x, 35, 70)
-      Low: ~ .x > 70
+      Medium: ~ dplyr::between(.x, 35, 65)
+      Low: ~ .x > 65
     type: primary
     accept_cats: Low
   r_cmd_check_errors: # Pointless as a primary check since CRAN insures no warnings / errors
     cond:
       High: ~ is.na(.x) | .x > 1
       Low: ~ .x == 0
-    type: primary
+    type: secondary
     accept_cats: Low
   r_cmd_check_warnings: # Pointless as a primary check since CRAN insures no warnings / errors
     cond:
       High: ~ is.na(.x) | .x > 1
       Low: ~ .x == 0
-    type: primary
+    type: secondary
     accept_cats: Low
+  dependencies:
+    cond:
+      # High: ~ is.na(.x)
+      High: ~ .x > 35
+      Medium: ~ dplyr::between(.x, 25, 35)
+      Low: ~ .x < 25
+    type: secondary
+    accept_cats: [Low, Medium]
   has_examples:
     cond:
       High: ~ is.na(.x) | .x < 1

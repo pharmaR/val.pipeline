@@ -4,7 +4,7 @@ devtools::load_all()
 
 
 # val_date <- Sys.Date()
-val_date <- "2025-10-27"
+val_date <- "2026-02-24"
 val_date_txt <- gsub("-", "", val_date)
 val_dir <- file.path(
   Sys.getenv("RISK_OUTPATH", unset = getwd()),

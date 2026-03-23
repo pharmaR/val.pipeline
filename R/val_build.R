@@ -359,6 +359,19 @@ val_build <- function(
   #
   # ---- Collate Pkg Meta into DF ----
   #
+    # For Debugging
+    # meta_files <- list.files(assessed, pattern = "_meta.rds$")
+    # meta_length <- meta_files |> length() # assessment file count
+    # pkg_bundles <- purrr::map(meta_files, function(file){
+    #   # file <- meta_files[1] # for debugging
+    #   meta_cnt <- which(meta_files == file)
+    #   pkg_v <- gsub("_meta.rds", "", file)
+    #   pkg <- stringr::word(pkg_v, 1, sep = "_")
+    #   ver <- stringr::word(pkg_v, 2, sep = "_")
+    #   cat(paste0("\n\n#", meta_cnt, " of ", meta_length, ": ", pkg))
+    #   readRDS(file.path(assessed, file))
+    # }) 
+  
   
   # Reduce package bundles down into a data.frame containing specific info
   # names(pkg_bundles)
