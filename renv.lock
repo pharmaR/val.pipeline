@@ -3152,7 +3152,7 @@
       "RemoteRepo": "riskscore",
       "RemoteUsername": "pharmar",
       "RemoteRef": "latest",
-      "RemoteSha": "31e240306a6370e04d869e97bf385691079deae5",
+      "RemoteSha": "224a0b35fbc9c1f37af459ef35879b0ebfe22f68",
       "NeedsCompilation": "no",
       "Author": "Aaron Clark [cre, aut] (ORCID: <https://orcid.org/0000-0002-0123-0970>), R Validation Hub [cph, fnd]",
       "Maintainer": "Aaron Clark <clark.aaronchris@gmail.com>"

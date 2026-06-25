@@ -1,5 +1,6 @@
 default:
   remote_only: [withr, VGAM, shinyBS, fitdistrplus, collapse, gamlss.dist, gss, segmented, RSiena, qtl, openxlsx2, BayesXsrc] # withr - crashes, VGAM 10h, shinyBS 5h, collapse 1.6h, fitdistrplus 1.7h, gamlss.dist 52m, gss 52m, segmented 45m, RSiena 1.6hr, qtl 22hr, openxlsx2 60m, BayesXsrc 45m,
+  approve_remote_reduce: [logrx] # Usually pkgs with low downloads, but shouldn't be immediately filtered
   approved_pkgs: [
     tidyverse, ggplot2, dplyr, tidyr, readr, purrr, tibble, stringr, forcats, lubridate,
     DBI, haven, httr, readxl, googlesheets4, googledrive, rvest, jsonlite, xml2,
@@ -18,7 +19,7 @@ default:
   ] # packages that have been approved manually outside of {val.pipeline} workflow
   decisions_lst: [Low, Medium, High]
   opt_repos: 
-    CRAN: https://packagemanager.posit.co/cran/latest
+    CRAN: https://packagemanager.posit.co/cran/2026-06-21"
     BioC: https://bioconductor.org/packages/3.22/bioc #https://packagemanager.posit.co/bioconductor/latest 
     
 remote_reduce:

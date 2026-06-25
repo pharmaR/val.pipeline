@@ -43,7 +43,7 @@ val_pipeline <- function(
   replace = FALSE, 
   out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
   opt_repos = 
-    c(CRAN = "https://packagemanager.posit.co/cran/2026-06-21",
+    c(CRAN = "https://packagemanager.posit.co/cran/latest",
       BioC = 'https://bioconductor.org/packages/3.22/bioc')
   ){
 
