@@ -1,6 +1,6 @@
 default:
   remote_only: [withr, VGAM, shinyBS, fitdistrplus, collapse, gamlss.dist, gss, segmented, RSiena, qtl, openxlsx2, BayesXsrc] # withr - crashes, VGAM 10h, shinyBS 5h, collapse 1.6h, fitdistrplus 1.7h, gamlss.dist 52m, gss 52m, segmented 45m, RSiena 1.6hr, qtl 22hr, openxlsx2 60m, BayesXsrc 45m,
-  approve_remote_reduce: [logrx] # Usually pkgs with low downloads, but shouldn't be immediately filtered
+  approved_remote_reduce: [logrx] # Usually pkgs with low downloads, but shouldn't be immediately filtered
   approved_pkgs: [
     tidyverse, ggplot2, dplyr, tidyr, readr, purrr, tibble, stringr, forcats, lubridate,
     DBI, haven, httr, readxl, googlesheets4, googledrive, rvest, jsonlite, xml2,
@@ -19,7 +19,7 @@ default:
   ] # packages that have been approved manually outside of {val.pipeline} workflow
   decisions_lst: [Low, Medium, High]
   opt_repos: 
-    CRAN: https://packagemanager.posit.co/cran/2026-06-21"
+    CRAN: https://packagemanager.posit.co/cran/2026-06-21
     BioC: https://bioconductor.org/packages/3.22/bioc #https://packagemanager.posit.co/bioconductor/latest 
     
 remote_reduce:
@@ -83,6 +83,17 @@ remote_reduce:
 
 decide:
   inherits: remote_reduce
+  # overwrite previous contraints!
+  downloads_1yr:
+    cond:
+      # High: ~ 
+      High: ~ is.na(.x) | .x < 120000
+      Medium: ~ dplyr::between(.x, 120000, 240000)
+      Low: ~ .x > 240000
+    type: secondary # only change
+    accept_cats: Low
+    promote_min: ~ .x > 80000 # bare minimum needed for promo
+    auto_accept: ~ .x > 1000000 # anything above this is gold & doesn't need all the rules
   covr_coverage:
     cond:
       High: ~ is.na(.x) | .x < 35
@@ -90,18 +101,18 @@ decide:
       Low: ~ .x > 65
     type: primary
     accept_cats: Low
-  r_cmd_check_errors: # Pointless as a primary check since CRAN insures no warnings / errors
-    cond:
-      High: ~ is.na(.x) | .x > 1
-      Low: ~ .x == 0
-    type: secondary
-    accept_cats: Low
-  r_cmd_check_warnings: # Pointless as a primary check since CRAN insures no warnings / errors
-    cond:
-      High: ~ is.na(.x) | .x > 1
-      Low: ~ .x == 0
-    type: secondary
-    accept_cats: Low
+  # r_cmd_check_errors: # Pointless as a primary check since CRAN insures no warnings / errors
+  #   cond:
+  #     High: ~ is.na(.x) | .x > 1
+  #     Low: ~ .x == 0
+  #   type: secondary
+  #   accept_cats: Low
+  # r_cmd_check_warnings: # Pointless as a primary check since CRAN insures no warnings / errors
+  #   cond:
+  #     High: ~ is.na(.x) | .x > 1
+  #     Low: ~ .x == 0
+  #   type: secondary
+  #   accept_cats: Low
   dependencies:
     cond:
       # High: ~ is.na(.x)

@@ -14,7 +14,7 @@ qual <- val_pipeline(
   metric_pkg = "riskmetric", 
   deps = c("depends"), #, "suggests"), # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
   deps_recursive = TRUE,
-  val_date = as.Date('2026-03-22'), #Sys.Date(),
+  val_date = as.Date("2026-06-21"), #Sys.Date(),
   # val_date = as.Date("2025-10-07"),
   replace = FALSE, 
   out = Sys.getenv("RISK_OUTPATH", unset = getwd())
@@ -24,17 +24,17 @@ qual <- val_pipeline(
 # Quick run
 # # 
 # 
-ref = "source"
-metric_pkg = "riskmetric"
-deps = c("depends") #,"suggests") # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
-deps_recursive = TRUE
-# val_date = Sys.Date()
-val_date = as.Date("2026-06-21")
-replace = FALSE
-out = Sys.getenv("RISK_OUTPATH", unset = getwd())
-opt_repos =
-  c(CRAN = "https://packagemanager.posit.co/cran/2026-06-21",
-    BioC = 'https://bioconductor.org/packages/3.22/bioc')
+# ref = "source"
+# metric_pkg = "riskmetric"
+# deps = c("depends") #,"suggests") # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+# deps_recursive = TRUE
+# # val_date = Sys.Date()
+# val_date = as.Date("2026-06-21")
+# replace = FALSE
+# out = Sys.getenv("RISK_OUTPATH", unset = getwd())
+# opt_repos =
+#   c(CRAN = "https://packagemanager.posit.co/cran/2026-06-21",
+#     BioC = 'https://bioconductor.org/packages/3.22/bioc')
 
 
 #

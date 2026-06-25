@@ -352,8 +352,10 @@ val_categorize <- function(
     # extract list values into a numeric vector
     if("downloads_1yr" %in% decisions_df$metric) {
       pkgs$dwnlds <- purrr::map_dbl(pkgs$downloads_1yr, ~ {
-          if(is.null(.x[[1]])) NA_real_ else as.numeric(.x[[1]])
-        })
+        if(is.null(.x[[1]])) NA_real_ else {
+          if("pkg_metric_error" %in% class(.x[[1]])) NA_real_ else as.numeric(.x[[1]])
+        }
+      })
     }
     if("reverse_dependencies" %in% decisions_df$metric) {
       pkgs$rev_deps <- pkgs$reverse_dependencies |>
