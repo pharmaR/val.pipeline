@@ -218,7 +218,13 @@ val_build <- function(
   if(!dir.exists(val_dir)) dir.create(val_dir)
   if(!dir.exists(assessed)) dir.create(assessed) # needed
   
-  
+  #
+  # Save the config file to the val_dir for record keeping
+  file.copy(
+    system.file("config.yml", package = "val.pipeline"),
+    file.path(val_dir, "config.yml"),
+    overwrite = TRUE
+  )
   
   #
   # ---- Build pkg bundles ----
@@ -416,10 +422,14 @@ val_build <- function(
   # NOTE: deps is from the args to val_build()... will need to be added
   reject_iteration <- function(pkg_dat, dec_reject = "High", failed_pkgs = NULL){
     
-    # 1. identify all packages that are NOT "Low Risk"
+    # 0. identify all packages that are NOT "Low Risk"
     if(is.null(failed_pkgs)) {
       failed_pkgs <- pkg_dat$pkg[pkg_dat$final_decision != decisions[1]]
     }
+    
+    # 1. identify all packages that are pre-approved as "Low Risk". These pkg
+    # decisions cannot get reversed So they should be removed from 'failed pkgs'
+    # approved_pkgs <- pull_config(val = "approved_pkgs", rule_type = "default")
     
     # Process the data.frame
     pkg_dat <- pkg_dat |>
@@ -431,11 +441,13 @@ val_build <- function(
       # 3. change their decision the decision of their dependency
       dplyr::mutate(
         final_decision = dplyr::case_when(
+          decision_reason == "Pre-Approved package" ~ decision, # if a pkg is pre-approved, then don't change it's decision
           dep_failed ~ dec_reject, # if any of the dependencies failed, then mark as 'High'
           sug_failed & ("Suggests" %in% deps) ~ dec_reject, # if any of the suggests failed, then mark as 'High'
           .default = decision
         ),
         final_decision_reason = dplyr::case_when(
+          decision_reason == "Pre-Approved package" ~ decision_reason, 
           dep_failed ~ "Dependency",
           sug_failed & ("Suggests" %in% deps) ~ "Dependency",
           .default = decision_reason
