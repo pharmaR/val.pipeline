@@ -1014,11 +1014,19 @@ rip_cats_by_pkg <- function(
   # --- Subset Metrics ----
   #
   
+  # Grab pkg names that are allowed to pass the primar filtering event.
+  # These are typically lower download pkgs that derserve their day in court
+  bypass_primary  <- pull_config(val = "pass_primary", rule_type = "default")
+  
   subset_metrics <- dec_df |>
     dplyr::filter(tolower(metric_type) == tolower(label)) %>%
     
-    # if this is not a CRAN pkg, do not use downloads_1yr as a primary metric
-    {if("downloads_1yr" %in% all_mets & toupper(repo_name) != "CRAN") {
+    # if this is not a CRAN pkg OR if it's a pkg that has been granted "pass-primary" status
+    # (usually pkgs with lower downloads, but need a fair shake)...
+    # then do not use downloads_1yr as the cornerstone primary metric
+    {if("downloads_1yr" %in% all_mets & 
+        (toupper(repo_name) != "CRAN" | pkgs_df$package %in% bypass_primary)
+         ) {
       dplyr::filter(., !(tolower(metric) %in% c("downloads_1yr"))) 
     } else .} |>
     

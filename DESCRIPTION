@@ -34,8 +34,6 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Suggests: 
-    risk.assessr (>= 2.0.0),
-    riskscore (>= 0.0.1),
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Imports: 
@@ -46,6 +44,7 @@ Imports:
     purrr,
     riskmetric (>= 0.2.5),
     riskreports (>= 0.0.0.9006),
+    riskscore (>= 0.1.0),
     rlang,
     stringr,
     tibble,

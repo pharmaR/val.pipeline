@@ -12,10 +12,11 @@ val_dir <- file.path(
   val_date_txt
 )
 
-assessed <- file.path(val_dir, "assessed")
-meta_files <- list.files(assessed, pattern = "_meta.rds$")
-# ass_files <- list.files(assessed, pattern = "_assessments.rds$")
-pkgs <- stringr::word(meta_files, sep = "_", start = 1)
+# Inspect files / pkgs assessed
+# assessed <- file.path(val_dir, "assessed")
+# meta_files <- list.files(assessed, pattern = "_meta.rds$")
+# # ass_files <- list.files(assessed, pattern = "_assessments.rds$")
+# pkgs <- stringr::word(meta_files, sep = "_", start = 1)
 
 
 # review qual df
@@ -26,12 +27,13 @@ pkgs <- stringr::word(meta_files, sep = "_", start = 1)
 
 
 # Create qualified pkg data.frame
-source("dev/pkg_lists.R") # build_pkgs & pkgs for CRAN only
+# source("dev/pkg_lists.R") # build_pkgs & pkgs for CRAN only
 # See the full dependency tree before running val_build()
 # these_pkgs <- "withr"  # messes with the entire process
 # these_pkgs <- "matrix" # takes 5 mins to install
 # these_pkgs <- "askpass"
 # these_pkgs <- "logrx"
+these_pkgs <- "dplyr"
 # these_pkgs <- "boot"
 # these_pkgs <- c("Biobase", "BiocGenerics")
 # these_pkgs <- pkgs
@@ -78,22 +80,21 @@ qual <- val_build(
 
 qual_df <- qual$pkgs_df
 View(qual_df)
+
 # 
 # Quick run
 # 
-
-# # -- dev --
-# pkg_names = these_pkgs
-# ref = "source"
-# metric_pkg = "riskmetric"
+pkg_names = these_pkgs
+ref = "source"
+metric_pkg = "riskmetric"
 # deps = "depends" # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
-# deps = NULL
+deps = NULL
 # deps_recursive = TRUE
-# # deps_recursive = FALSE
+deps_recursive = FALSE
 # val_date = Sys.Date()
-# # val_date = as.Date("2025-10-23")
-# replace = FALSE
-# out = Sys.getenv("RISK_OUTPATH", unset = getwd())
+val_date = as.Date("2026-06-21")
+replace = FALSE
+out = Sys.getenv("RISK_OUTPATH", unset = getwd())
 
 # -- defaults --
 # ref = "source"

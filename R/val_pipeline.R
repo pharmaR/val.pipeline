@@ -167,14 +167,14 @@ val_pipeline <- function(
   
   # Grab pkg names that are allowed to pass the remote_reduce filtering event.
   # These are typically lower download pkgs that derserve their day in court
-  approved_remote_reduce <- pull_config(val = "approved_remote_reduce", rule_type = "default")
+  pass_remote_pkgs  <- pull_config(val = "pass_primary", rule_type = "default")
   
   # Grab packages that have passed the filtering event, or those that were approved
-  # via the approved_remote_reduce config
+  # to pass the primary decision guantlet via the pass_primary config
   passed_pkgs <-
     pre_filtered_pkg_metrics |>
     dplyr::filter(
-      package %in% approved_remote_reduce |
+      package %in% pass_remote_pkgs |
       final_risk %in% decisions[1])
   
     

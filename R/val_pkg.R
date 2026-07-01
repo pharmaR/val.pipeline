@@ -243,7 +243,8 @@ val_pkg <- function(
         decisions = decisions,
         else_cat = decisions[length(decisions)],
         decisions_df = build_decisions_df(
-          rule_type = "decide",
+          # rule_type = "decide", # was
+          rule_type = "remote_reduce",  # trying
           viable_metrics = init_viable_metrics
           )
       )
@@ -309,34 +310,35 @@ val_pkg <- function(
   #
   #### risk.assessr ####
   #
-  } else if(metric_pkg == "risk.assessr") {
-    requireNamespace("risk.assessr", quietly = TRUE)
-    if(ref == "source") {
-      pkg_assessment <- risk.assessr::risk_assess_pkg(tar_file)
-      # names(pkg_assessment)
-      # pkg_assessment$results
-      # pkg_assessment$results$dep # doesn't mention lattice...
-      # (pkg_assessment$results$download$last_month_download * 12) |> prettyNum(big.mark = ",")
-      # pkg_assessment$covr_list # failed
-      # pkg_assessment$tm        # failed
-      # pkg_assessment$check_list # appears to depend on pkgs installed locally
-    } else {
-      pkg_assessment <- risk.assessr::assess_pkg_r_package(pkg, ver)
-      # names(pkg_assessment0)
-      # pkg_assessment0$results
-      # pkg_assessment0$results$dep 
-      # (pkg_assessment0$results$download$last_month_download * 12) |> prettyNum(big.mark = ",")
-      # pkg_assessment0$covr_list 
-      # pkg_assessment0$tm        
-      # pkg_assessment0$check_list 
-    }
-    
-  #
-  #### val.meter ####
-  #
-  } else if(metric_pkg == "val.meter") {
-    stop("Not yet implemented: val_pkg() using 'val.meter' tooling")
-  } # no else since we assert metric_pkg values at top of val_pkg().
+  } 
+  # else if(metric_pkg == "risk.assessr") {
+  #   requireNamespace("risk.assessr", quietly = TRUE)
+  #   if(ref == "source") {
+  #     pkg_assessment <- risk.assessr::risk_assess_pkg(tar_file)
+  #     # names(pkg_assessment)
+  #     # pkg_assessment$results
+  #     # pkg_assessment$results$dep # doesn't mention lattice...
+  #     # (pkg_assessment$results$download$last_month_download * 12) |> prettyNum(big.mark = ",")
+  #     # pkg_assessment$covr_list # failed
+  #     # pkg_assessment$tm        # failed
+  #     # pkg_assessment$check_list # appears to depend on pkgs installed locally
+  #   } else {
+  #     pkg_assessment <- risk.assessr::assess_pkg_r_package(pkg, ver)
+  #     # names(pkg_assessment0)
+  #     # pkg_assessment0$results
+  #     # pkg_assessment0$results$dep 
+  #     # (pkg_assessment0$results$download$last_month_download * 12) |> prettyNum(big.mark = ",")
+  #     # pkg_assessment0$covr_list 
+  #     # pkg_assessment0$tm        
+  #     # pkg_assessment0$check_list 
+  #   }
+  #   
+  # #
+  # #### val.meter ####
+  # #
+  # } else if(metric_pkg == "val.meter") {
+  #   stop("Not yet implemented: val_pkg() using 'val.meter' tooling")
+  # } # no else since we assert metric_pkg values at top of val_pkg().
   
   
   assessed_end <- Sys.time()

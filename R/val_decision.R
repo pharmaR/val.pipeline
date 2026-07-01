@@ -115,12 +115,22 @@ val_decision <- function(
   # prime_decision <- "Low"
   # prime_decision <- "unknown"
   
-
-  # If pkg is not from CRAN & either decision is 'low' or "unknown", then make decision using secondary metric conditions
+  # Assess uing secondary metrics if:
+  # - pkg is not from CRAN & either decision is "unknown" or NOT 'low'
   if((prime_decision == "unknown") |
      (tolower(repo_name) != "cran" & prime_decision != decisions[1])
      ) {
-    cat(glue::glue("\n\n\n--> Package '{pkg}' needs secondary metric assessments.\n\n"))
+    
+    # Share reason for secondary metric assessment
+    if(tolower(repo_name) != "cran" & prime_decision != decisions[1]) {
+      cat(glue::glue("\n\n\n--> Package '{pkg}' is NOT from a CRAN source and has 'failed' with a primary decision of '{prime_decision}'.\n"))
+    } else if(prime_decision == "unknown") {
+      cat(glue::glue("\n\n\n--> Package '{pkg}' earned a primary decision of '{prime_decision}'.\n"))
+    }
+    
+    # State conclusion
+    cat(glue::glue("\n--> Package '{pkg}' needs secondary metric assessments.\n\n"))
+    
     #
     # ---- Perform 'Secondary' Checks ----
     #
