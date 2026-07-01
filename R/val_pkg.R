@@ -243,8 +243,8 @@ val_pkg <- function(
         decisions = decisions,
         else_cat = decisions[length(decisions)],
         decisions_df = build_decisions_df(
-          # rule_type = "decide", # was
-          rule_type = "remote_reduce",  # trying
+          rule_type = "decide",
+          # rule_type = "remote_reduce",  # Could use this one here.
           viable_metrics = init_viable_metrics
           )
       )

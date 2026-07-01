@@ -4,13 +4,13 @@ devtools::load_all()
 
 
 # val_date <- Sys.Date()
-val_date <- "2026-06-21"
-val_date_txt <- gsub("-", "", val_date)
-val_dir <- file.path(
-  Sys.getenv("RISK_OUTPATH", unset = getwd()),
-  glue::glue('R_{getRversion()}'),
-  val_date_txt
-)
+# val_date <- "2026-06-21"
+# val_date_txt <- gsub("-", "", val_date)
+# val_dir <- file.path(
+#   Sys.getenv("RISK_OUTPATH", unset = getwd()),
+#   glue::glue('R_{getRversion()}'),
+#   val_date_txt
+# )
 
 # Inspect files / pkgs assessed
 # assessed <- file.path(val_dir, "assessed")
@@ -32,8 +32,9 @@ val_dir <- file.path(
 # these_pkgs <- "withr"  # messes with the entire process
 # these_pkgs <- "matrix" # takes 5 mins to install
 # these_pkgs <- "askpass"
-# these_pkgs <- "logrx"
-these_pkgs <- "dplyr"
+these_pkgs <- "logrx"
+# these_pkgs <- "dplyr"
+# these_pkgs <- "tibble"
 # these_pkgs <- "boot"
 # these_pkgs <- c("Biobase", "BiocGenerics")
 # these_pkgs <- pkgs
@@ -46,15 +47,15 @@ tree <- tools::package_dependencies(
   # which = c("Suggests"),
   which = "strong", #c("Depends", "Imports", "LinkingTo"),
   # which = c("Depends", "Imports", "LinkingTo", "Suggests"), # prod
-  # recursive = TRUE
-  recursive = FALSE
+  recursive = TRUE
+  # recursive = FALSE
 ) |>
   unlist(use.names = FALSE) |>
   unique()
 # How many? # 621 pkgs -->  When recursive: 2,570. Only 744 when you don't include Suggests
 full_tree <- c(these_pkgs, tree) |> unique()
 full_tree |> length()
-pkgs |> length()
+# pkgs |> length()
 
 # temporary until we can figure out what's gone haywire with this pkg
 # build_pkgs <- build_pkgs[build_pkgs != "withr"]
@@ -66,35 +67,35 @@ qual <- val_build(
   pkg_names = these_pkgs,
   ref = "source",
   metric_pkg = "riskmetric", 
-  # deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
-  deps = NULL,
-  # deps_recursive = TRUE,
-  deps_recursive = FALSE,
+  deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+  # deps = NULL,
+  deps_recursive = TRUE,
+  # deps_recursive = FALSE,
   # val_date = Sys.Date(),
   val_date = as.Date("2026-06-21"),
-  replace = FALSE, 
+  replace = TRUE, 
   # use a env var for the out path
   out = Sys.getenv("RISK_OUTPATH", unset = getwd())
     # Sys.getenv("RISK_OUTPATH", unset = getwd())
 )
 
 qual_df <- qual$pkgs_df
-View(qual_df)
+# View(qual_df)
 
 # 
 # Quick run
 # 
-pkg_names = these_pkgs
-ref = "source"
-metric_pkg = "riskmetric"
-# deps = "depends" # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
-deps = NULL
-# deps_recursive = TRUE
-deps_recursive = FALSE
-# val_date = Sys.Date()
-val_date = as.Date("2026-06-21")
-replace = FALSE
-out = Sys.getenv("RISK_OUTPATH", unset = getwd())
+# pkg_names = these_pkgs
+# ref = "source"
+# metric_pkg = "riskmetric"
+# # deps = "depends" # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+# deps = NULL
+# # deps_recursive = TRUE
+# deps_recursive = FALSE
+# # val_date = Sys.Date()
+# val_date = as.Date("2026-06-21")
+# replace = FALSE
+# out = Sys.getenv("RISK_OUTPATH", unset = getwd())
 
 # -- defaults --
 # ref = "source"

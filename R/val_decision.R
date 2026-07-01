@@ -123,13 +123,13 @@ val_decision <- function(
     
     # Share reason for secondary metric assessment
     if(tolower(repo_name) != "cran" & prime_decision != decisions[1]) {
-      cat(glue::glue("\n\n\n--> Package '{pkg}' is NOT from a CRAN source and has 'failed' with a primary decision of '{prime_decision}'.\n"))
+      cat(glue::glue("\n\n\n--> Package '{pkg}' is NOT from a CRAN source and has 'failed' with a primary decision of '{prime_decision}'.\n\n"))
     } else if(prime_decision == "unknown") {
-      cat(glue::glue("\n\n\n--> Package '{pkg}' earned a primary decision of '{prime_decision}'.\n"))
+      cat(glue::glue("\n\n\n--> Package '{pkg}' earned a primary decision of '{prime_decision}'.\n\n"))
     }
     
     # State conclusion
-    cat(glue::glue("\n--> Package '{pkg}' needs secondary metric assessments.\n\n"))
+    cat(glue::glue("\n\n--> Package '{pkg}' needs secondary metric assessments.\n\n"))
     
     #
     # ---- Perform 'Secondary' Checks ----
