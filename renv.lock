@@ -2921,8 +2921,8 @@
     },
     "riskmetric": {
       "Package": "riskmetric",
-      "Version": "0.2.5",
-      "Source": "Repository",
+      "Version": "0.2.7",
+      "Source": "GitHub",
       "Type": "Package",
       "Title": "Risk Metrics to Evaluating R Packages",
       "Description": "Facilities for assessing R packages against a number of metrics to  help quantify their robustness.",
@@ -2950,22 +2950,29 @@
         "devtools"
       ],
       "Suggests": [
-        "knitr",
-        "rmarkdown",
-        "withr",
-        "magrittr",
         "dplyr",
+        "jsonlite",
+        "knitr",
+        "magrittr",
+        "pkgbuild",
+        "rmarkdown",
         "testthat",
         "webmockr",
-        "jsonlite"
+        "withr"
       ],
-      "RoxygenNote": "7.3.2",
+      "RoxygenNote": "7.3.3",
       "VignetteBuilder": "knitr",
       "Config/testthat/edition": "3",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteRepo": "riskmetric",
+      "RemoteUsername": "pharmaR",
+      "RemotePkgRef": "pharmaR/riskmetric",
+      "RemoteRef": "HEAD",
+      "RemoteSha": "fd07e38635ddd2ba675c6afa4fa1ba4ff787fd19",
       "NeedsCompilation": "no",
       "Author": "R Validation Hub [aut], Doug Kelkhoff [aut], Marly Gotti [aut], Eli Miller [cre, aut], Kevin K [aut], Yilong Zhang [aut], Eric Milliman [aut], Juliane Manitz [aut], Mark Padgham [ctb], PSI special interest group Application and Implementation of Methodologies in Statistics [cph]",
-      "Maintainer": "Eli Miller <eli.miller@atorusresearch.com>",
-      "Repository": "RSPM"
+      "Maintainer": "Eli Miller <eli.miller@atorusresearch.com>"
     },
     "riskreports": {
       "Package": "riskreports",
