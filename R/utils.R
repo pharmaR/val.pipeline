@@ -1024,8 +1024,8 @@ rip_cats_by_pkg <- function(
     # if this is not a CRAN pkg OR if it's a pkg that has been granted "pass-primary" status
     # (usually pkgs with lower downloads, but need a fair shake)...
     # then do not use downloads_1yr as the cornerstone primary metric
-    {if("downloads_1yr" %in% all_mets & 
-        (toupper(repo_name) != "CRAN" | pkgs_df$package %in% bypass_primary)
+    {if("downloads_1yr" %in% all_mets && 
+        (toupper(repo_name) != "CRAN" || pkgs_df$package %in% bypass_primary)
          ) {
       dplyr::filter(., !(tolower(metric) %in% c("downloads_1yr"))) 
     } else .} |>
@@ -1075,7 +1075,11 @@ rip_cats_by_pkg <- function(
         across(ends_with("_cat"), ~ factor(.x, levels = decisions)), 
         
         # if any column ending in "_cataa" is TRUE, then set final_risk_catid to 1 (Low)
-        final_risk_cataa = ifelse(rowSums(across(ends_with("_cataa"), ~ .x), na.rm = TRUE) > 0, 1, NA_integer_),
+        # final_risk_cataa = dplyr::if_else(rowSums(across(ends_with("_cataa"), ~ .x), na.rm = TRUE) > 0, 1, NA_integer_), # original but fragile
+        final_risk_cataa = dplyr::if_else(
+          dplyr::if_any(dplyr::ends_with("_cataa"), ~ isTRUE(.x)),
+          1L, NA_integer_
+        ), # much better
         
         # higher risk trumps lower risk amongst all _cat vars (e.g., High > Medium > Low)
         max_catid = pmax(!!!rlang::syms(paste0(unique(subset_metrics$derived_col), "_catid")), na.rm = TRUE) |> as.integer(),
