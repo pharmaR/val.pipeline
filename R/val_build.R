@@ -397,8 +397,11 @@ val_build <- function(
     purrr::reduce(dplyr::bind_rows)
   
   
-  saveRDS(pkgs_df0, file.path(val_dir, "qual_metadata.rds"))
-  # cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_metadata.rds"), "\n"))
+  # Interim snapshot BEFORE dependency-based decision propagation runs.
+  # Kept as a separate file (qual_metadata0.rds) so the pre-propagation state
+  # remains inspectable for debugging decision-graph issues. The final
+  # qual_metadata.rds is written after reject_iteration() converges (below).
+  saveRDS(pkgs_df0, file.path(val_dir, "qual_metadata0.rds"))
   
   
   
@@ -419,60 +422,29 @@ val_build <- function(
   # 3. change their decision the decision of their dependency
   
   # pkgs_df0$decision[1] <- "High" # for debugging
-  # NOTE: deps is from the args to val_build()... will need to be added
-  reject_iteration <- function(pkg_dat, dec_reject = "High", failed_pkgs = NULL){
-    
-    # 0. identify all packages that are NOT "Low Risk"
-    if(is.null(failed_pkgs)) {
-      failed_pkgs <- pkg_dat$pkg[pkg_dat$final_decision != decisions[1]]
-    }
-    
-    # 1. identify all packages that are pre-approved as "Low Risk". These pkg
-    # decisions cannot get reversed So they should be removed from 'failed pkgs'
-    # approved_pkgs <- pull_config(val = "approved_pkgs", rule_type = "default")
-    
-    # Process the data.frame
-    pkg_dat <- pkg_dat |>
-      
-      # 2. identify all packages that depend on those packages
-      dplyr::mutate(dep_failed = purrr::map_lgl(depends, ~ any(.x %in% failed_pkgs)),
-                    sug_failed = purrr::map_lgl(suggests, ~ any(.x %in% failed_pkgs))) |>
-      
-      # 3. change their decision the decision of their dependency
-      dplyr::mutate(
-        final_decision = dplyr::case_when(
-          decision_reason == "Pre-Approved package" ~ decision, # if a pkg is pre-approved, then don't change it's decision
-          dep_failed ~ dec_reject, # if any of the dependencies failed, then mark as 'High'
-          sug_failed & ("Suggests" %in% deps) ~ dec_reject, # if any of the suggests failed, then mark as 'High'
-          .default = decision
-        ),
-        final_decision_reason = dplyr::case_when(
-          decision_reason == "Pre-Approved package" ~ decision_reason, 
-          dep_failed ~ "Dependency",
-          sug_failed & ("Suggests" %in% deps) ~ "Dependency",
-          .default = decision_reason
-        )
-      ) |>
-      dplyr::select(-dep_failed, -sug_failed)
-    
-    return(pkg_dat)
-  }
-  
+  # reject_iteration() lives in R/utils.R so it is unit-testable in isolation.
   # First iteration:
   # Based off of 'decision', not 'final_decision'
   dec_reject <- decisions[length(decisions)]
   failed <- pkgs_df0$pkg[pkgs_df0$decision != decisions[1]] # start w/ 'decision'
-  pkgs_df <- reject_iteration(pkgs_df0, dec_reject, failed)
+  pkgs_df <- reject_iteration(pkgs_df0, dec_reject, deps, decisions, failed)
   
   # All remaining iterations!
   while(!identical(pkgs_df$pkg[pkgs_df$final_decision != decisions[1]], failed)) {
     # if the list of failed pkgs has changed, then we need to iterate again
     failed <<- pkgs_df$pkg[pkgs_df$final_decision != decisions[1]]
-    pkgs_df <<- reject_iteration(pkgs_df, dec_reject, failed)
+    pkgs_df <<- reject_iteration(pkgs_df, dec_reject, deps, decisions, failed)
   }
   
   cat("\n--> Assigned 'final' decisions.\n")
   
+  # Save the final qualification frame BEFORE the per-package meta RDS
+  # update walk below. Prior versions saved this at the very end of val_build(),
+  # which meant any error inside the walk would leave qual_metadata.rds as the
+  # interim pkgs_df0 snapshot (final_decision NA for every val_pkg()-assessed
+  # row). See #53.
+  saveRDS(pkgs_df, file.path(val_dir, "qual_metadata.rds"))
+  cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_metadata.rds"), "\n"))
   
   
   
@@ -509,9 +481,6 @@ val_build <- function(
   val_end <- Sys.time()
   val_end_txt <- utils::capture.output(val_end - val_start)
   cat("\n--> Build", val_end_txt,"\n")
-  
-  saveRDS(pkgs_df, file.path(val_dir, "qual_metadata.rds"))
-  cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_metadata.rds"), "\n"))
   
   # Return object 
   return(list(
