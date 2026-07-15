@@ -441,8 +441,22 @@ val_pkg <- function(
   } else {
     decision_reason <- "Risk Assessment"
   }
-  
+
+  # When the decision reason is "Risk Assessment" and the package didn't land
+  # in the lowest-risk category, capture the specific metrics whose per-metric
+  # `_cat` matched the final risk (i.e. the metrics that drove the outcome).
+  # For other decision reasons (auto-accept, pre-approved, dependency-driven)
+  # we leave this NA_character_ for now — see issue #37 for scope.
+  decision_reason_note <- if(identical(decision_reason, "Risk Assessment")) {
+    extract_risk_drivers(decision, decisions = decisions)
+  } else {
+    NA_character_
+  }
+
   cat("\n-->", pkg_v,"decision reason:\n---->", decision_reason, "\n")
+  if(!is.na(decision_reason_note)) {
+    cat("---->", pkg_v, "risk-driving metric(s):", decision_reason_note, "\n")
+  }
   
   
   
@@ -490,8 +504,10 @@ val_pkg <- function(
     # metrics = pkg_assessment, # saved separately for {riskreports}
     decision = decision$final_risk,
     decision_reason = decision_reason,
+    decision_reason_note = decision_reason_note,
     final_decision = NA_character_, # Will be set later
     final_decision_reason = NA_character_, # Will be set later
+    final_decision_reason_note = NA_character_, # Will be set later
     depends = if(identical(depends, character(0))) NA_character_ else depends,
     suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
     rev_deps = if(is.null(pkg_assessment$reverse_dependencies)) NA_character_ else pkg_assessment$reverse_dependencies |> as.vector(),

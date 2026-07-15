@@ -1,5 +1,11 @@
 # val.pipeline (development version)
 
+- Add `decision_reason_note` / `final_decision_reason_note` to the per-package
+  meta bundle. When `decision_reason == "Risk Assessment"` and the package
+  didn't land in the lowest-risk tier, this note lists the specific metrics
+  whose per-metric category matched the aggregated `final_risk` — i.e. the
+  metrics that drove the package into `"Medium"` / `"High"` (#37).
+
 # val.pipeline 0.0.1
 
 * Dynamically change the packagemanager date used for `CRAN` repo to reflect the
