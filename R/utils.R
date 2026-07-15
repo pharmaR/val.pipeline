@@ -1382,8 +1382,10 @@ split_join_cats <- function(
 #'   on this iteration. If `NULL`, derived from `pkg_dat$final_decision !=
 #'   decisions[1]`.
 #'
-#' @return `pkg_dat` with `final_decision` and `final_decision_reason`
-#'   populated for every row (no `NA`s introduced by this function).
+#' @return `pkg_dat` with `final_decision`, `final_decision_reason`, and
+#'   `final_decision_reason_note` populated for every row (no `NA`s
+#'   introduced by this function outside the note field, which stays `NA`
+#'   for dependency-driven downgrades — see issue #37).
 #'
 #' @importFrom dplyr mutate case_when select
 #' @importFrom purrr map_lgl
@@ -1412,7 +1414,70 @@ reject_iteration <- function(pkg_dat, dec_reject, deps, decisions,
         dep_failed ~ "Dependency",
         sug_failed & ("Suggests" %in% deps) ~ "Dependency",
         .default = decision_reason
+      ),
+      # If the final decision reason is "Dependency" (dep- or suggests-driven
+      # downgrade), we don't currently identify which dep failed — that's
+      # deferred (see issue #37). Otherwise carry the assessment-side
+      # driver metric note through.
+      final_decision_reason_note = dplyr::case_when(
+        decision_reason == "Pre-Approved package" ~ decision_reason_note,
+        dep_failed ~ NA_character_,
+        sug_failed & ("Suggests" %in% deps) ~ NA_character_,
+        .default = decision_reason_note
       )
     ) |>
     dplyr::select(-dep_failed, -sug_failed)
+}
+
+
+#' Extract Risk Drivers From a Decision Row
+#'
+#' Given a single-row `data.frame` produced by [val_decision()] (or one of the
+#' underlying `rip_cats_*` helpers), return the names of the per-metric
+#' categorization columns (`<metric>_cat`) whose category equals the
+#' `final_risk` for that row. Only metrics that "tie" the final risk category
+#' are returned — i.e. the metrics that drove the package out of the lowest
+#' risk category.
+#'
+#' Used by [val_pkg()] to populate `decision_reason_note` with the specific
+#' metrics that caused a package to fall out of the lowest-risk category into
+#' `"Medium"` / `"High"`.
+#'
+#' @param decision_df A single-row `data.frame` with a `final_risk` column
+#'   (factor or character) and one or more `<metric>_cat` columns.
+#' @param decisions Character vector of decision categories, lowest to highest.
+#'   Metrics matching `decisions[1]` (the "safe" category) are never returned
+#'   as drivers.
+#'
+#' @return A single character string with driver metric names separated by
+#'   `", "`, or `NA_character_` if none apply (e.g. `final_risk` is the
+#'   lowest category, is `NA`, or no `<metric>_cat` column matches).
+#'
+#' @keywords internal
+extract_risk_drivers <- function(
+    decision_df,
+    decisions = c("Low", "Medium", "High")
+) {
+  if(is.null(decision_df) || !is.data.frame(decision_df) || nrow(decision_df) == 0) {
+    return(NA_character_)
+  }
+  if(!"final_risk" %in% names(decision_df)) return(NA_character_)
+
+  fr <- as.character(decision_df$final_risk[[1]])
+  if(is.na(fr) || identical(fr, decisions[1])) return(NA_character_)
+
+  # Candidate per-metric category columns: anything ending in "_cat", excluding
+  # any aggregate columns that happen to share the suffix. `_cataa` cols don't
+  # match `_cat` end so they're already excluded.
+  cat_cols <- grep("_cat$", names(decision_df), value = TRUE)
+  cat_cols <- setdiff(cat_cols, "final_risk_cat")
+  if(length(cat_cols) == 0) return(NA_character_)
+
+  matches <- vapply(cat_cols, function(col) {
+    v <- as.character(decision_df[[col]][[1]])
+    !is.na(v) && identical(v, fr)
+  }, logical(1))
+
+  if(!any(matches)) return(NA_character_)
+  paste(sub("_cat$", "", cat_cols[matches]), collapse = ", ")
 }

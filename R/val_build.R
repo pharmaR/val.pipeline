@@ -321,8 +321,10 @@ val_build <- function(
         metric_pkg = NA_character_,
         decision = decisions[length(decisions)],
         decision_reason = "Dependency",
+        decision_reason_note = NA_character_,
         final_decision = decisions[length(decisions)],
         final_decision_reason = "Dependency",
+        final_decision_reason_note = NA_character_,
         depends = if(identical(depends, character(0))) NA_character_ else depends,
         suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
         rev_deps = NA_character_,
@@ -469,6 +471,7 @@ val_build <- function(
       purrr::walk(pkg_meta_file, function(f){
         dep_meta <- readRDS(f)
         dep_meta$final_decision_reason <- "Dependency"
+        dep_meta$final_decision_reason_note <- NA_character_
         dep_meta$final_decision <- decisions[length(decisions)]
         saveRDS(dep_meta, f)
         cat(paste0("\n\n--> Updated ", dep_meta$pkg, " v", dep_meta$ver," from '", dep_meta$decision,"' to '", dep_meta$final_decision,"' in meta bundle .rds.\n"))

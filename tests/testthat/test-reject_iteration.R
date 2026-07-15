@@ -17,6 +17,8 @@ make_pkg_dat <- function() {
     ),
     final_decision         = NA_character_, # as val_pkg.R initializes
     final_decision_reason  = NA_character_,
+    decision_reason_note   = NA_character_,
+    final_decision_reason_note = NA_character_,
     depends  = list(character(0), character(0), "B",            character(0)),
     suggests = list(character(0), character(0), character(0),   "B")
   )
