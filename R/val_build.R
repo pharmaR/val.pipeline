@@ -515,9 +515,9 @@ val_build <- function(
   
   # Return object 
   return(list(
-    val_dir = val_dir,
-    pkg_meta = pkgs_df,
-    pkg_assess = assessment_bundle
+    val_dir = val_dir#,
+    # pkg_meta = pkgs_df,
+    # pkg_assess = assessment_bundle
   ))
 }
 

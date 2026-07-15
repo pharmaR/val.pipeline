@@ -3,21 +3,29 @@
 devtools::load_all()
 
 
-# val_date <- Sys.Date()
-# val_date <- "2026-06-21"
-# val_date_txt <- gsub("-", "", val_date)
-# val_dir <- file.path(
-#   Sys.getenv("RISK_OUTPATH", unset = getwd()),
-#   glue::glue('R_{getRversion()}'),
-#   val_date_txt
-# )
+val_date <- Sys.Date()
+val_date <- "2026-06-21"
+val_date_txt <- gsub("-", "", val_date)
+val_dir <- file.path(
+  Sys.getenv("RISK_OUTPATH", unset = getwd()),
+  glue::glue('R_{getRversion()}'),
+  val_date_txt
+)
 
-# Inspect files / pkgs assessed
-# assessed <- file.path(val_dir, "assessed")
-# meta_files <- list.files(assessed, pattern = "_meta.rds$")
-# # ass_files <- list.files(assessed, pattern = "_assessments.rds$")
-# pkgs <- stringr::word(meta_files, sep = "_", start = 1)
+# # Inspect files / pkgs assessed
+assessed <- file.path(val_dir, "assessed")
+meta_files <- list.files(assessed, pattern = "_meta.rds$")
+ass_files <- list.files(assessed, pattern = "_assess_record.rds$")
+ass_files |> length()
+pkgs <- stringr::word(meta_files, sep = "_", start = 1)
+pkgs |> length()
 
+reports <- file.path(val_dir, "reports")
+report_files <- list.files(reports) #, pattern = "_meta.rds$")
+report_pkgs <- stringr::word(report_files, sep = "_", start = 3)
+report_pkgs |> length()
+
+pkgs[!pkgs %in% report_pkgs]
 
 # review qual df
 # qual <- readRDS(file.path(val_dir, paste0("qual_evidence_", val_date_txt, ".rds")))
@@ -33,6 +41,7 @@ devtools::load_all()
 # these_pkgs <- "matrix" # takes 5 mins to install
 # these_pkgs <- "askpass"
 these_pkgs <- "logrx"
+these_pkgs <- "broom"
 # these_pkgs <- "dplyr"
 # these_pkgs <- "tibble"
 # these_pkgs <- "boot"
@@ -64,13 +73,13 @@ full_tree |> length()
 
 qual <- val_build(
   # pkg_names = build_pkgs,
-  pkg_names = these_pkgs,
+  pkg_names = these_pkgs, #tidyR required 'decor' pkg be installed!
   ref = "source",
   metric_pkg = "riskmetric", 
-  deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
-  # deps = NULL,
-  deps_recursive = TRUE,
-  # deps_recursive = FALSE,
+  # deps = "depends", # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+  deps = NULL,
+  # deps_recursive = TRUE,
+  deps_recursive = FALSE,
   # val_date = Sys.Date(),
   val_date = as.Date("2026-06-21"),
   replace = TRUE, 
@@ -88,10 +97,10 @@ qual_df <- qual$pkgs_df
 # pkg_names = these_pkgs
 # ref = "source"
 # metric_pkg = "riskmetric"
-# # deps = "depends" # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
-# deps = NULL
-# # deps_recursive = TRUE
-# deps_recursive = FALSE
+# deps = "depends" # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+# # deps = NULL
+# deps_recursive = TRUE
+# # deps_recursive = FALSE
 # # val_date = Sys.Date()
 # val_date = as.Date("2026-06-21")
 # replace = FALSE

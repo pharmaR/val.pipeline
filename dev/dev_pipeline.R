@@ -24,72 +24,109 @@ qual <- val_pipeline(
 # Quick run
 # # 
 # 
-# ref = "source"
-# metric_pkg = "riskmetric"
-# deps = c("depends") #,"suggests") # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
-# deps_recursive = TRUE
-# # val_date = Sys.Date()
-# val_date = as.Date("2026-06-21")
-# replace = FALSE
-# out = Sys.getenv("RISK_OUTPATH", unset = getwd())
-# opt_repos =
-#   c(CRAN = "https://packagemanager.posit.co/cran/2026-06-21",
-#     BioC = 'https://bioconductor.org/packages/3.22/bioc')
+ref = "source"
+metric_pkg = "riskmetric"
+deps = c("depends") #,"suggests") # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+deps_recursive = TRUE
+# val_date = Sys.Date()
+val_date = as.Date("2026-06-21")
+replace = FALSE
+out = Sys.getenv("RISK_OUTPATH", unset = getwd())
+opt_repos =
+  c(CRAN = "https://packagemanager.posit.co/cran/2026-06-21",
+    BioC = 'https://bioconductor.org/packages/3.22/bioc')
 
 
 #
 # Inspect the assessment dir
 #
+# 
+val_date = as.Date("2026-06-21")
+val_date_txt <- gsub("-", "", val_date)
+val_dir <- file.path(
+  Sys.getenv("RISK_OUTPATH", unset = getwd()),
+  glue::glue('R_{getRversion()}'),
+  val_date_txt
+  )
 
-# val_date = as.Date("2026-02-24")
-# val_date_txt <- gsub("-", "", val_date)
-# val_dir <- file.path(
-#   Sys.getenv("RISK_OUTPATH", unset = getwd()),
-#   glue::glue('R_{getRversion()}'),
-#   val_date_txt
-#   )
 
 
-# review qual df
+# # # Inspect files / pkgs assessed vs reports
+# assessed <- file.path(val_dir, "assessed")
+# meta_files <- list.files(assessed, pattern = "_meta.rds$")
+# ass_files <- list.files(assessed, pattern = "_assess_record.rds$")
+# ass_files |> length()
+# pkgs <- stringr::word(meta_files, sep = "_", start = 1)
+# pkgs |> length()
+# 
+# reports <- file.path(val_dir, "reports")
+# report_files <- list.files(reports) #, pattern = "_meta.rds$")
+# report_pkgs <- stringr::word(report_files, sep = "_", start = 3)
+# report_pkgs |> length()
+# 
+# pkgs[!pkgs %in% report_pkgs]
 
-# decisions <- pull_config(val = "decisions_lst", rule_type = "default")
-# # qual <- readRDS(file.path(val_dir, "qual_supplemental.rds")) |>
-# val_dir <- "/data/shared/riskassessments//R_4.5.1/20260224"
-# qual_metadata <- readRDS(file.path(val_dir, "qual_evidence.rds"))
-# decisions <- c("Low", "Medium", "High")
-# qual <- qual_metadata |>
-#   dplyr::mutate(decision = factor(decision, levels = decisions),
-#                 final_decision = factor(final_decision, levels = decisions)
-#                 )
 
+
+# Review assessment df (below)
+
+
+# Review qual df
+decisions <- pull_config(val = "decisions_lst", rule_type = "default")
+qual_metadata <- readRDS(file.path(val_dir, "qual_metadata.rds"))
+qual <- qual_metadata #|>
+  # dplyr::mutate(decision = factor(decision, levels = decisions),
+  #               final_decision = factor(final_decision, levels = decisions)
+  #               )
+
+  
+
+
+  
 # Summarize Decisions & final decisions into table
-# dec <- table(qual$decision_reason, qual$decision)
-# dec
-# findec <- table(qual$final_decision_reason, qual$final_decision)
-# findec
-# diff <- findec - dec
-# diff
+dec <- table(qual$decision_reason, qual$decision)
+dec
+findec <- table(qual$final_decision_reason, qual$final_decision)
+findec
+diff <- findec - dec
+diff
 
-# slow <- qual |>
-#   dplyr::filter(assessment_runtime_mins > 45)
-# slow |> dplyr::select(pkg, assessment_runtime_txt)
+
+
+# Were final decisions rendered in qual_metadata? If not, run this:
+
+
+slow <- qual |>
+  dplyr::filter(assessment_runtime_mins > 45)
+slow |> dplyr::select(pkg, assessment_runtime_txt)
 
 # Search for any 'unknown' repos
-# unknown_repos <- qual |>
-#   dplyr::filter(repos == "unknown")
-# unknown_repos |> dplyr::select(pkg, repos)
-# unknown_repos |> pull(pkg) |> length()
+unknown_repos <- qual |>
+  dplyr::filter(repos == "unknown")
+unknown_repos |> dplyr::select(pkg, repos)
+unknown_repos |> pull(pkg) |> length()
+
 
 #
 # Assemble the assessment's data.frame
 #
-# assessed <- file.path(val_dir, "assessed")
-# ass_files <- list.files(assessed, pattern = "_assessments.rds$")
-# ass_length <- ass_files |> length() # assessment file count
-# round((ass_files |> length()) / nrow(qual) * 100, 2) # 74.77 percent of total
+assessed <- file.path(val_dir, "assessed")
+ass_files <- list.files(assessed, pattern = "_assessments.rds$")
+ass_length <- ass_files |> length() # assessment file count
+# Calculate percent of pkgs that ran an assessment, out of total pkgs in qual_metadata
+round((ass_files |> length()) / nrow(qual) * 100, 2)
+  # 72.11 percent of total
 
 
-# Start bundling rds files from assessment & score Rds, OR...
+#
+# If needed, rebuild assessments data.frame (qual_assessments.rds)
+#
+
+#
+# Option 1:
+# Start bundling rds files from assessment lists (rds) & score lists (Rds), OR...
+#
+
 # rm(assessment_bundle)
 # assessment_bundle <- purrr::map(ass_files, function(file){
 #   ass_cnt <- which(ass_files == file)
@@ -116,9 +153,12 @@ qual <- val_pipeline(
 #   purrr::reduce(dplyr::bind_rows)
 
 
+
 #
+# Option 2:
 # Assemble the assessment's data.frame by binding aesses_record's
 #
+
 # assessed <- file.path(val_dir, "assessed")
 # ass_files <- list.files(assessed, pattern = "_assess_record.rds$")
 # ass_length <- ass_files |> length() # assessment file count
@@ -144,12 +184,20 @@ qual <- val_pipeline(
 #   # purrr::reduce(dplyr::bind_rows)
 
 
-
+#
+# Save & or load result
+#
 # saveRDS(assessment_bundle, file.path(val_dir, "qual_assessments.rds"))
+assessment_bundle <- readRDS(file.path(val_dir, "qual_assessments.rds"))
 # # saveRDS(assessment_bundle, file.path("dev", "qual_assessments_20251028.rds"))
 # # assessment_bundle <- readRDS(file.path("dev", "qual_assessments_20251023.rds"))
 
-# count how many r_cmd_check_errors there are
+
+
+#
+# Analyze Assessments df
+#
+# # Count how many r_cmd_check_errors there are
 # check <- assessment_bundle |>
 #   dplyr::filter(!is.na(r_cmd_check_errors)) |>
 #   dplyr::as_tibble()
@@ -167,7 +215,8 @@ qual <- val_pipeline(
 #   dplyr::as_tibble()
 
 
-# # choose a pkg
+
+# # # choose a pkg
 # # pkg_name <- "zoo"
 # # meta_pkg <- meta_files[stringr::str_detect(meta_files, pkg_name)]
 # # meta <- readRDS(file.path(assessed, meta_pkg))

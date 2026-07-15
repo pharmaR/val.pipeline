@@ -212,49 +212,33 @@ val_pipeline <- function(
   # ---- Inspect outputs ----
   #
   
-  qual <- outtie$pkgs_df
+  # old - removed for return()
+  # qual <- outtie$pkg_meta
+  # pkg_assess <- outtie$pkg_assess
   
-  # nrow(qual)
-  saveRDS(qual, file.path(outtie$val_dir, paste0("qual_evidence_", val_date_txt, ".rds")))
-  
-  # # Inspect the assessment dir
-  # # valdate <- gsub("-", "", Sys.Date())
-  # valdate <- "20250731"
-  # val_dir <- file.path(
-  #   "dev/riskassessments",
-  #   glue::glue('R_{getRversion()}'),
-  #   valdate
-  #   )
-  # assessed <- file.path(val_dir, "assessed")
-  # meta_files <- list.files(assessed, pattern = "_meta.rds$")
-  # ass_files <- list.files(assessed, pattern = "_assessments.rds$")
-  # 
-  # # choose a pkg
-  # pkg_name <- "zoo"
-  # meta_pkg <- meta_files[stringr::str_detect(meta_files, pkg_name)]
-  # meta <- readRDS(file.path(assessed, meta_pkg)) 
-  # ass_pkg <- ass_files[stringr::str_detect(ass_files, pkg_name)]
-  # ass <- readRDS(file.path(assessed, ass_pkg)) 
-  # 
-  # # explore outputs
-  # meta
-  # names(ass)
-  # ass$covr_coverage$totalcoverage
-  # ass$downloads_1yr |> prettyNum(big.mark = ",")
-  
-  # 
-  # # val_build(pkg_names = c('aamatch'), deps = NULL) # No coverage
-  
-  
+  # Instead, load metadata
+  # qual <- readRDS(file.path(outtie$val_dir, paste0("qual_metadata.rds")))
+  # qual_asses <- readRDS(file.path(outtie$val_dir, paste0("qual_assessments.rds")))
   
   
   
   #
   # ---- Wrap up ----
   #
-  # determine qualified pkgs to provision for PPM
+  # Determine qualified pkgs to provision for 'validated' PPM repo. Then convert
+  # the vector into a text file where one package name is on each line.
   # qualified <- qual |>
   #   dplyr::filter(final_decision == decisions[1])
+  
+  # Using qual, create a high-level PDF report containing summary statistics
+  # about the qualification run. The report may contain things like: Three
+  # tables: Low, Medium, and High Risk pkgs. Each table should include package
+  # name, version, and the reason for the decision. The report should also
+  # include a summary of the number of packages in each category, as well as any
+  # notable trends or observations from the assessment process. The report
+  # should be generated in a format that is easy to read and understand, such as
+  # a PDF or HTML document. The report should be saved to the output directory
+  # specified in the function
   
   # Store as pins board?
   # How to Provision PPM metadata for all pkgs
