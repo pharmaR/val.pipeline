@@ -14,7 +14,7 @@ val_build(
   out = "riskassessment",
   replace = FALSE,
   opt_repos = c(CRAN = "https://packagemanager.posit.co/cran/latest", BioC =
-    "https://bioconductor.org/packages/3.21/bioc")
+    "https://bioconductor.org/packages/3.22/bioc")
 )
 }
 \arguments{

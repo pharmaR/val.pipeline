@@ -1353,11 +1353,66 @@ split_join_cats <- function(
 }
 
 
+#' Reject Iteration: Propagate dependency-based decision downgrades
+#'
+#' Given a data.frame of per-package risk assessments (one row per package,
+#' with `decision`, `decision_reason`, `depends`, `suggests` list-columns),
+#' compute the `final_decision` and `final_decision_reason` for every row by
+#' marking any package whose dependencies (or Suggests, when `"Suggests"` is
+#' in `deps`) appear in `failed_pkgs` as `dec_reject`. Pre-approved packages
+#' are never downgraded. Packages with no failing dep carry their original
+#' `decision` / `decision_reason` through to `final_decision` /
+#' `final_decision_reason`.
+#'
+#' The function is designed to be called iteratively from `val_build()` until
+#' the set of failing packages stabilizes (a package can become "failed"
+#' because one of its deps just became failed, which can cascade further).
+#'
+#' @param pkg_dat A tibble with columns `pkg`, `decision`, `decision_reason`,
+#'   `depends` (list-col of character), `suggests` (list-col of character).
+#' @param dec_reject Character. The category to assign to dependency-failed
+#'   packages (typically `"High"`).
+#' @param deps Character. The dependency scope from the enclosing
+#'   `val_build()` call (`"depends"` or `"suggests"`). Only when `"Suggests"`
+#'   is present will Suggests-failures propagate.
+#' @param decisions Character vector. Ordered risk categories, low → high
+#'   (e.g. `c("Low", "Medium", "High")`). Only used to identify the "not
+#'   failed" baseline (`decisions[1]`) when `failed_pkgs` is `NULL`.
+#' @param failed_pkgs Character vector of package names to treat as failed
+#'   on this iteration. If `NULL`, derived from `pkg_dat$final_decision !=
+#'   decisions[1]`.
+#'
+#' @return `pkg_dat` with `final_decision` and `final_decision_reason`
+#'   populated for every row (no `NA`s introduced by this function).
+#'
+#' @importFrom dplyr mutate case_when select
+#' @importFrom purrr map_lgl
+#'
+#' @keywords internal
+reject_iteration <- function(pkg_dat, dec_reject, deps, decisions,
+                             failed_pkgs = NULL) {
+  if (is.null(failed_pkgs)) {
+    failed_pkgs <- pkg_dat$pkg[pkg_dat$final_decision != decisions[1]]
+  }
 
-
-
-
-
-
-
-  
+  pkg_dat |>
+    dplyr::mutate(
+      dep_failed = purrr::map_lgl(depends,  ~ any(.x %in% failed_pkgs)),
+      sug_failed = purrr::map_lgl(suggests, ~ any(.x %in% failed_pkgs))
+    ) |>
+    dplyr::mutate(
+      final_decision = dplyr::case_when(
+        decision_reason == "Pre-Approved package" ~ decision,
+        dep_failed ~ dec_reject,
+        sug_failed & ("Suggests" %in% deps) ~ dec_reject,
+        .default = decision
+      ),
+      final_decision_reason = dplyr::case_when(
+        decision_reason == "Pre-Approved package" ~ decision_reason,
+        dep_failed ~ "Dependency",
+        sug_failed & ("Suggests" %in% deps) ~ "Dependency",
+        .default = decision_reason
+      )
+    ) |>
+    dplyr::select(-dep_failed, -sug_failed)
+}

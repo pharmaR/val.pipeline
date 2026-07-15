@@ -3,6 +3,12 @@
 - Found out that Posit provides their own validation documentation for several
 co-horts of packages they develop, so we've added them to the config's
 `approved_pkgs` config element by default. (#42)
+- Fix `qual_metadata.rds` so `final_decision` / `final_decision_reason` are
+populated for every package (not just dependency-downgraded ones). The
+interim pre-propagation frame is now saved separately as
+`qual_metadata0.rds`, and the post-propagation frame is written before the
+per-package meta RDS update walk so any error inside that walk cannot leave
+a stale `qual_metadata.rds` on disk. (#53)
 
 # val.pipeline 0.0.1
 
