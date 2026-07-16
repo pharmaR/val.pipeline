@@ -3,6 +3,7 @@ utils::globalVariables(c(
   ".", "Freq", "Freq.x", "Freq.y", "Package", "Repository", "V1", "Var1",
   "Version", "accept_cats", "auto_accept", "auto_pass", "bugs_status",
   "decision", "decision_reason", "decision_reason_note", "dep_failed",
+  "dep_failed_matches", "sug_failed_matches",
   "dep_freq", "depends", "deps",
   "derived_col", "downloads_1yr", "ends_with", "exception_risk_category",
   "final_decision", "final_decision_reason_note", "final_risk",

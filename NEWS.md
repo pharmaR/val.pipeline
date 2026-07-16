@@ -5,6 +5,12 @@
   didn't land in the lowest-risk tier, this note lists the specific metrics
   whose per-metric category matched the aggregated `final_risk` — i.e. the
   metrics that drove the package into `"Medium"` / `"High"` (#37).
+- Extend `decision_reason_note` / `final_decision_reason_note` to the
+  `"Dependency"` case: when a package is downgraded because a dep (or, if
+  `deps` includes `"Suggests"`, a suggest) failed, the note now lists the
+  failing dep package name(s), comma-separated. Best-effort — may
+  under-report if a failing dep wasn't yet in the tracked failure set at
+  the time of the check (#37).
 
 # val.pipeline 0.0.1
 

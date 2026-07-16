@@ -227,6 +227,12 @@ val_build <- function(
   # Initiate a list to store pkgs that include the reverse dependencies of pkgs
   # that have failed
   dont_run <- character(0)
+  # Track the actual failed package names (not just their rev_deps) so we can
+  # name at least one failing dep in `decision_reason_note` for pre-skipped
+  # packages downstream. Pkgs are processed in dep-frequency order, so a
+  # foundational failing dep will be in `failed_pkgs` by the time any of its
+  # rev-deps are visited (see issue #37).
+  failed_pkgs <- character(0)
   
   
   # Start bundling
@@ -269,6 +275,7 @@ val_build <- function(
       if(pkg_meta$decision != decisions[1]) {
         cat(paste0("\n\n--> ", pkg, " v", ver," was assessed with a '", pkg_meta$decision,"' risk. All packages that depend on it will also be marked as '", decisions[length(decisions)],"' risk.\n\n"))
         dont_run <<- c(dont_run, pkg_meta$rev_deps) |> unique()
+        failed_pkgs <<- c(failed_pkgs, pkg) |> unique()
       }
       
     } else {
@@ -302,6 +309,13 @@ val_build <- function(
         dirname() |> dirname() # trim '/src/contrib/` ending
       repo_name <- get_repo_origin(repo_src = repo_src, pkg_name = pkg)
       
+      # Identify which upstream pkg(s) actually failed and caused us to skip.
+      # `depends`/`suggests` are recursive char vecs; intersect with the set of
+      # pkgs that failed earlier in this run. May under-report if a dep failure
+      # came from a pkg we haven't visited yet (see issue #37 caveat), but this
+      # is the best info available at skip time.
+      dep_note <- identify_failed_deps(c(depends, suggests), failed_pkgs)
+      
       
       
       pkg_meta <- list(
@@ -315,10 +329,10 @@ val_build <- function(
         metric_pkg = NA_character_,
         decision = decisions[length(decisions)],
         decision_reason = "Dependency",
-        decision_reason_note = NA_character_,
+        decision_reason_note = dep_note,
         final_decision = decisions[length(decisions)],
         final_decision_reason = "Dependency",
-        final_decision_reason_note = NA_character_,
+        final_decision_reason_note = dep_note,
         depends = if(identical(depends, character(0))) NA_character_ else depends,
         suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
         rev_deps = NA_character_,
@@ -414,8 +428,12 @@ val_build <- function(
     pkg_dat <- pkg_dat |>
       
       # 2. identify all packages that depend on those packages
-      dplyr::mutate(dep_failed = purrr::map_lgl(depends, ~ any(.x %in% failed_pkgs)),
-                    sug_failed = purrr::map_lgl(suggests, ~ any(.x %in% failed_pkgs))) |>
+      dplyr::mutate(
+        dep_failed_matches = purrr::map_chr(depends, identify_failed_deps, failed_pkgs = failed_pkgs),
+        sug_failed_matches = purrr::map_chr(suggests, identify_failed_deps, failed_pkgs = failed_pkgs),
+        dep_failed = !is.na(dep_failed_matches),
+        sug_failed = !is.na(sug_failed_matches)
+      ) |>
       
       # 3. change their decision the decision of their dependency
       dplyr::mutate(
@@ -429,17 +447,17 @@ val_build <- function(
           sug_failed & ("Suggests" %in% deps) ~ "Dependency",
           .default = decision_reason
         ),
-        # If the final decision reason is "Dependency" (dep- or suggests-driven
-        # downgrade), we don't currently identify which dep failed — that's
-        # deferred (see issue #37). Otherwise carry the assessment-side
-        # driver metric note through.
+        # When a pkg is downgraded because a dep (or suggest, if deps includes
+        # "Suggests") failed, list the failing dep pkg name(s) in the note.
+        # Best-effort — may under-report if a chain of failures wasn't fully
+        # captured in `failed_pkgs` at this iteration (see issue #37).
         final_decision_reason_note = dplyr::case_when(
-          dep_failed ~ NA_character_,
-          sug_failed & ("Suggests" %in% deps) ~ NA_character_,
+          dep_failed ~ dep_failed_matches,
+          sug_failed & ("Suggests" %in% deps) ~ sug_failed_matches,
           .default = decision_reason_note
         )
       ) |>
-      dplyr::select(-dep_failed, -sug_failed)
+      dplyr::select(-dep_failed, -sug_failed, -dep_failed_matches, -sug_failed_matches)
     
     return(pkg_dat)
   }
@@ -471,7 +489,9 @@ val_build <- function(
     pkgs_df |>
     dplyr::filter(final_decision != decision)
 
-  purrr::walk2(changed_pkgs$pkg, changed_pkgs$ver, function(pkg, ver){
+  purrr::pwalk(
+    list(changed_pkgs$pkg, changed_pkgs$ver, changed_pkgs$final_decision_reason_note),
+    function(pkg, ver, note){
     # i <- 1 # for debugging
     # pkg <- changed_pkgs$pkg[i] # for debugging
     # ver <- changed_pkgs$ver[i] # for debugging
@@ -483,7 +503,7 @@ val_build <- function(
       purrr::walk(pkg_meta_file, function(f){
         dep_meta <- readRDS(f)
         dep_meta$final_decision_reason <- "Dependency"
-        dep_meta$final_decision_reason_note <- NA_character_
+        dep_meta$final_decision_reason_note <- note
         dep_meta$final_decision <- decisions[length(decisions)]
         saveRDS(dep_meta, f)
         cat(paste0("\n\n--> Updated ", dep_meta$pkg, " v", dep_meta$ver," from '", dep_meta$decision,"' to '", dep_meta$final_decision,"' in meta bundle .rds.\n"))

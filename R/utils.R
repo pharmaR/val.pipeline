@@ -1392,3 +1392,31 @@ extract_risk_drivers <- function(
   if(!any(matches)) return(NA_character_)
   paste(sub("_cat$", "", cat_cols[matches]), collapse = ", ")
 }
+
+
+#' Identify Failed Dependency Package Names
+#'
+#' Given a vector of dependency package names for a single package and the
+#' set of packages known to have failed in this run, return a comma-
+#' separated character string of the intersection (the failing deps), or
+#' `NA_character_` if none intersect. Used to populate the
+#' `decision_reason_note` column when a package is downgraded because a
+#' dependency failed (see issue #37).
+#'
+#' Handles `NULL`, `character(0)`, and `NA_character_` inputs safely.
+#'
+#' @param dep_pkgs Character vector of dependency package names (may include
+#'   Depends, Imports, LinkingTo, and/or Suggests, depending on caller).
+#' @param failed_pkgs Character vector of packages known to have failed.
+#'
+#' @return A single character string like `"pkgA, pkgB"` listing the
+#'   failing deps (sorted, unique), or `NA_character_` if none match.
+#'
+#' @keywords internal
+identify_failed_deps <- function(dep_pkgs, failed_pkgs) {
+  if(is.null(dep_pkgs) || length(failed_pkgs) == 0) return(NA_character_)
+  matches <- intersect(dep_pkgs, failed_pkgs)
+  matches <- matches[!is.na(matches)]
+  if(length(matches) == 0) return(NA_character_)
+  paste(sort(unique(matches)), collapse = ", ")
+}
