@@ -49,6 +49,20 @@ show a literal `"NA"`. `val_pipeline()` now persists
 `pre_filtered_pkg_metrics.rds` alongside `qual_metadata.rds` so re-runs
 of the report against the same directory pick the candidate count up
 automatically. (#59)
+- `val_pipeline_report()`: add a new **Pre-Filter Summary** section
+(before Decision Summary) with the pre-filter risk distribution and a
+pass / drop count table, plus a new **Appendix: Packages Dropped by
+Pre-Filter** with a filterable table of every candidate that didn't
+make it into `val_build()` (including download counts, reverse-dep
+counts, and other raw metric values for context). The `Candidate
+packages` row on the Run Metadata table is renamed to `Candidate
+packages evaluated`. `val_pipeline()` now persists
+`pre_filtered_pkg_metrics.rds` **eagerly** (right after the pre-filter
+data frame is created, before `val_build()` runs) so an interrupted
+run still leaves the candidate universe on disk. Adds a
+`pre_filtered_path` argument to `val_pipeline_report()` for callers
+who want to pass it explicitly; `NULL` (default) auto-detects a
+sibling, `NA` skips the pre-filter sections gracefully. (#59)
 
 # val.pipeline 0.0.1
 

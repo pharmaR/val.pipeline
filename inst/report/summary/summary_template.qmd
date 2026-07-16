@@ -12,6 +12,7 @@ params:
   config_path: NULL
   thresholds_path: NULL
   n_candidates: NULL
+  pre_filtered_path: NULL
 format:
   html:
     toc: true
@@ -77,8 +78,16 @@ qual_assessments <- if (!is.null(params$qual_assessments_path)) {
 } else {
   NULL
 }
+pre_filtered <- if (!is.null(params$pre_filtered_path) &&
+                      file.exists(params$pre_filtered_path)) {
+  readRDS(params$pre_filtered_path)
+} else {
+  NULL
+}
 
 has_assessments <- !is.null(qual_assessments)
+has_pre_filter <- !is.null(pre_filtered) &&
+                    all(c("package", "final_risk") %in% names(pre_filtered))
 
 # Backfill columns that older qual_metadata.rds runs may lack (the
 # `_note` columns were added in val.pipeline 0.0.1.9003 / issue #37).
@@ -94,6 +103,16 @@ qual_metadata$final_decision <- factor(qual_metadata$final_decision,
                                        levels = decision_levels)
 qual_metadata$decision <- factor(qual_metadata$decision,
                                  levels = decision_levels)
+
+# Normalise pre_filtered final_risk to the same factor levels for consistent
+# ordering in tables. `val_categorize()` already returns it as a factor, but
+# older RDS files may not.
+if (has_pre_filter) {
+  pre_filtered$final_risk <- factor(as.character(pre_filtered$final_risk),
+                                    levels = decision_levels)
+  assessed_pkgs <- unique(qual_metadata$pkg)
+  pre_filtered$passed_to_build <- pre_filtered$package %in% assessed_pkgs
+}
 ```
 
 # Run Metadata
@@ -119,8 +138,8 @@ meta_rows <- list(
 )
 if (!is.null(params$n_candidates)) {
   meta_rows <- c(meta_rows, list(
-    c("Candidate packages",  format(as.integer(params$n_candidates),
-                                    big.mark = ","))
+    c("Candidate packages evaluated",
+      format(as.integer(params$n_candidates), big.mark = ","))
   ))
 }
 meta_rows <- c(meta_rows, list(
@@ -135,6 +154,50 @@ meta_tbl <- tibble::tibble(
   Value = vapply(meta_rows, `[`, character(1), 2)
 )
 kable(meta_tbl)
+```
+
+# Pre-Filter Summary
+
+```{r pre-filter-summary, results = "asis", eval = has_pre_filter}
+cat("The pre-filter step runs `riskmetric`'s `remote_reduce` rules over ",
+    "the entire candidate universe (from `{riskscore}`) to identify ",
+    "packages worth spending a full assessment on. Only packages ",
+    "categorised as **Low** risk here — plus any explicitly allow-listed ",
+    "in the `pass_primary` config — proceed to `val_build()`.\n\n", sep = "")
+```
+
+```{r pre-filter-summary-skip, results = "asis", eval = !has_pre_filter}
+cat("_No `pre_filtered_pkg_metrics.rds` was supplied or auto-detected ",
+    "alongside `qual_metadata.rds`. Historical runs predating this ",
+    "artifact will not include a pre-filter summary._\n\n", sep = "")
+```
+
+## Pre-filter risk distribution
+
+```{r pre-filter-counts, eval = has_pre_filter}
+pre_counts <- pre_filtered |>
+  dplyr::count(final_risk, .drop = FALSE, name = "n") |>
+  dplyr::mutate(
+    Percent = sprintf("%.1f%%", 100 * n / sum(n)),
+    n = format(n, big.mark = ",")
+  ) |>
+  dplyr::rename(`Pre-filter risk` = final_risk, Count = n)
+kable(pre_counts, align = "lrr")
+```
+
+## Pass / drop breakdown
+
+```{r pre-filter-passfail, eval = has_pre_filter}
+n_total <- nrow(pre_filtered)
+n_passed <- sum(pre_filtered$passed_to_build)
+n_dropped <- n_total - n_passed
+pf_pass <- tibble::tribble(
+  ~Item, ~Count,
+  "Candidate packages evaluated", format(n_total, big.mark = ","),
+  "Passed to val_build()",        format(n_passed, big.mark = ","),
+  "Dropped by pre-filter",        format(n_dropped, big.mark = ",")
+)
+kable(pf_pass, align = "lr")
 ```
 
 # Decision Summary
@@ -367,6 +430,63 @@ lic_tbl <- qa |>
   dplyr::mutate(percent = sprintf("%.1f%%", 100 * packages / sum(packages))) |>
   dplyr::rename(License = license, Packages = packages, Percent = percent)
 itable(lic_tbl, default_page_size = 15)
+```
+
+# Appendix: Packages Dropped by Pre-Filter
+
+```{r pre-filter-dropped-intro, results = "asis"}
+if (has_pre_filter) {
+  n_dropped_ap <- sum(!pre_filtered$passed_to_build)
+  cat("The ", format(n_dropped_ap, big.mark = ","),
+      " packages below were evaluated against the `remote_reduce` rules ",
+      "but did not qualify for a full assessment run (either their ",
+      "pre-filter risk was above `Low`, or they were absent from the ",
+      "`pass_primary` allow-list). Their raw metric values are shown for ",
+      "context — these are the reasons `val_build()` never opened them.\n\n",
+      sep = "")
+} else {
+  cat("_No `pre_filtered_pkg_metrics.rds` available for this run — ",
+      "dropped-package appendix omitted._\n", sep = "")
+}
+```
+
+```{r pre-filter-dropped-table, eval = has_pre_filter}
+metric_cols <- c(
+  Package = "package",
+  Version = "version",
+  `Pre-filter risk` = "final_risk",
+  `Auto-pass` = "auto_pass",
+  `Downloads (1yr)` = "dwnlds",
+  `Reverse deps` = "rev_deps",
+  Dependencies = "n_deps",
+  Vignettes = "n_vig",
+  `NEWS current` = "news_curr",
+  `Source control` = "src_cntrl",
+  Website = "n_sites",
+  Repo = "repo_name"
+)
+present <- metric_cols[metric_cols %in% names(pre_filtered)]
+
+dropped_tbl <- pre_filtered |>
+  dplyr::filter(!passed_to_build) |>
+  dplyr::select(dplyr::all_of(unname(present))) |>
+  dplyr::arrange(dplyr::desc(final_risk),
+                 if ("dwnlds" %in% names(pre_filtered)) dplyr::desc(dwnlds)
+                 else dplyr::desc(package))
+names(dropped_tbl) <- names(present)
+
+# Format numeric-ish columns with thousands separators for readability.
+for (col in c("Downloads (1yr)", "Reverse deps", "Dependencies")) {
+  if (col %in% names(dropped_tbl)) {
+    dropped_tbl[[col]] <- ifelse(
+      is.na(dropped_tbl[[col]]),
+      NA_character_,
+      format(as.numeric(dropped_tbl[[col]]), big.mark = ",",
+             scientific = FALSE, trim = TRUE)
+    )
+  }
+}
+itable(dropped_tbl, default_page_size = 25)
 ```
 
 # Appendix: Metric Thresholds

@@ -354,3 +354,89 @@ test_that("val_pipeline_report renames source label and drops NA cells", {
   expect_false(grepl("source, NA", html, fixed = TRUE))
   expect_false(grepl("riskmetric, NA", html, fixed = TRUE))
 })
+
+# Small helper that builds a minimal pre_filtered_pkg_metrics data frame
+# matching the column shape produced by val_categorize().
+make_fake_pre_filtered <- function(n = 10) {
+  data.frame(
+    package = sprintf("pf_pkg%02d", seq_len(n)),
+    version = "1.0.0",
+    final_risk = factor(
+      rep(c("Low", "Medium", "High"), length.out = n),
+      levels = c("Low", "Medium", "High")
+    ),
+    auto_pass = FALSE,
+    repo_name = "CRAN",
+    dwnlds = seq(100L, by = 1000L, length.out = n),
+    rev_deps = seq_len(n),
+    n_deps = seq_len(n),
+    n_vig = 0L,
+    news_curr = 1,
+    src_cntrl = 1,
+    n_sites = 1,
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("val_pipeline_report renders Pre-Filter Summary when RDS present", {
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(make_fake_qual_metadata(), qm_path)
+  saveRDS(make_fake_pre_filtered(),
+          file.path(work, "pre_filtered_pkg_metrics.rds"))
+
+  out <- val_pipeline_report(
+    qual_metadata_path = qm_path,
+    qual_assessments_path = NA,
+    format = "html",
+    quiet = TRUE
+  )
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  expect_true(grepl("Candidate packages evaluated", html, fixed = TRUE))
+  expect_true(grepl("Pre-Filter Summary", html, fixed = TRUE))
+  expect_true(grepl("Pre-filter risk distribution", html, fixed = TRUE))
+  expect_true(grepl("Pass / drop breakdown", html, fixed = TRUE))
+  expect_true(grepl("Packages Dropped by Pre-Filter", html, fixed = TRUE))
+  # Dropped rows (Medium/High) appear in the appendix table
+  expect_true(grepl("pf_pkg02", html, fixed = TRUE))
+})
+
+test_that("val_pipeline_report tolerates missing pre_filtered_pkg_metrics", {
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(make_fake_qual_metadata(), qm_path)
+
+  out <- val_pipeline_report(
+    qual_metadata_path = qm_path,
+    qual_assessments_path = NA,
+    n_candidates = NA,
+    pre_filtered_path = NA,
+    format = "html",
+    quiet = TRUE
+  )
+  expect_true(file.exists(out))
+})
+
+test_that("val_pipeline_report errors on missing pre_filtered_path", {
+  qm_path <- tempfile(fileext = ".rds")
+  saveRDS(make_fake_qual_metadata(), qm_path)
+  on.exit(unlink(qm_path), add = TRUE)
+  expect_error(
+    val_pipeline_report(
+      qual_metadata_path = qm_path,
+      qual_assessments_path = NA,
+      pre_filtered_path = tempfile(fileext = ".rds")
+    ),
+    "pre_filtered_pkg_metrics file not found"
+  )
+})

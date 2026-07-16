@@ -13,6 +13,7 @@ val_pipeline_report(
   title = NULL,
   subtitle = NULL,
   n_candidates = NULL,
+  pre_filtered_path = NULL,
   quiet = FALSE
 )
 }
@@ -47,6 +48,13 @@ considered by \code{\link[=val_pipeline]{val_pipeline()}} before the \code{remot
 function looks for a sibling \code{pre_filtered_pkg_metrics.rds} in the
 directory containing \code{qual_metadata_path} and uses its row count. Pass
 \code{NA} to explicitly skip this metric.}
+
+\item{pre_filtered_path}{Character or NULL. Optional path to a
+\code{pre_filtered_pkg_metrics.rds} produced by \code{\link[=val_pipeline]{val_pipeline()}} (the
+pre-\code{val_build()} candidate-set data frame with a \code{package} and
+\code{final_risk} column). When \code{NULL} (the default), a sibling file of
+that name next to \code{qual_metadata_path} is used if present. Pass \code{NA}
+to explicitly skip and omit the Pre-Filter Summary section.}
 
 \item{quiet}{Logical. Suppress Quarto rendering output. Default \code{FALSE}.}
 }

@@ -137,6 +137,25 @@ val_pipeline <- function(
         )
       )
   # see <- pre_filtered_pkg_metrics |> dplyr::filter(dwnlds > 1000000) 
+
+  # Persist the pre-filter candidate set eagerly (before val_build() runs), so
+  # an interrupted run still leaves the evaluated universe on disk for
+  # inspection and for a later re-render of val_pipeline_report(). Uses the
+  # same val_dir path convention val_build() computes, and creates the
+  # directory tree if it doesn't yet exist.
+  eager_r_dir <- file.path(out, glue::glue("R_{r_ver}"))
+  eager_val_dir <- file.path(eager_r_dir, val_date_txt)
+  if (!dir.exists(eager_val_dir)) {
+    dir.create(eager_val_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+  tryCatch(
+    saveRDS(pre_filtered_pkg_metrics,
+            file.path(eager_val_dir, "pre_filtered_pkg_metrics.rds")),
+    error = function(e) {
+      warning("Could not persist pre_filtered_pkg_metrics.rds: ",
+              conditionMessage(e), call. = FALSE)
+    }
+  )
   
   
   
@@ -232,21 +251,11 @@ val_pipeline <- function(
   
   # Generate a high-level HTML + PDF summary report of the run, saved next to
   # qual_metadata.rds in the val_build() output directory. Suitable for GxP /
-  # QMS archival. Failure to render should not fail the whole pipeline.
+  # QMS archival. Failure to render should not fail the whole pipeline. The
+  # pre-filter candidate set was already persisted eagerly above (right after
+  # it was created) so an interrupted val_build() still leaves it on disk.
   qm_path <- file.path(outtie$val_dir, "qual_metadata.rds")
   qa_path <- file.path(outtie$val_dir, "qual_assessments.rds")
-
-  # Persist the pre-filter candidate set alongside the evidence so the
-  # candidate-count row survives report re-runs (and future analyses can
-  # inspect the pre_reduce risk categorisation directly).
-  tryCatch(
-    saveRDS(pre_filtered_pkg_metrics,
-            file.path(outtie$val_dir, "pre_filtered_pkg_metrics.rds")),
-    error = function(e) {
-      warning("Could not persist pre_filtered_pkg_metrics.rds: ",
-              conditionMessage(e), call. = FALSE)
-    }
-  )
 
   if (file.exists(qm_path)) {
     tryCatch(
