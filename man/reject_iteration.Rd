@@ -26,9 +26,9 @@ on this iteration. If \code{NULL}, derived from \code{pkg_dat$final_decision != 
 }
 \value{
 \code{pkg_dat} with \code{final_decision}, \code{final_decision_reason}, and
-\code{final_decision_reason_note} populated for every row (no \code{NA}s
-introduced by this function outside the note field, which stays \code{NA}
-for dependency-driven downgrades — see issue #37).
+\code{final_decision_reason_note} populated for every row. For dependency-
+driven downgrades the note lists the failing dep pkg name(s), comma-
+separated (see \code{\link[=identify_failed_deps]{identify_failed_deps()}} and issue #37).
 }
 \description{
 Given a data.frame of per-package risk assessments (one row per package,

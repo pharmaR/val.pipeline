@@ -1,0 +1,329 @@
+---
+title: "`r params$title`"
+subtitle: "`r params$subtitle`"
+date-format: "YYYY-MM-DD"
+date: "`r params$val_date`"
+params:
+  title: "val.pipeline Qualification Summary"
+  subtitle: ""
+  qual_metadata_path: NULL
+  qual_assessments_path: NULL
+  val_date: NULL
+  config_path: NULL
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    embed-resources: true
+    theme: [cosmo]
+    df-print: paged
+  typst:
+    toc: true
+    toc-depth: 3
+    section-numbering: 1.1.1
+    margin:
+      x: 2cm
+      y: 2cm
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE
+)
+options(knitr.kable.NA = "")
+library(dplyr)
+library(knitr)
+```
+
+```{r load-inputs}
+qual_metadata <- readRDS(params$qual_metadata_path)
+qual_assessments <- if (!is.null(params$qual_assessments_path)) {
+  readRDS(params$qual_assessments_path)
+} else {
+  NULL
+}
+
+has_assessments <- !is.null(qual_assessments)
+
+# Backfill columns that older qual_metadata.rds runs may lack (the
+# `_note` columns were added in val.pipeline 0.0.1.9003 / issue #37).
+for (col in c("decision_reason_note", "final_decision_reason_note")) {
+  if (!col %in% names(qual_metadata)) {
+    qual_metadata[[col]] <- NA_character_
+  }
+}
+has_notes <- any(!is.na(qual_metadata$final_decision_reason_note))
+
+decision_levels <- c("Low", "Medium", "High")
+qual_metadata$final_decision <- factor(qual_metadata$final_decision,
+                                       levels = decision_levels)
+qual_metadata$decision <- factor(qual_metadata$decision,
+                                 levels = decision_levels)
+```
+
+# Run Metadata
+
+```{r run-metadata}
+r_ver <- unique(qual_metadata$r_ver)
+val_dates <- unique(as.character(qual_metadata$val_date))
+repos <- unique(unlist(strsplit(as.character(qual_metadata$repos), "\\s*,\\s*")))
+metric_pkg <- unique(qual_metadata$metric_pkg)
+ref_types <- unique(qual_metadata$ref)
+
+meta_tbl <- tibble::tribble(
+  ~Item, ~Value,
+  "Report generated",       format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"),
+  "Validation date(s)",     paste(val_dates, collapse = ", "),
+  "R version",              paste(r_ver, collapse = ", "),
+  "Assessment source",      paste(ref_types, collapse = ", "),
+  "Metric package",         paste(metric_pkg, collapse = ", "),
+  "Repositories",           paste(repos, collapse = "; "),
+  "Packages assessed",      format(nrow(qual_metadata), big.mark = ","),
+  "qual_metadata path",     params$qual_metadata_path,
+  "qual_assessments path",  ifelse(has_assessments, params$qual_assessments_path, "(not provided)")
+)
+kable(meta_tbl)
+```
+
+# Decision Summary
+
+## Final decision counts
+
+The `final_decision` column reflects the risk category after dependency
+propagation (a package is downgraded if any dependency was Medium/High).
+
+```{r final-decision-counts}
+final_counts <- qual_metadata |>
+  dplyr::count(final_decision, .drop = FALSE, name = "packages") |>
+  dplyr::mutate(percent = sprintf("%.1f%%", 100 * packages / sum(packages)))
+kable(final_counts, col.names = c("Final decision", "Packages", "Percent"),
+      align = "lrr")
+```
+
+## Initial vs. final decision
+
+Packages whose category changed because of dependency propagation.
+
+```{r decision-crosstab}
+xt <- qual_metadata |>
+  dplyr::count(decision, final_decision, .drop = FALSE) |>
+  tidyr::pivot_wider(names_from = final_decision, values_from = n,
+                     values_fill = 0L, names_expand = TRUE)
+kable(xt, caption = "Rows = initial decision, Columns = final decision")
+
+downgraded_n <- sum(qual_metadata$decision != qual_metadata$final_decision,
+                    na.rm = TRUE)
+```
+
+**`r downgraded_n`** package(s) were downgraded from their initial decision
+because of a failing (Medium/High) dependency.
+
+## Reasons driving the final decision
+
+```{r decision-reason-counts}
+reason_counts <- qual_metadata |>
+  dplyr::count(final_decision, final_decision_reason, name = "packages",
+               .drop = FALSE) |>
+  dplyr::filter(packages > 0) |>
+  dplyr::arrange(final_decision, dplyr::desc(packages))
+kable(reason_counts,
+      col.names = c("Final decision", "Reason", "Packages"),
+      align = "llr")
+```
+
+# Packages by Risk Category
+
+The tables below list every package in each risk tier, with the reason and
+supporting note (driver metrics for `Risk Assessment`, failing dependency
+for `Dependency`, auto-accept metric list for `Auto-Accepted`).
+
+```{r pkg-tables-helper}
+pkg_table <- function(df, cat) {
+  out <- df |>
+    dplyr::filter(final_decision == cat) |>
+    dplyr::arrange(pkg) |>
+    dplyr::transmute(
+      Package = pkg,
+      Version = ver,
+      Reason = final_decision_reason,
+      Note = ifelse(is.na(final_decision_reason_note) |
+                      final_decision_reason_note == "",
+                    "", final_decision_reason_note)
+    )
+  if (nrow(out) == 0L) {
+    return(tibble::tibble(Package = character(),
+                          Version = character(),
+                          Reason = character(),
+                          Note = character()))
+  }
+  out
+}
+```
+
+## Low risk (`r sum(qual_metadata$final_decision == "Low", na.rm = TRUE)`)
+
+```{r low-tbl}
+kable(pkg_table(qual_metadata, "Low"))
+```
+
+## Medium risk (`r sum(qual_metadata$final_decision == "Medium", na.rm = TRUE)`)
+
+```{r medium-tbl}
+kable(pkg_table(qual_metadata, "Medium"))
+```
+
+## High risk (`r sum(qual_metadata$final_decision == "High", na.rm = TRUE)`)
+
+```{r high-tbl}
+kable(pkg_table(qual_metadata, "High"))
+```
+
+# Runtime
+
+```{r runtime-summary}
+rt <- qual_metadata$assessment_runtime_mins
+if (inherits(rt, "difftime")) rt <- as.numeric(rt)
+rt <- rt[!is.na(rt)]
+
+if (length(rt) > 0L) {
+  rt_tbl <- tibble::tribble(
+    ~Metric, ~`Minutes`,
+    "Packages with recorded runtime", length(rt),
+    "Total runtime (mins)",           round(sum(rt), 1),
+    "Total runtime (hours)",          round(sum(rt) / 60, 2),
+    "Mean per package (mins)",        round(mean(rt), 3),
+    "Median per package (mins)",      round(stats::median(rt), 3),
+    "Max per package (mins)",         round(max(rt), 2)
+  )
+  kable(rt_tbl, align = "lr")
+} else {
+  cat("No runtime data recorded.\n")
+}
+```
+
+## Ten slowest packages
+
+```{r slowest-pkgs}
+if (length(rt) > 0L) {
+  slow_df <- qual_metadata |>
+    dplyr::mutate(runtime_mins = as.numeric(assessment_runtime_mins)) |>
+    dplyr::filter(!is.na(runtime_mins)) |>
+    dplyr::arrange(dplyr::desc(runtime_mins)) |>
+    dplyr::slice_head(n = 10) |>
+    dplyr::transmute(
+      Package = pkg,
+      Version = ver,
+      `Final decision` = as.character(final_decision),
+      `Runtime (mins)` = round(runtime_mins, 2)
+    )
+  kable(slow_df, align = "llrr")
+}
+```
+
+```{r assessments-header, results = "asis", eval = has_assessments}
+cat("# Metric-Level Summaries\n\n",
+    "The following summaries are derived from `qual_assessments.rds` ",
+    "and describe the distribution of each `{riskmetric}` metric across ",
+    "the assessed packages.\n", sep = "")
+```
+
+```{r metric-helpers, eval = has_assessments}
+numeric_metric_summary <- function(df, col) {
+  x <- suppressWarnings(as.numeric(df[[col]]))
+  x <- x[!is.na(x)]
+  if (length(x) == 0L) return(NULL)
+  tibble::tibble(
+    Metric = col,
+    N = length(x),
+    Min = signif(min(x), 4),
+    Median = signif(stats::median(x), 4),
+    Mean = signif(mean(x), 4),
+    Max = signif(max(x), 4)
+  )
+}
+
+qa <- qual_assessments
+numeric_cols <- vapply(names(qa), function(nm) {
+  v <- qa[[nm]]
+  if (is.list(v)) return(FALSE)
+  suppressWarnings(nv <- as.numeric(v))
+  !all(is.na(nv)) && !nm %in% c("val_date", "version")
+}, logical(1))
+numeric_col_names <- setdiff(
+  names(qa)[numeric_cols],
+  c("package", "version", "val_date", "riskmetric_version", "ref")
+)
+```
+
+## Numeric metric distributions
+
+```{r numeric-summaries, eval = has_assessments}
+tbl <- purrr::map_dfr(numeric_col_names, ~ numeric_metric_summary(qa, .x))
+kable(tbl, align = "lrrrrr")
+```
+
+## Package coverage (`covr_coverage`)
+
+```{r coverage, eval = has_assessments && "covr_coverage" %in% names(qa)}
+cov <- suppressWarnings(as.numeric(qa$covr_coverage))
+cov_tbl <- tibble::tibble(
+  Bucket = c("Not measured (NA)", "0%", "1-49%", "50-79%", "80-94%", "95-100%"),
+  Packages = c(
+    sum(is.na(cov)),
+    sum(cov == 0, na.rm = TRUE),
+    sum(cov > 0 & cov < 50, na.rm = TRUE),
+    sum(cov >= 50 & cov < 80, na.rm = TRUE),
+    sum(cov >= 80 & cov < 95, na.rm = TRUE),
+    sum(cov >= 95 & cov <= 100, na.rm = TRUE)
+  )
+) |>
+  dplyr::mutate(Percent = sprintf("%.1f%%", 100 * Packages / sum(Packages)))
+kable(cov_tbl, align = "lrr")
+```
+
+## R CMD check outcomes
+
+```{r rcmd-check, eval = has_assessments && all(c("r_cmd_check_errors","r_cmd_check_warnings") %in% names(qa))}
+err <- suppressWarnings(as.numeric(qa$r_cmd_check_errors))
+wrn <- suppressWarnings(as.numeric(qa$r_cmd_check_warnings))
+rcmd_tbl <- tibble::tibble(
+  Outcome = c("Clean (0 errors, 0 warnings)",
+              "Warnings only",
+              "Errors",
+              "Not measured (NA)"),
+  Packages = c(
+    sum(err == 0 & wrn == 0, na.rm = TRUE),
+    sum(err == 0 & wrn > 0, na.rm = TRUE),
+    sum(err > 0, na.rm = TRUE),
+    sum(is.na(err))
+  )
+) |>
+  dplyr::mutate(Percent = sprintf("%.1f%%", 100 * Packages / sum(Packages)))
+kable(rcmd_tbl, align = "lrr")
+```
+
+## License distribution
+
+```{r license, eval = has_assessments && "license" %in% names(qa)}
+lic_tbl <- qa |>
+  dplyr::count(license, sort = TRUE, name = "packages") |>
+  dplyr::mutate(percent = sprintf("%.1f%%", 100 * packages / sum(packages)))
+kable(lic_tbl, col.names = c("License", "Packages", "Percent"),
+      align = "lrr")
+```
+
+# Appendix: Configuration
+
+```{r config, results = "asis"}
+if (!is.null(params$config_path) && file.exists(params$config_path)) {
+  cat("Configuration snapshot from the run (from `",
+      params$config_path, "`):\n\n", sep = "")
+  cat("```yaml\n")
+  cat(readLines(params$config_path), sep = "\n")
+  cat("\n```\n")
+} else {
+  cat("_(No `config.yml` alongside inputs; configuration snapshot omitted.)_\n")
+}
+```

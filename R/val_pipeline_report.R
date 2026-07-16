@@ -1,0 +1,183 @@
+#' Generate a high-level Quarto summary report for a validation run
+#'
+#' Renders an HTML and/or PDF summary of a `val_pipeline()` / `val_build()`
+#' run, intended for GxP / QMS archival. Given a `qual_metadata.rds` produced
+#' by [val_build()], it summarises the final decisions, downgrades due to
+#' dependencies, per-category package lists, and runtime. When the sibling
+#' `qual_assessments.rds` is also supplied, the report adds metric-level
+#' distributions (coverage buckets, R CMD check outcomes, license mix, etc.).
+#'
+#' The function is exported so it can be re-run outside the pipeline (e.g.
+#' against a historical run archived under `/data/shared/riskassessments/`),
+#' and is also invoked automatically at the end of [val_pipeline()] so every
+#' full run leaves a summary artefact next to its evidence files.
+#'
+#' @param qual_metadata_path Character. Path to a `qual_metadata.rds` file
+#'   produced by [val_build()]. Required.
+#' @param qual_assessments_path Character or NULL. Optional path to the
+#'   sibling `qual_assessments.rds`. When `NULL` (the default), the function
+#'   looks for `qual_assessments.rds` in the same directory as
+#'   `qual_metadata_path`; pass `NA` to skip this lookup and produce a
+#'   metadata-only report.
+#' @param out_dir Character. Directory to write the rendered report into.
+#'   Defaults to the directory containing `qual_metadata_path`.
+#' @param format Character vector. One or more of `"html"`, `"pdf"`. Defaults
+#'   to both.
+#' @param file_stem Character. Base filename (without extension) for the
+#'   rendered report. Defaults to `"val_pipeline_summary"`.
+#' @param title Character. Optional report title. When `NULL`, a title is
+#'   derived from the validation date on the input.
+#' @param subtitle Character. Optional subtitle (e.g. "R 4.5.2 / 2026-06-21
+#'   snapshot"). When `NULL`, a subtitle is derived from the input.
+#' @param quiet Logical. Suppress Quarto rendering output. Default `FALSE`.
+#'
+#' @return Invisibly, a character vector of the rendered report file paths.
+#'
+#' @examples
+#' \dontrun{
+#' val_pipeline_report(
+#'   qual_metadata_path = file.path(
+#'     "/data/shared/riskassessments/R_4.5.2/20260621",
+#'     "qual_metadata.rds"
+#'   )
+#' )
+#' }
+#'
+#' @export
+val_pipeline_report <- function(
+  qual_metadata_path,
+  qual_assessments_path = NULL,
+  out_dir = NULL,
+  format = c("html", "pdf"),
+  file_stem = "val_pipeline_summary",
+  title = NULL,
+  subtitle = NULL,
+  quiet = FALSE
+) {
+  stopifnot(
+    is.character(qual_metadata_path),
+    length(qual_metadata_path) == 1L,
+    nzchar(qual_metadata_path)
+  )
+  if (!file.exists(qual_metadata_path)) {
+    stop("qual_metadata file not found: ", qual_metadata_path, call. = FALSE)
+  }
+  qual_metadata_path <- normalizePath(qual_metadata_path, winslash = "/",
+                                      mustWork = TRUE)
+
+  format <- match.arg(format, choices = c("html", "pdf"),
+                      several.ok = TRUE)
+
+  input_dir <- dirname(qual_metadata_path)
+
+  # Resolve the optional assessments path.
+  #   NULL -> auto-detect sibling qual_assessments.rds
+  #   NA   -> explicitly skip
+  #   path -> use as given
+  qa_path <- if (is.null(qual_assessments_path)) {
+    candidate <- file.path(input_dir, "qual_assessments.rds")
+    if (file.exists(candidate)) {
+      normalizePath(candidate, winslash = "/", mustWork = TRUE)
+    } else {
+      NULL
+    }
+  } else if (length(qual_assessments_path) == 1L &&
+               is.na(qual_assessments_path)) {
+    NULL
+  } else {
+    if (!file.exists(qual_assessments_path)) {
+      stop("qual_assessments file not found: ", qual_assessments_path,
+           call. = FALSE)
+    }
+    normalizePath(qual_assessments_path, winslash = "/", mustWork = TRUE)
+  }
+
+  # Sibling config.yml, if any
+  config_candidate <- file.path(input_dir, "config.yml")
+  config_path <- if (file.exists(config_candidate)) {
+    normalizePath(config_candidate, winslash = "/", mustWork = TRUE)
+  } else {
+    NULL
+  }
+
+  if (is.null(out_dir)) out_dir <- input_dir
+  if (!dir.exists(out_dir)) {
+    dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+  out_dir <- normalizePath(out_dir, winslash = "/", mustWork = TRUE)
+
+  # Peek at inputs to synthesize title/subtitle/date
+  qm <- readRDS(qual_metadata_path)
+  val_dates <- unique(as.character(qm$val_date))
+  r_vers <- unique(as.character(qm$r_ver))
+  if (is.null(title)) {
+    title <- "val.pipeline Qualification Summary"
+  }
+  if (is.null(subtitle)) {
+    subtitle <- paste0(
+      "R ", paste(r_vers, collapse = ", "),
+      " \u2014 ",
+      paste(val_dates, collapse = ", "),
+      " (", format(nrow(qm), big.mark = ","), " packages)"
+    )
+  }
+  val_date_str <- val_dates[1L]
+
+  # Locate the template shipped with the package and copy to a temp working
+  # directory so Quarto's intermediate outputs don't touch shared storage.
+  tmpl_src <- system.file("report", "summary", "summary_template.qmd",
+                          package = "val.pipeline")
+  if (!nzchar(tmpl_src) || !file.exists(tmpl_src)) {
+    stop("Could not locate summary_template.qmd inside val.pipeline. ",
+         "Reinstall the package.", call. = FALSE)
+  }
+
+  work_dir <- file.path(tempfile(pattern = "val_pipeline_report_"))
+  dir.create(work_dir, recursive = TRUE)
+  on.exit(unlink(work_dir, recursive = TRUE), add = TRUE)
+
+  qmd_path <- file.path(work_dir, "summary_template.qmd")
+  file.copy(tmpl_src, qmd_path, overwrite = TRUE)
+
+  # Map friendly names to Quarto format identifiers
+  format_map <- c(html = "html", pdf = "typst")
+  quarto_formats <- unname(format_map[format])
+
+  execute_params <- list(
+    title = title,
+    subtitle = subtitle,
+    qual_metadata_path = qual_metadata_path,
+    qual_assessments_path = qa_path,
+    val_date = val_date_str,
+    config_path = config_path
+  )
+
+  quarto::quarto_render(
+    input = qmd_path,
+    output_format = quarto_formats,
+    execute_params = execute_params,
+    quiet = quiet
+  )
+
+  # Quarto writes outputs next to the .qmd. Collect and move them.
+  ext_map <- c(html = "html", pdf = "pdf")
+  produced <- character(0)
+  for (fmt in format) {
+    src <- file.path(work_dir, paste0("summary_template.", ext_map[[fmt]]))
+    if (!file.exists(src)) {
+      warning("Expected rendered ", fmt, " output was not produced: ", src,
+              call. = FALSE)
+      next
+    }
+    dest <- file.path(out_dir, paste0(file_stem, ".", ext_map[[fmt]]))
+    file.copy(src, dest, overwrite = TRUE)
+    produced <- c(produced, dest)
+  }
+
+  if (length(produced) > 0L && !quiet) {
+    message("Wrote val.pipeline summary report(s):\n  ",
+            paste(produced, collapse = "\n  "))
+  }
+
+  invisible(produced)
+}

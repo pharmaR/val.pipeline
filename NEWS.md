@@ -19,6 +19,13 @@ cases: `"Auto-Accepted"` (auto-accept metrics), `"Risk Assessment"`
 (driver metrics whose per-metric `_cat` matched the final risk), and
 `"Dependency"` (failing dep pkg name(s), comma-separated — best effort per
 the caveat in issue #37). (#37)
+- Add `val_pipeline_report()`, a new exported function that renders a
+high-level HTML + PDF summary of a `val_pipeline()` / `val_build()` run
+suitable for GxP / QMS archival. It takes a `qual_metadata.rds` (and
+optionally the sibling `qual_assessments.rds` for richer per-metric
+distributions) and writes the rendered reports alongside the inputs by
+default. `val_pipeline()` now invokes it automatically at the end of every
+run. Adds `{quarto}` (R pkg + CLI) as an `Imports` dependency. (#59)
 
 # val.pipeline 0.0.1
 

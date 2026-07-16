@@ -230,20 +230,28 @@ val_pipeline <- function(
   # qualified <- qual |>
   #   dplyr::filter(final_decision == decisions[1])
   
-  # Using qual, create a high-level PDF report containing summary statistics
-  # about the qualification run. The report may contain things like: Three
-  # tables: Low, Medium, and High Risk pkgs. Each table should include package
-  # name, version, and the reason for the decision. The report should also
-  # include a summary of the number of packages in each category, as well as any
-  # notable trends or observations from the assessment process. The report
-  # should be generated in a format that is easy to read and understand, such as
-  # a PDF or HTML document. The report should be saved to the output directory
-  # specified in the function
-  
-  # Store as pins board?
-  # How to Provision PPM metadata for all pkgs
+  # Generate a high-level HTML + PDF summary report of the run, saved next to
+  # qual_metadata.rds in the val_build() output directory. Suitable for GxP /
+  # QMS archival. Failure to render should not fail the whole pipeline.
+  qm_path <- file.path(outtie$val_dir, "qual_metadata.rds")
+  qa_path <- file.path(outtie$val_dir, "qual_assessments.rds")
+  if (file.exists(qm_path)) {
+    tryCatch(
+      val_pipeline_report(
+        qual_metadata_path = qm_path,
+        qual_assessments_path = if (file.exists(qa_path)) qa_path else NA,
+        out_dir = outtie$val_dir
+      ),
+      error = function(e) {
+        warning("val_pipeline_report() failed: ", conditionMessage(e),
+                call. = FALSE)
+      }
+    )
+  }
 
- return(qual)
+  # Return the val_build() results (val_dir points to all evidence, incl. the
+  # newly rendered summary report).
+  return(outtie)
 }
 
 
