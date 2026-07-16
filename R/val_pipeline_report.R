@@ -50,6 +50,12 @@
 #'   derived from the validation date on the input.
 #' @param subtitle Character. Optional subtitle (e.g. "R 4.5.2 / 2026-06-21
 #'   snapshot"). When `NULL`, a subtitle is derived from the input.
+#' @param n_candidates Integer or NULL. Number of candidate packages
+#'   considered by [val_pipeline()] before the `remote_reduce` filter (i.e.
+#'   `nrow(pre_filtered_pkg_metrics)`). When `NULL` (the default), the
+#'   function looks for a sibling `pre_filtered_pkg_metrics.rds` in the
+#'   directory containing `qual_metadata_path` and uses its row count. Pass
+#'   `NA` to explicitly skip this metric.
 #' @param quiet Logical. Suppress Quarto rendering output. Default `FALSE`.
 #'
 #' @return Invisibly, a character vector of the rendered report file paths.
@@ -73,6 +79,7 @@ val_pipeline_report <- function(
   file_stem = "val_pipeline_summary",
   title = NULL,
   subtitle = NULL,
+  n_candidates = NULL,
   quiet = FALSE
 ) {
   stopifnot(
@@ -134,6 +141,25 @@ val_pipeline_report <- function(
     normalizePath(config_candidate, winslash = "/", mustWork = TRUE)
   } else {
     NULL
+  }
+
+  # Resolve n_candidates.
+  #   NULL -> try sibling pre_filtered_pkg_metrics.rds
+  #   NA   -> explicitly skip
+  #   numeric -> use as given
+  n_candidates_val <- if (is.null(n_candidates)) {
+    pf_candidate <- file.path(input_dir, "pre_filtered_pkg_metrics.rds")
+    if (file.exists(pf_candidate)) {
+      tryCatch(nrow(readRDS(pf_candidate)), error = function(e) NULL)
+    } else {
+      NULL
+    }
+  } else if (length(n_candidates) == 1L && is.na(n_candidates)) {
+    NULL
+  } else {
+    stopifnot(is.numeric(n_candidates), length(n_candidates) == 1L,
+              is.finite(n_candidates), n_candidates >= 0)
+    as.integer(n_candidates)
   }
 
   if (is.null(out_dir)) out_dir <- input_dir
@@ -221,7 +247,8 @@ val_pipeline_report <- function(
     qual_assessments_path = qa_path,
     val_date = val_date_str,
     config_path = config_path,
-    thresholds_path = if (file.exists(thresholds_rds)) thresholds_rds else NULL
+    thresholds_path = if (file.exists(thresholds_rds)) thresholds_rds else NULL,
+    n_candidates = n_candidates_val
   )
 
   quarto::quarto_render(

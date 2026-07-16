@@ -250,3 +250,107 @@ test_that("val_pipeline_report tolerates qual_assessments missing metric cols", 
   )
   expect_true(file.exists(out))
 })
+
+test_that("val_pipeline_report shows Candidate packages when supplied", {
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(make_fake_qual_metadata(), qm_path)
+
+  out <- val_pipeline_report(
+    qual_metadata_path = qm_path,
+    qual_assessments_path = NA,
+    format = "html",
+    n_candidates = 12345L,
+    quiet = TRUE
+  )
+
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  expect_true(grepl("Candidate packages", html))
+  expect_true(grepl("12,345", html, fixed = TRUE))
+})
+
+test_that("val_pipeline_report auto-detects candidate count from sibling RDS", {
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(make_fake_qual_metadata(), qm_path)
+  saveRDS(
+    data.frame(package = paste0("p", seq_len(9876))),
+    file.path(work, "pre_filtered_pkg_metrics.rds")
+  )
+
+  out <- val_pipeline_report(
+    qual_metadata_path = qm_path,
+    qual_assessments_path = NA,
+    format = "html",
+    quiet = TRUE
+  )
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  expect_true(grepl("Candidate packages", html))
+  expect_true(grepl("9,876", html, fixed = TRUE))
+})
+
+test_that("val_pipeline_report omits Candidate packages row when NA passed", {
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(make_fake_qual_metadata(), qm_path)
+  # Sibling RDS present, but NA overrides auto-detect
+  saveRDS(
+    data.frame(package = paste0("p", seq_len(100))),
+    file.path(work, "pre_filtered_pkg_metrics.rds")
+  )
+
+  out <- val_pipeline_report(
+    qual_metadata_path = qm_path,
+    qual_assessments_path = NA,
+    format = "html",
+    n_candidates = NA,
+    quiet = TRUE
+  )
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  expect_false(grepl("Candidate packages", html))
+})
+
+test_that("val_pipeline_report renames source label and drops NA cells", {
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  # Include NA rows to prove they don't leak as literal "NA" into the
+  # run-metadata table (this mimics dependency-only rows in real runs).
+  qm <- make_fake_qual_metadata()
+  qm$ref[c(3L, 5L)] <- NA_character_
+  qm$metric_pkg[c(3L, 5L)] <- NA_character_
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(qm, qm_path)
+
+  out <- val_pipeline_report(
+    qual_metadata_path = qm_path,
+    qual_assessments_path = NA,
+    format = "html",
+    n_candidates = NA,
+    quiet = TRUE
+  )
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  expect_true(grepl("Assessment reference", html))
+  expect_false(grepl("Assessment source", html))
+  # No stray "NA" cells introduced by our label rows
+  expect_false(grepl("source, NA", html, fixed = TRUE))
+  expect_false(grepl("riskmetric, NA", html, fixed = TRUE))
+})

@@ -12,6 +12,7 @@ val_pipeline_report(
   file_stem = "val_pipeline_summary",
   title = NULL,
   subtitle = NULL,
+  n_candidates = NULL,
   quiet = FALSE
 )
 }
@@ -39,6 +40,13 @@ derived from the validation date on the input.}
 
 \item{subtitle}{Character. Optional subtitle (e.g. "R 4.5.2 / 2026-06-21
 snapshot"). When \code{NULL}, a subtitle is derived from the input.}
+
+\item{n_candidates}{Integer or NULL. Number of candidate packages
+considered by \code{\link[=val_pipeline]{val_pipeline()}} before the \code{remote_reduce} filter (i.e.
+\code{nrow(pre_filtered_pkg_metrics)}). When \code{NULL} (the default), the
+function looks for a sibling \code{pre_filtered_pkg_metrics.rds} in the
+directory containing \code{qual_metadata_path} and uses its row count. Pass
+\code{NA} to explicitly skip this metric.}
 
 \item{quiet}{Logical. Suppress Quarto rendering output. Default \code{FALSE}.}
 }

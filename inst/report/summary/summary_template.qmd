@@ -11,6 +11,7 @@ params:
   val_date: NULL
   config_path: NULL
   thresholds_path: NULL
+  n_candidates: NULL
 format:
   html:
     toc: true
@@ -101,20 +102,37 @@ qual_metadata$decision <- factor(qual_metadata$decision,
 r_ver <- unique(qual_metadata$r_ver)
 val_dates <- unique(as.character(qual_metadata$val_date))
 repos <- unique(unlist(strsplit(as.character(qual_metadata$repos), "\\s*,\\s*")))
-metric_pkg <- unique(qual_metadata$metric_pkg)
-ref_types <- unique(qual_metadata$ref)
+# Drop NAs before flattening: rows whose packages were categorised via
+# dependency propagation (never independently assessed by riskmetric)
+# leave `ref` / `metric_pkg` unset, and we don't want a literal "NA" to
+# leak into the human-readable metadata table.
+metric_pkg <- setdiff(unique(qual_metadata$metric_pkg), NA)
+ref_types <- setdiff(unique(qual_metadata$ref), NA)
 
-meta_tbl <- tibble::tribble(
-  ~Item, ~Value,
-  "Report generated",       format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"),
-  "Validation date(s)",     paste(val_dates, collapse = ", "),
-  "R version",              paste(r_ver, collapse = ", "),
-  "Assessment source",      paste(ref_types, collapse = ", "),
-  "Metric package",         paste(metric_pkg, collapse = ", "),
-  "Repositories",           paste(repos, collapse = "; "),
-  "Packages assessed",      format(nrow(qual_metadata), big.mark = ","),
-  "qual_metadata path",     params$qual_metadata_path,
-  "qual_assessments path",  ifelse(has_assessments, params$qual_assessments_path, "(not provided)")
+meta_rows <- list(
+  c("Report generated",      format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")),
+  c("Validation date(s)",    paste(val_dates, collapse = ", ")),
+  c("R version",             paste(r_ver, collapse = ", ")),
+  c("Assessment reference",  paste(ref_types, collapse = ", ")),
+  c("Metric package",        paste(metric_pkg, collapse = ", ")),
+  c("Repositories",          paste(repos, collapse = "; "))
+)
+if (!is.null(params$n_candidates)) {
+  meta_rows <- c(meta_rows, list(
+    c("Candidate packages",  format(as.integer(params$n_candidates),
+                                    big.mark = ","))
+  ))
+}
+meta_rows <- c(meta_rows, list(
+  c("Packages assessed",     format(nrow(qual_metadata), big.mark = ",")),
+  c("qual_metadata path",    params$qual_metadata_path),
+  c("qual_assessments path", ifelse(has_assessments,
+                                    params$qual_assessments_path,
+                                    "(not provided)"))
+))
+meta_tbl <- tibble::tibble(
+  Item  = vapply(meta_rows, `[`, character(1), 1),
+  Value = vapply(meta_rows, `[`, character(1), 2)
 )
 kable(meta_tbl)
 ```

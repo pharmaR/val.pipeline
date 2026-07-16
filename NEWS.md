@@ -40,6 +40,15 @@ typed `qual_assessments` metric cols are all handled gracefully. The R
 function validates a minimum required column set and errors with a clear
 message on truly ancient files. Adds `{quarto}` (R pkg + CLI) as an
 `Imports` dependency. (#59)
+- `val_pipeline_report()`: run-metadata table gains a **Candidate
+packages** row (`nrow(pre_filtered_pkg_metrics)`) shown above **Packages
+assessed**; **Assessment source** is renamed to **Assessment reference**;
+and NA `ref` / `metric_pkg` values (rows categorised via dependency
+propagation only) are dropped before flattening so those cells no longer
+show a literal `"NA"`. `val_pipeline()` now persists
+`pre_filtered_pkg_metrics.rds` alongside `qual_metadata.rds` so re-runs
+of the report against the same directory pick the candidate count up
+automatically. (#59)
 
 # val.pipeline 0.0.1
 

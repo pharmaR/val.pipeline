@@ -235,12 +235,26 @@ val_pipeline <- function(
   # QMS archival. Failure to render should not fail the whole pipeline.
   qm_path <- file.path(outtie$val_dir, "qual_metadata.rds")
   qa_path <- file.path(outtie$val_dir, "qual_assessments.rds")
+
+  # Persist the pre-filter candidate set alongside the evidence so the
+  # candidate-count row survives report re-runs (and future analyses can
+  # inspect the pre_reduce risk categorisation directly).
+  tryCatch(
+    saveRDS(pre_filtered_pkg_metrics,
+            file.path(outtie$val_dir, "pre_filtered_pkg_metrics.rds")),
+    error = function(e) {
+      warning("Could not persist pre_filtered_pkg_metrics.rds: ",
+              conditionMessage(e), call. = FALSE)
+    }
+  )
+
   if (file.exists(qm_path)) {
     tryCatch(
       val_pipeline_report(
         qual_metadata_path = qm_path,
         qual_assessments_path = if (file.exists(qa_path)) qa_path else NA,
-        out_dir = outtie$val_dir
+        out_dir = outtie$val_dir,
+        n_candidates = nrow(pre_filtered_pkg_metrics)
       ),
       error = function(e) {
         warning("val_pipeline_report() failed: ", conditionMessage(e),
