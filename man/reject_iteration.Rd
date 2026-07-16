@@ -25,8 +25,10 @@ failed" baseline (\code{decisions[1]}) when \code{failed_pkgs} is \code{NULL}.}
 on this iteration. If \code{NULL}, derived from \code{pkg_dat$final_decision != decisions[1]}.}
 }
 \value{
-\code{pkg_dat} with \code{final_decision} and \code{final_decision_reason}
-populated for every row (no \code{NA}s introduced by this function).
+\code{pkg_dat} with \code{final_decision}, \code{final_decision_reason}, and
+\code{final_decision_reason_note} populated for every row (note may be \code{NA}
+when no driver applies; for dependency-driven downgrades it lists failing dep pkg
+name(s) — see issue #37).
 }
 \description{
 Given a data.frame of per-package risk assessments (one row per package,
