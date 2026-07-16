@@ -10,7 +10,7 @@ make_pkg_dat <- function() {
     pkg              = c("A", "B", "C", "D"),
     decision         = c("Low", "High", "Low", "Low"),
     decision_reason  = c(
-      "Met auto-accepted metric threshold(s) for: downloads_1yr",
+      "Auto-Accepted",
       "Risk Assessment",
       "Risk Assessment",
       "Risk Assessment"
@@ -44,7 +44,7 @@ test_that("reject_iteration() carries decision through un-downgraded pkgs", {
   expect_equal(out$final_decision[out$pkg == "A"], "Low")
   expect_equal(
     out$final_decision_reason[out$pkg == "A"],
-    "Met auto-accepted metric threshold(s) for: downloads_1yr"
+    "Auto-Accepted"
   )
   # B was assessed High: stays High, reason preserved
   expect_equal(out$final_decision[out$pkg == "B"], "High")
