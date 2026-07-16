@@ -20,6 +20,11 @@ a stale `qual_metadata.rds` on disk. (#53)
   failing dep package name(s), comma-separated. Best-effort — may
   under-report if a failing dep wasn't yet in the tracked failure set at
   the time of the check (#37).
+- Refactor the `"Auto-Accepted"` decision reason: `decision_reason` is now
+  the short label `"Auto-Accepted"` (previously the metric names were
+  concatenated into the reason string), and `decision_reason_note` lists
+  the auto-accepted metric name(s), comma-separated. Consistent with the
+  same-shape treatment of `"Risk Assessment"` and `"Dependency"` (#37).
 
 # val.pipeline 0.0.1
 
