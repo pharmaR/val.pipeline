@@ -435,14 +435,32 @@ val_pkg <- function(
 
     decision_reason <- dplyr::case_when(
       pkg %in% approved_pkgs ~ "Pre-Approved package",
-      length(aa_metrics) > 0 ~ paste("Met auto-accepted metric threshold(s) for:", paste(aa_metrics, collapse = ", ")),
+      length(aa_metrics) > 0 ~ "Auto-Accepted",
       TRUE ~ "Risk Assessment"
     ) 
   } else {
     decision_reason <- "Risk Assessment"
   }
-  
+
+  # Populate decision_reason_note with the specific metrics that drove the
+  # decision, depending on which decision_reason applies:
+  # - "Auto-Accepted": the metric(s) whose auto_accept condition matched
+  # - "Risk Assessment": the metric(s) whose per-metric `_cat` matched the
+  #   final risk (only when the package landed above the lowest-risk tier)
+  # - "Pre-Approved package" / "Dependency" / other: NA here (Dependency
+  #   note is populated downstream in val_build.R / reject_iteration()).
+  decision_reason_note <- dplyr::case_when(
+    identical(decision_reason, "Auto-Accepted") ~
+      paste(aa_metrics, collapse = ", "),
+    identical(decision_reason, "Risk Assessment") ~
+      extract_risk_drivers(decision, decisions = decisions),
+    .default = NA_character_
+  )
+
   cat("\n-->", pkg_v,"decision reason:\n---->", decision_reason, "\n")
+  if(!is.na(decision_reason_note)) {
+    cat("---->", pkg_v, "driver metric(s):", decision_reason_note, "\n")
+  }
   
   
   
@@ -490,8 +508,10 @@ val_pkg <- function(
     # metrics = pkg_assessment, # saved separately for {riskreports}
     decision = decision$final_risk,
     decision_reason = decision_reason,
+    decision_reason_note = decision_reason_note,
     final_decision = NA_character_, # Will be set later
     final_decision_reason = NA_character_, # Will be set later
+    final_decision_reason_note = NA_character_, # Will be set later
     depends = if(identical(depends, character(0))) NA_character_ else depends,
     suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
     rev_deps = if(is.null(pkg_assessment$reverse_dependencies)) NA_character_ else pkg_assessment$reverse_dependencies |> as.vector(),

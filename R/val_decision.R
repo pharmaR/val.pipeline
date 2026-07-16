@@ -128,9 +128,13 @@ val_decision <- function(
       label = "Secondary",
       repo_name = repo_name,
       dec_df = decisions_df,
+      # Keep primary metric `<metric>_cat` columns so downstream callers
+      # (e.g. val_pkg() building `decision_reason_note`) can identify which
+      # primary metrics drove the final decision. Primary/secondary metric
+      # names are disjoint in the config, so no collision with secondary
+      # metric `_cat` cols added below.
       pkgs_df = primed_pkgs |>
-        dplyr::rename(primary_risk_category = final_risk_cat) |>
-        dplyr::select(-dplyr::ends_with("_cat")), # remove to keep things tidy, or could leave them in?
+        dplyr::rename(primary_risk_category = final_risk_cat),
       decisions = decisions,
       else_cat = else_cat
     )
