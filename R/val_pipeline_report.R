@@ -62,6 +62,12 @@
 #'   `final_risk` column). When `NULL` (the default), a sibling file of
 #'   that name next to `qual_metadata_path` is used if present. Pass `NA`
 #'   to explicitly skip and omit the Pre-Filter Summary section.
+#' @param pipeline_runtime Optional total wall-clock runtime of the
+#'   [val_pipeline()] call that produced these evidence files. Accepts a
+#'   [difftime], a numeric number of seconds, or a pre-formatted character
+#'   string. When supplied, an extra `val_pipeline() runtime` row is added
+#'   to the Run Metadata table. Not persisted in the evidence RDS files
+#'   because it's a pipeline-level (not per-package) fact.
 #' @param quiet Logical. Suppress Quarto rendering output. Default `FALSE`.
 #'
 #' @return Invisibly, a character vector of the rendered report file paths.
@@ -87,6 +93,7 @@ val_pipeline_report <- function(
   subtitle = NULL,
   n_candidates = NULL,
   pre_filtered_path = NULL,
+  pipeline_runtime = NULL,
   quiet = FALSE
 ) {
   stopifnot(
@@ -269,6 +276,29 @@ val_pipeline_report <- function(
   format_map <- c(html = "html", pdf = "typst")
   quarto_formats <- unname(format_map[format])
 
+  # Resolve pipeline_runtime.
+  #   NULL / NA / "" -> skip
+  #   difftime      -> convert to seconds, format as "Nh Nm Ns"
+  #   numeric       -> treat as seconds
+  #   character     -> pass through verbatim
+  runtime_str <- if (is.null(pipeline_runtime) ||
+                      (length(pipeline_runtime) == 1L &&
+                         is.na(pipeline_runtime))) {
+    NULL
+  } else if (inherits(pipeline_runtime, "difftime")) {
+    format_runtime_seconds(as.numeric(pipeline_runtime, units = "secs"))
+  } else if (is.numeric(pipeline_runtime)) {
+    stopifnot(length(pipeline_runtime) == 1L,
+              is.finite(pipeline_runtime), pipeline_runtime >= 0)
+    format_runtime_seconds(as.numeric(pipeline_runtime))
+  } else if (is.character(pipeline_runtime)) {
+    stopifnot(length(pipeline_runtime) == 1L)
+    if (nzchar(pipeline_runtime)) pipeline_runtime else NULL
+  } else {
+    stop("pipeline_runtime must be a difftime, numeric seconds, ",
+         "character, or NULL.", call. = FALSE)
+  }
+
   execute_params <- list(
     title = title,
     subtitle = subtitle,
@@ -278,7 +308,8 @@ val_pipeline_report <- function(
     config_path = config_path,
     thresholds_path = if (file.exists(thresholds_rds)) thresholds_rds else NULL,
     n_candidates = n_candidates_val,
-    pre_filtered_path = pf_path
+    pre_filtered_path = pf_path,
+    pipeline_runtime = runtime_str
   )
 
   quarto::quarto_render(

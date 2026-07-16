@@ -14,6 +14,7 @@ val_pipeline_report(
   subtitle = NULL,
   n_candidates = NULL,
   pre_filtered_path = NULL,
+  pipeline_runtime = NULL,
   quiet = FALSE
 )
 }
@@ -55,6 +56,13 @@ pre-\code{val_build()} candidate-set data frame with a \code{package} and
 \code{final_risk} column). When \code{NULL} (the default), a sibling file of
 that name next to \code{qual_metadata_path} is used if present. Pass \code{NA}
 to explicitly skip and omit the Pre-Filter Summary section.}
+
+\item{pipeline_runtime}{Optional total wall-clock runtime of the
+\code{\link[=val_pipeline]{val_pipeline()}} call that produced these evidence files. Accepts a
+\link{difftime}, a numeric number of seconds, or a pre-formatted character
+string. When supplied, an extra \verb{val_pipeline() runtime} row is added
+to the Run Metadata table. Not persisted in the evidence RDS files
+because it's a pipeline-level (not per-package) fact.}
 
 \item{quiet}{Logical. Suppress Quarto rendering output. Default \code{FALSE}.}
 }

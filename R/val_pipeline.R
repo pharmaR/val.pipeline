@@ -263,7 +263,8 @@ val_pipeline <- function(
         qual_metadata_path = qm_path,
         qual_assessments_path = if (file.exists(qa_path)) qa_path else NA,
         out_dir = outtie$val_dir,
-        n_candidates = if(!exists("pre_filtered_pkg_metrics")) available.packages()[,1] |> length() else nrow(pre_filtered_pkg_metrics)
+        n_candidates = if(!exists("pre_filtered_pkg_metrics")) available.packages()[,1] |> length() else nrow(pre_filtered_pkg_metrics),
+        pipeline_runtime = difftime(Sys.time(), val_start, units = "secs")
       ),
       error = function(e) {
         warning("val_pipeline_report() failed: ", conditionMessage(e),

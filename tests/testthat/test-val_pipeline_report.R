@@ -401,7 +401,7 @@ test_that("val_pipeline_report renders Pre-Filter Summary when RDS present", {
   expect_true(grepl("Pre-Filter Summary", html, fixed = TRUE))
   expect_true(grepl("Pre-filter risk distribution", html, fixed = TRUE))
   expect_true(grepl("Pass / drop breakdown", html, fixed = TRUE))
-  expect_true(grepl("Packages Dropped by Pre-Filter", html, fixed = TRUE))
+  expect_true(grepl("Packages dropped by pre-filter", html, fixed = TRUE))
   # Dropped rows (Medium/High) appear in the appendix table
   expect_true(grepl("pf_pkg02", html, fixed = TRUE))
 })
@@ -439,4 +439,90 @@ test_that("val_pipeline_report errors on missing pre_filtered_path", {
     ),
     "pre_filtered_pkg_metrics file not found"
   )
+})
+
+test_that("val_pipeline_report shows val_pipeline() runtime row when supplied", {
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(make_fake_qual_metadata(), qm_path)
+
+  out <- val_pipeline_report(
+    qual_metadata_path = qm_path,
+    qual_assessments_path = NA,
+    n_candidates = NA,
+    pre_filtered_path = NA,
+    pipeline_runtime = as.difftime(67335, units = "secs"),
+    format = "html",
+    quiet = TRUE
+  )
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  expect_true(grepl("val_pipeline() runtime", html, fixed = TRUE))
+  expect_true(grepl("18h 42m 15s", html, fixed = TRUE))
+})
+
+test_that("val_pipeline_report omits pre-filter sub-headers when RDS absent", {
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(make_fake_qual_metadata(), qm_path)
+
+  out <- val_pipeline_report(
+    qual_metadata_path = qm_path,
+    qual_assessments_path = NA,
+    pre_filtered_path = NA,
+    format = "html",
+    quiet = TRUE
+  )
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  # Parent heading still renders
+  expect_true(grepl("Pre-Filter Summary", html, fixed = TRUE))
+  # Sub-headers should NOT render as h2 when has_pre_filter is FALSE
+  expect_false(grepl(">Pass / drop breakdown<", html, fixed = TRUE))
+  expect_false(grepl(">Pre-filter risk distribution<", html, fixed = TRUE))
+  expect_false(grepl(">Per-metric risk distribution<", html, fixed = TRUE))
+  expect_false(grepl(">Packages dropped by pre-filter<", html, fixed = TRUE))
+})
+
+test_that("val_pipeline_report per-metric distribution renders _cat cols", {
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(make_fake_qual_metadata(), qm_path)
+
+  pf <- make_fake_pre_filtered(9)
+  # Add a couple of per-metric _cat columns
+  pf$rev_deps_cat <- factor(
+    rep(c("Low", "Medium", "High"), length.out = nrow(pf)),
+    levels = c("Low", "Medium", "High")
+  )
+  pf$n_deps_cat <- factor(
+    rep(c("Low", "Low", "High"), length.out = nrow(pf)),
+    levels = c("Low", "Medium", "High")
+  )
+  saveRDS(pf, file.path(work, "pre_filtered_pkg_metrics.rds"))
+
+  out <- val_pipeline_report(
+    qual_metadata_path = qm_path,
+    qual_assessments_path = NA,
+    format = "html",
+    quiet = TRUE
+  )
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  expect_true(grepl("Per-metric risk distribution", html, fixed = TRUE))
+  # Metric names (with _cat stripped) appear in the rendered table
+  expect_true(grepl("rev_deps", html, fixed = TRUE))
+  expect_true(grepl("n_deps", html, fixed = TRUE))
 })

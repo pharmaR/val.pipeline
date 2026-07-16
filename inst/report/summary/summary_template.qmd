@@ -13,6 +13,7 @@ params:
   thresholds_path: NULL
   n_candidates: NULL
   pre_filtered_path: NULL
+  pipeline_runtime: NULL
 format:
   html:
     toc: true
@@ -136,6 +137,12 @@ meta_rows <- list(
   c("Metric package",        paste(metric_pkg, collapse = ", ")),
   c("Repositories",          paste(repos, collapse = "; "))
 )
+if (!is.null(params$pipeline_runtime) &&
+      nzchar(as.character(params$pipeline_runtime))) {
+  meta_rows <- c(meta_rows, list(
+    c("val_pipeline() runtime", as.character(params$pipeline_runtime))
+  ))
+}
 if (!is.null(params$n_candidates)) {
   meta_rows <- c(meta_rows, list(
     c("Candidate packages evaluated",
@@ -162,8 +169,9 @@ kable(meta_tbl)
 cat("The pre-filter step runs `riskmetric`'s `remote_reduce` rules over ",
     "the entire candidate universe (from `{riskscore}`) to identify ",
     "packages worth spending a full assessment on. Only packages ",
-    "categorised as **Low** risk here — plus any explicitly allow-listed ",
-    "in the `pass_primary` config — proceed to `val_build()`.\n\n", sep = "")
+    "categorised as **Low** risk here \u2014 plus any explicitly ",
+    "allow-listed in the `pass_primary` config \u2014 proceed to ",
+    "`val_build()`.\n\n", sep = "")
 ```
 
 ```{r pre-filter-summary-skip, results = "asis", eval = !has_pre_filter}
@@ -172,7 +180,30 @@ cat("_No `pre_filtered_pkg_metrics.rds` was supplied or auto-detected ",
     "artifact will not include a pre-filter summary._\n\n", sep = "")
 ```
 
-## Pre-filter risk distribution
+```{r pre-filter-passfail-hdr, results = "asis", eval = has_pre_filter}
+cat("## Pass / drop breakdown\n\n")
+```
+
+```{r pre-filter-passfail, eval = has_pre_filter}
+n_total <- nrow(pre_filtered)
+n_passed <- sum(pre_filtered$passed_to_build)
+n_dropped <- n_total - n_passed
+pf_pass <- data.frame(
+  Item = c("Candidate packages evaluated",
+           "Passed to val_build()",
+           "Dropped by pre-filter"),
+  n = c(n_total, n_passed, n_dropped),
+  stringsAsFactors = FALSE
+) |>
+  dplyr::arrange(dplyr::desc(n)) |>
+  dplyr::mutate(Count = format(n, big.mark = ",")) |>
+  dplyr::select(Item, Count)
+kable(pf_pass, align = "lr")
+```
+
+```{r pre-filter-counts-hdr, results = "asis", eval = has_pre_filter}
+cat("## Pre-filter risk distribution\n\n")
+```
 
 ```{r pre-filter-counts, eval = has_pre_filter}
 pre_counts <- pre_filtered |>
@@ -185,19 +216,92 @@ pre_counts <- pre_filtered |>
 kable(pre_counts, align = "lrr")
 ```
 
-## Pass / drop breakdown
+```{r pre-filter-per-metric-hdr, results = "asis", eval = has_pre_filter}
+cat("## Per-metric risk distribution\n\n")
+cat("For each metric evaluated by the `remote_reduce` rules, the ",
+    "share of candidate packages that fell into each risk category. ",
+    "This mirrors the summary printed to the console during ",
+    "`val_pipeline()`.\n\n", sep = "")
+```
 
-```{r pre-filter-passfail, eval = has_pre_filter}
-n_total <- nrow(pre_filtered)
-n_passed <- sum(pre_filtered$passed_to_build)
-n_dropped <- n_total - n_passed
-pf_pass <- tibble::tribble(
-  ~Item, ~Count,
-  "Candidate packages evaluated", format(n_total, big.mark = ","),
-  "Passed to val_build()",        format(n_passed, big.mark = ","),
-  "Dropped by pre-filter",        format(n_dropped, big.mark = ",")
+```{r pre-filter-per-metric, eval = has_pre_filter}
+cat_cols <- grep("_cat$", names(pre_filtered), value = TRUE)
+cat_cols <- setdiff(cat_cols, "final_risk_cat")
+if (length(cat_cols) > 0L) {
+  per_metric <- lapply(cat_cols, function(cc) {
+    vals <- factor(as.character(pre_filtered[[cc]]),
+                   levels = decision_levels)
+    tab <- table(vals, useNA = "no")
+    tot <- sum(tab)
+    fmt <- function(n) {
+      if (tot == 0L) "0 (0.0%)"
+      else sprintf("%s (%.1f%%)", format(n, big.mark = ","),
+                   100 * n / tot)
+    }
+    data.frame(
+      Metric = sub("_cat$", "", cc),
+      Low    = fmt(tab[["Low"]]),
+      Medium = fmt(tab[["Medium"]]),
+      High   = fmt(tab[["High"]]),
+      stringsAsFactors = FALSE
+    )
+  })
+  per_metric_tbl <- do.call(rbind, per_metric)
+  itable(per_metric_tbl, default_page_size = 15)
+} else {
+  cat("_No per-metric `_cat` columns available in ",
+      "`pre_filtered_pkg_metrics.rds`._\n")
+}
+```
+
+```{r pre-filter-dropped-hdr, results = "asis", eval = has_pre_filter}
+n_dropped_ap <- sum(!pre_filtered$passed_to_build)
+cat("## Packages dropped by pre-filter\n\n")
+cat("The ", format(n_dropped_ap, big.mark = ","),
+    " packages below were evaluated against the `remote_reduce` rules ",
+    "but did not qualify for a full assessment run (either their ",
+    "pre-filter risk was above `Low`, or they were absent from the ",
+    "`pass_primary` allow-list). Their raw metric values are shown for ",
+    "context \u2014 these are the reasons `val_build()` never opened ",
+    "them.\n\n", sep = "")
+```
+
+```{r pre-filter-dropped-table, eval = has_pre_filter}
+metric_cols <- c(
+  Package = "package",
+  Version = "version",
+  `Pre-filter risk` = "final_risk",
+  `Auto-pass` = "auto_pass",
+  `Downloads (1yr)` = "dwnlds",
+  `Reverse deps` = "rev_deps",
+  Dependencies = "n_deps",
+  Vignettes = "n_vig",
+  `NEWS current` = "news_curr",
+  `Source control` = "src_cntrl",
+  Website = "n_sites",
+  Repo = "repo_name"
 )
-kable(pf_pass, align = "lr")
+present <- metric_cols[metric_cols %in% names(pre_filtered)]
+
+dropped_tbl <- pre_filtered |>
+  dplyr::filter(!passed_to_build) |>
+  dplyr::select(dplyr::all_of(unname(present))) |>
+  dplyr::arrange(dplyr::desc(final_risk),
+                 if ("dwnlds" %in% names(pre_filtered)) dplyr::desc(dwnlds)
+                 else dplyr::desc(package))
+names(dropped_tbl) <- names(present)
+
+for (col in c("Downloads (1yr)", "Reverse deps", "Dependencies")) {
+  if (col %in% names(dropped_tbl)) {
+    dropped_tbl[[col]] <- ifelse(
+      is.na(dropped_tbl[[col]]),
+      NA_character_,
+      format(as.numeric(dropped_tbl[[col]]), big.mark = ",",
+             scientific = FALSE, trim = TRUE)
+    )
+  }
+}
+itable(dropped_tbl, default_page_size = 25)
 ```
 
 # Decision Summary
@@ -430,63 +534,6 @@ lic_tbl <- qa |>
   dplyr::mutate(percent = sprintf("%.1f%%", 100 * packages / sum(packages))) |>
   dplyr::rename(License = license, Packages = packages, Percent = percent)
 itable(lic_tbl, default_page_size = 15)
-```
-
-# Appendix: Packages Dropped by Pre-Filter
-
-```{r pre-filter-dropped-intro, results = "asis"}
-if (has_pre_filter) {
-  n_dropped_ap <- sum(!pre_filtered$passed_to_build)
-  cat("The ", format(n_dropped_ap, big.mark = ","),
-      " packages below were evaluated against the `remote_reduce` rules ",
-      "but did not qualify for a full assessment run (either their ",
-      "pre-filter risk was above `Low`, or they were absent from the ",
-      "`pass_primary` allow-list). Their raw metric values are shown for ",
-      "context — these are the reasons `val_build()` never opened them.\n\n",
-      sep = "")
-} else {
-  cat("_No `pre_filtered_pkg_metrics.rds` available for this run — ",
-      "dropped-package appendix omitted._\n", sep = "")
-}
-```
-
-```{r pre-filter-dropped-table, eval = has_pre_filter}
-metric_cols <- c(
-  Package = "package",
-  Version = "version",
-  `Pre-filter risk` = "final_risk",
-  `Auto-pass` = "auto_pass",
-  `Downloads (1yr)` = "dwnlds",
-  `Reverse deps` = "rev_deps",
-  Dependencies = "n_deps",
-  Vignettes = "n_vig",
-  `NEWS current` = "news_curr",
-  `Source control` = "src_cntrl",
-  Website = "n_sites",
-  Repo = "repo_name"
-)
-present <- metric_cols[metric_cols %in% names(pre_filtered)]
-
-dropped_tbl <- pre_filtered |>
-  dplyr::filter(!passed_to_build) |>
-  dplyr::select(dplyr::all_of(unname(present))) |>
-  dplyr::arrange(dplyr::desc(final_risk),
-                 if ("dwnlds" %in% names(pre_filtered)) dplyr::desc(dwnlds)
-                 else dplyr::desc(package))
-names(dropped_tbl) <- names(present)
-
-# Format numeric-ish columns with thousands separators for readability.
-for (col in c("Downloads (1yr)", "Reverse deps", "Dependencies")) {
-  if (col %in% names(dropped_tbl)) {
-    dropped_tbl[[col]] <- ifelse(
-      is.na(dropped_tbl[[col]]),
-      NA_character_,
-      format(as.numeric(dropped_tbl[[col]]), big.mark = ",",
-             scientific = FALSE, trim = TRUE)
-    )
-  }
-}
-itable(dropped_tbl, default_page_size = 25)
 ```
 
 # Appendix: Metric Thresholds

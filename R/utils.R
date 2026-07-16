@@ -1631,3 +1631,30 @@ render_summary_table <- function(df,
     knitr::kable(df, ...)
   }
 }
+
+
+#' Format a duration in seconds as a compact human-readable string
+#'
+#' Formats a non-negative numeric number of seconds as `"Nh Nm Ns"`,
+#' dropping leading zero-valued fields. Used by [val_pipeline_report()] to
+#' render the `val_pipeline() runtime` row on the Run Metadata table.
+#'
+#' @param secs Non-negative numeric. Number of seconds.
+#'
+#' @return Character scalar (e.g. `"18h 42m 15s"`, `"7m 3s"`, `"12s"`,
+#'   or `"0s"`).
+#'
+#' @keywords internal
+format_runtime_seconds <- function(secs) {
+  stopifnot(is.numeric(secs), length(secs) == 1L, is.finite(secs),
+            secs >= 0)
+  secs <- as.integer(round(secs))
+  h <- secs %/% 3600L
+  m <- (secs %% 3600L) %/% 60L
+  s <- secs %% 60L
+  parts <- character(0)
+  if (h > 0L) parts <- c(parts, paste0(h, "h"))
+  if (h > 0L || m > 0L) parts <- c(parts, paste0(m, "m"))
+  parts <- c(parts, paste0(s, "s"))
+  paste(parts, collapse = " ")
+}

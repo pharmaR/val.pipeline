@@ -63,6 +63,24 @@ run still leaves the candidate universe on disk. Adds a
 `pre_filtered_path` argument to `val_pipeline_report()` for callers
 who want to pass it explicitly; `NULL` (default) auto-detects a
 sibling, `NA` skips the pre-filter sections gracefully. (#59)
+- `val_pipeline_report()`: rework the Pre-Filter Summary section.
+  * When `pre_filtered_pkg_metrics.rds` is unavailable, only the
+    parent heading renders (all H2 sub-sections are suppressed
+    instead of showing empty placeholders).
+  * Pass / drop breakdown now appears before Pre-filter risk
+    distribution, and its rows are sorted by descending count.
+  * New **Per-metric risk distribution** sub-section that
+    consolidates the Low/Medium/High counts + percents that
+    `val_pipeline()` prints to the console for each `_cat` metric
+    into a single filterable table.
+  * The dropped-packages table (previously in its own appendix) is
+    now the last sub-section of Pre-Filter Summary.
+  Adds a `pipeline_runtime` argument to `val_pipeline_report()`
+  (accepts `difftime`, numeric seconds, or a pre-formatted string).
+  When supplied, a `val_pipeline() runtime` row is added to the
+  Run Metadata table. `val_pipeline()` now passes
+  `Sys.time() - val_start` in automatically. Not persisted in the
+  evidence RDS files (pipeline-level fact, not per-package). (#59)
 
 # val.pipeline 0.0.1
 
