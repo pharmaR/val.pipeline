@@ -240,7 +240,7 @@ val_categorize <- function(
     else_cat = "High",
     decisions_df = build_decisions_df(rule_type = "remote_reduce")
 ) {
-  # @importFrom riskscore cran_assessed_lastest cran_scored_lastest
+  # Uses riskscore::assessed_latest and riskscore::scored_latest
   
   # verify decisions_df is compliant
   if(!all(c("metric", "decision", "condition", "metric_type", "accept_condition") %in% colnames(decisions_df))) {
