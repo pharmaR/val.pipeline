@@ -1383,12 +1383,12 @@ split_join_cats <- function(
 #'   decisions[1]`.
 #'
 #' @return `pkg_dat` with `final_decision`, `final_decision_reason`, and
-#'   `final_decision_reason_note` populated for every row (no `NA`s
-#'   introduced by this function outside the note field, which stays `NA`
-#'   for dependency-driven downgrades — see issue #37).
+#'   `final_decision_reason_note` populated for every row. For dependency-
+#'   driven downgrades the note lists the failing dep pkg name(s), comma-
+#'   separated (see [identify_failed_deps()] and issue #37).
 #'
 #' @importFrom dplyr mutate case_when select
-#' @importFrom purrr map_lgl
+#' @importFrom purrr map_chr
 #'
 #' @keywords internal
 reject_iteration <- function(pkg_dat, dec_reject, deps, decisions,
@@ -1399,8 +1399,10 @@ reject_iteration <- function(pkg_dat, dec_reject, deps, decisions,
 
   pkg_dat |>
     dplyr::mutate(
-      dep_failed = purrr::map_lgl(depends,  ~ any(.x %in% failed_pkgs)),
-      sug_failed = purrr::map_lgl(suggests, ~ any(.x %in% failed_pkgs))
+      dep_failed_matches = purrr::map_chr(depends,  identify_failed_deps, failed_pkgs = failed_pkgs),
+      sug_failed_matches = purrr::map_chr(suggests, identify_failed_deps, failed_pkgs = failed_pkgs),
+      dep_failed = !is.na(dep_failed_matches),
+      sug_failed = !is.na(sug_failed_matches)
     ) |>
     dplyr::mutate(
       final_decision = dplyr::case_when(
@@ -1415,18 +1417,18 @@ reject_iteration <- function(pkg_dat, dec_reject, deps, decisions,
         sug_failed & ("Suggests" %in% deps) ~ "Dependency",
         .default = decision_reason
       ),
-      # If the final decision reason is "Dependency" (dep- or suggests-driven
-      # downgrade), we don't currently identify which dep failed — that's
-      # deferred (see issue #37). Otherwise carry the assessment-side
-      # driver metric note through.
+      # When a pkg is downgraded because a dep (or suggest, if deps includes
+      # "Suggests") failed, list the failing dep pkg name(s) in the note.
+      # Best-effort — may under-report if a chain of failures wasn't fully
+      # captured in `failed_pkgs` at this iteration (see issue #37).
       final_decision_reason_note = dplyr::case_when(
         decision_reason == "Pre-Approved package" ~ decision_reason_note,
-        dep_failed ~ NA_character_,
-        sug_failed & ("Suggests" %in% deps) ~ NA_character_,
+        dep_failed ~ dep_failed_matches,
+        sug_failed & ("Suggests" %in% deps) ~ sug_failed_matches,
         .default = decision_reason_note
       )
     ) |>
-    dplyr::select(-dep_failed, -sug_failed)
+    dplyr::select(-dep_failed, -sug_failed, -dep_failed_matches, -sug_failed_matches)
 }
 
 
@@ -1480,4 +1482,32 @@ extract_risk_drivers <- function(
 
   if(!any(matches)) return(NA_character_)
   paste(sub("_cat$", "", cat_cols[matches]), collapse = ", ")
+}
+
+
+#' Identify Failed Dependency Package Names
+#'
+#' Given a vector of dependency package names for a single package and the
+#' set of packages known to have failed in this run, return a comma-
+#' separated character string of the intersection (the failing deps), or
+#' `NA_character_` if none intersect. Used to populate the
+#' `decision_reason_note` column when a package is downgraded because a
+#' dependency failed (see issue #37).
+#'
+#' Handles `NULL`, `character(0)`, and `NA_character_` inputs safely.
+#'
+#' @param dep_pkgs Character vector of dependency package names (may include
+#'   Depends, Imports, LinkingTo, and/or Suggests, depending on caller).
+#' @param failed_pkgs Character vector of packages known to have failed.
+#'
+#' @return A single character string like `"pkgA, pkgB"` listing the
+#'   failing deps (sorted, unique), or `NA_character_` if none match.
+#'
+#' @keywords internal
+identify_failed_deps <- function(dep_pkgs, failed_pkgs) {
+  if(is.null(dep_pkgs) || length(failed_pkgs) == 0) return(NA_character_)
+  matches <- intersect(dep_pkgs, failed_pkgs)
+  matches <- matches[!is.na(matches)]
+  if(length(matches) == 0) return(NA_character_)
+  paste(sort(unique(matches)), collapse = ", ")
 }
