@@ -153,3 +153,100 @@ test_that("val_pipeline_report handles missing _note cols (older runs)", {
   )
   expect_true(file.exists(out))
 })
+
+test_that("val_pipeline_report handles missing runtime cols (ancient runs)", {
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm <- make_fake_qual_metadata()
+  qm$assessment_runtime_mins <- NULL
+  qm$assessment_runtime_txt <- NULL
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(qm, qm_path)
+
+  out <- val_pipeline_report(
+    qual_metadata_path = qm_path,
+    qual_assessments_path = NA,
+    format = "html",
+    quiet = TRUE
+  )
+  expect_true(file.exists(out))
+
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  # Placeholder rendered rather than a crash
+  expect_true(grepl("No .*assessment_runtime_mins.* recorded", html))
+})
+
+test_that("val_pipeline_report handles NA final_decision (pre-#53 runs)", {
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm <- make_fake_qual_metadata()
+  qm$final_decision[c(1L, 3L)] <- NA
+  qm$final_decision_reason[c(1L, 3L)] <- NA
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(qm, qm_path)
+
+  out <- val_pipeline_report(
+    qual_metadata_path = qm_path,
+    qual_assessments_path = NA,
+    format = "html",
+    quiet = TRUE
+  )
+  expect_true(file.exists(out))
+})
+
+test_that("val_pipeline_report errors clearly when required cols missing", {
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm <- make_fake_qual_metadata()
+  qm$final_decision <- NULL
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(qm, qm_path)
+
+  expect_error(
+    val_pipeline_report(qm_path, qual_assessments_path = NA, quiet = TRUE),
+    "missing required columns.*final_decision"
+  )
+})
+
+test_that("val_pipeline_report tolerates qual_assessments missing metric cols", {
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(make_fake_qual_metadata(), qm_path)
+
+  qa <- data.frame(
+    package = c("dplyr", "rlang"),
+    version = c("1.2.1", "1.2.0"),
+    val_date = as.Date("2026-06-21"),
+    riskmetric_version = "0.2.7",
+    ref = "source",
+    downloads_1yr = c(1e7, 8e6),
+    reverse_dependencies = c(100L, 500L),
+    dependencies = c(3L, 0L),
+    stringsAsFactors = FALSE
+  )
+  qa_path <- file.path(work, "qual_assessments.rds")
+  saveRDS(qa, qa_path)
+
+  out <- val_pipeline_report(
+    qual_metadata_path = qm_path,
+    qual_assessments_path = qa_path,
+    format = "html",
+    quiet = TRUE
+  )
+  expect_true(file.exists(out))
+})

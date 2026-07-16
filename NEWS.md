@@ -25,7 +25,13 @@ suitable for GxP / QMS archival. It takes a `qual_metadata.rds` (and
 optionally the sibling `qual_assessments.rds` for richer per-metric
 distributions) and writes the rendered reports alongside the inputs by
 default. `val_pipeline()` now invokes it automatically at the end of every
-run. Adds `{quarto}` (R pkg + CLI) as an `Imports` dependency. (#59)
+run. The template is tolerant of older evidence files: missing
+`_note` cols (pre-#37), missing `assessment_runtime_mins` (pre-runtime
+tracking), `NA` `final_decision` values (pre-#53), and missing / list-
+typed `qual_assessments` metric cols are all handled gracefully. The R
+function validates a minimum required column set and errors with a clear
+message on truly ancient files. Adds `{quarto}` (R pkg + CLI) as an
+`Imports` dependency. (#59)
 
 # val.pipeline 0.0.1
 

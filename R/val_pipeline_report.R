@@ -12,6 +12,27 @@
 #' and is also invoked automatically at the end of [val_pipeline()] so every
 #' full run leaves a summary artefact next to its evidence files.
 #'
+#' # Backward compatibility with older evidence files
+#'
+#' The template is deliberately tolerant of older `qual_metadata.rds` /
+#' `qual_assessments.rds` files so historical runs can still be summarised:
+#'
+#' * `decision_reason_note` / `final_decision_reason_note` (added by issue
+#'   #37) are backfilled with `NA` when absent — the per-category package
+#'   tables just show a blank Note column for those rows.
+#' * `assessment_runtime_mins` (older files may lack it) — the runtime
+#'   section is skipped with a note.
+#' * Any metric column in `qual_assessments.rds` may be absent
+#'   (`covr_coverage`, `license`, `r_cmd_check_errors`, ...) — the
+#'   corresponding sub-section is skipped.
+#' * List-typed columns in `qual_assessments.rds` (e.g. raw
+#'   `r_cmd_check` output) are ignored when computing numeric summaries.
+#'
+#' A minimum set of columns is still required in `qual_metadata.rds`:
+#' `pkg`, `ver`, `decision`, `decision_reason`, `final_decision`, and
+#' `final_decision_reason`. Files missing any of these predate
+#' `val.pipeline 0.0.1` and are rejected with an informative error.
+#'
 #' @param qual_metadata_path Character. Path to a `qual_metadata.rds` file
 #'   produced by [val_build()]. Required.
 #' @param qual_assessments_path Character or NULL. Optional path to the
@@ -65,6 +86,21 @@ val_pipeline_report <- function(
   qual_metadata_path <- normalizePath(qual_metadata_path, winslash = "/",
                                       mustWork = TRUE)
 
+  required_cols <- c("pkg", "ver", "decision", "decision_reason",
+                     "final_decision", "final_decision_reason")
+  qm_peek <- readRDS(qual_metadata_path)
+  missing_cols <- setdiff(required_cols, names(qm_peek))
+  if (length(missing_cols) > 0L) {
+    stop(
+      "qual_metadata file is missing required columns: ",
+      paste(missing_cols, collapse = ", "),
+      ". This file was likely produced by a version of val_build() ",
+      "predating val.pipeline 0.0.1 and is not supported by ",
+      "val_pipeline_report().",
+      call. = FALSE
+    )
+  }
+
   format <- match.arg(format, choices = c("html", "pdf"),
                       several.ok = TRUE)
 
@@ -107,7 +143,7 @@ val_pipeline_report <- function(
   out_dir <- normalizePath(out_dir, winslash = "/", mustWork = TRUE)
 
   # Peek at inputs to synthesize title/subtitle/date
-  qm <- readRDS(qual_metadata_path)
+  qm <- qm_peek
   val_dates <- unique(as.character(qm$val_date))
   r_vers <- unique(as.character(qm$r_ver))
   if (is.null(title)) {

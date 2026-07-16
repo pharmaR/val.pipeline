@@ -183,7 +183,8 @@ kable(pkg_table(qual_metadata, "High"))
 # Runtime
 
 ```{r runtime-summary}
-rt <- qual_metadata$assessment_runtime_mins
+has_runtime <- "assessment_runtime_mins" %in% names(qual_metadata)
+rt <- if (has_runtime) qual_metadata$assessment_runtime_mins else numeric(0)
 if (inherits(rt, "difftime")) rt <- as.numeric(rt)
 rt <- rt[!is.na(rt)]
 
@@ -199,7 +200,7 @@ if (length(rt) > 0L) {
   )
   kable(rt_tbl, align = "lr")
 } else {
-  cat("No runtime data recorded.\n")
+  cat("_No `assessment_runtime_mins` recorded on this run._\n")
 }
 ```
 
@@ -219,6 +220,8 @@ if (length(rt) > 0L) {
       `Runtime (mins)` = round(runtime_mins, 2)
     )
   kable(slow_df, align = "llrr")
+} else {
+  cat("_(runtime data not available)_\n")
 }
 ```
 

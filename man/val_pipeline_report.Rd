@@ -59,6 +59,28 @@ against a historical run archived under \verb{/data/shared/riskassessments/}),
 and is also invoked automatically at the end of \code{\link[=val_pipeline]{val_pipeline()}} so every
 full run leaves a summary artefact next to its evidence files.
 }
+\section{Backward compatibility with older evidence files}{
+The template is deliberately tolerant of older \code{qual_metadata.rds} /
+\code{qual_assessments.rds} files so historical runs can still be summarised:
+\itemize{
+\item \code{decision_reason_note} / \code{final_decision_reason_note} (added by issue
+#37) are backfilled with \code{NA} when absent — the per-category package
+tables just show a blank Note column for those rows.
+\item \code{assessment_runtime_mins} (older files may lack it) — the runtime
+section is skipped with a note.
+\item Any metric column in \code{qual_assessments.rds} may be absent
+(\code{covr_coverage}, \code{license}, \code{r_cmd_check_errors}, ...) — the
+corresponding sub-section is skipped.
+\item List-typed columns in \code{qual_assessments.rds} (e.g. raw
+\code{r_cmd_check} output) are ignored when computing numeric summaries.
+}
+
+A minimum set of columns is still required in \code{qual_metadata.rds}:
+\code{pkg}, \code{ver}, \code{decision}, \code{decision_reason}, \code{final_decision}, and
+\code{final_decision_reason}. Files missing any of these predate
+\verb{val.pipeline 0.0.1} and are rejected with an informative error.
+}
+
 \examples{
 \dontrun{
 val_pipeline_report(
