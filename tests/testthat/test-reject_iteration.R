@@ -10,13 +10,15 @@ make_pkg_dat <- function() {
     pkg              = c("A", "B", "C", "D"),
     decision         = c("Low", "High", "Low", "Low"),
     decision_reason  = c(
-      "Met auto-accepted metric threshold(s) for: downloads_1yr",
+      "Auto-Accepted",
       "Risk Assessment",
       "Risk Assessment",
       "Risk Assessment"
     ),
     final_decision         = NA_character_, # as val_pkg.R initializes
     final_decision_reason  = NA_character_,
+    decision_reason_note   = NA_character_,
+    final_decision_reason_note = NA_character_,
     depends  = list(character(0), character(0), "B",            character(0)),
     suggests = list(character(0), character(0), character(0),   "B")
   )
@@ -42,7 +44,7 @@ test_that("reject_iteration() carries decision through un-downgraded pkgs", {
   expect_equal(out$final_decision[out$pkg == "A"], "Low")
   expect_equal(
     out$final_decision_reason[out$pkg == "A"],
-    "Met auto-accepted metric threshold(s) for: downloads_1yr"
+    "Auto-Accepted"
   )
   # B was assessed High: stays High, reason preserved
   expect_equal(out$final_decision[out$pkg == "B"], "High")
@@ -58,6 +60,8 @@ test_that("reject_iteration() downgrades packages whose Depends fail", {
   # C depends on B (which failed): downgraded to High/Dependency
   expect_equal(out$final_decision[out$pkg == "C"], "High")
   expect_equal(out$final_decision_reason[out$pkg == "C"], "Dependency")
+  # note names the failing dep (issue #37)
+  expect_equal(out$final_decision_reason_note[out$pkg == "C"], "B")
 })
 
 test_that("reject_iteration() only downgrades on Suggests when deps has it", {
@@ -73,6 +77,8 @@ test_that("reject_iteration() only downgrades on Suggests when deps has it", {
     out_dep$final_decision_reason[out_dep$pkg == "D"],
     "Risk Assessment"
   )
+  # No dep failure -> note stays NA (D wasn't downgraded)
+  expect_true(is.na(out_dep$final_decision_reason_note[out_dep$pkg == "D"]))
 
   # deps includes "Suggests": D suggests B, so it SHOULD be downgraded
   out_sug <- reject_iteration(pkg_dat, dec_reject = "High",
@@ -80,6 +86,8 @@ test_that("reject_iteration() only downgrades on Suggests when deps has it", {
                               decisions = decisions, failed_pkgs = failed)
   expect_equal(out_sug$final_decision[out_sug$pkg == "D"], "High")
   expect_equal(out_sug$final_decision_reason[out_sug$pkg == "D"], "Dependency")
+  # note names the failing suggest (issue #37)
+  expect_equal(out_sug$final_decision_reason_note[out_sug$pkg == "D"], "B")
 })
 
 test_that("reject_iteration() never downgrades Pre-Approved packages", {

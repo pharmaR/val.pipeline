@@ -9,6 +9,16 @@ interim pre-propagation frame is now saved separately as
 `qual_metadata0.rds`, and the post-propagation frame is written before the
 per-package meta RDS update walk so any error inside that walk cannot leave
 a stale `qual_metadata.rds` on disk. (#53)
+- Add `decision_reason_note` / `final_decision_reason_note` to the
+per-package meta bundle, populated with the specific driver metric(s) or
+failing dep pkg name(s) depending on the reason. Also shorten the
+`decision_reason` for auto-accepted pkgs from
+`"Met auto-accepted metric threshold(s) for: <metrics>"` to just
+`"Auto-Accepted"` (the metric names now live in the note). Covers three
+cases: `"Auto-Accepted"` (auto-accept metrics), `"Risk Assessment"`
+(driver metrics whose per-metric `_cat` matched the final risk), and
+`"Dependency"` (failing dep pkg name(s), comma-separated — best effort per
+the caveat in issue #37). (#37)
 
 # val.pipeline 0.0.1
 
