@@ -612,9 +612,13 @@ val_categorize <- function(
       )
     }
     
-    # remove primary & exception risk category columns
-    pkgs_final <- promos |>
-      dplyr::select(-primary_risk_category, -exception_risk_category)
+    # Keep primary_risk_category / exception_risk_category on the final output
+    # so downstream consumers (e.g. val_pipeline_report()'s Per-metric risk
+    # distribution) can attribute the primary-metric decision (downloads_1yr
+    # under remote_reduce) without having to re-evaluate config rules. No
+    # code outside val_decision.R currently references these columns, so
+    # keeping them is additive.
+    pkgs_final <- promos
     
   } else {
     pkgs_final <- primed_pkgs |>

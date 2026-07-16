@@ -81,6 +81,18 @@ sibling, `NA` skips the pre-filter sections gracefully. (#59)
   Run Metadata table. `val_pipeline()` now passes
   `Sys.time() - val_start` in automatically. Not persisted in the
   evidence RDS files (pipeline-level fact, not per-package). (#59)
+- `val_pipeline_report()`: the Per-metric risk distribution table
+now includes a **Downloads (1yr)** row (backed by the primary
+metric's per-package risk category), and all rows use human-friendly
+labels (**Reverse dependencies**, **Dependencies**, **Vignettes**,
+**NEWS currency**, **Source control**, **Website**, ...) instead of
+raw column names like `rev_deps_cat` / `n_vig_cat`. Enabling this
+required a one-line change to `val_categorize()` to stop dropping
+`primary_risk_category` / `exception_risk_category` at the end of
+its pipeline (no code outside `R/val_decision.R` referenced those
+columns, so the change is additive). Older
+`pre_filtered_pkg_metrics.rds` files missing `primary_risk_category`
+still render \u2014 the Downloads row is simply skipped. (#59)
 
 # val.pipeline 0.0.1
 

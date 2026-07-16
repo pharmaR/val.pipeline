@@ -522,7 +522,40 @@ test_that("val_pipeline_report per-metric distribution renders _cat cols", {
   )
   html <- paste(readLines(out, warn = FALSE), collapse = "\n")
   expect_true(grepl("Per-metric risk distribution", html, fixed = TRUE))
-  # Metric names (with _cat stripped) appear in the rendered table
-  expect_true(grepl("rev_deps", html, fixed = TRUE))
-  expect_true(grepl("n_deps", html, fixed = TRUE))
+  # Pretty metric labels appear (raw column names are hidden).
+  expect_true(grepl("Reverse dependencies", html, fixed = TRUE))
+  expect_true(grepl("Dependencies", html, fixed = TRUE))
+  expect_false(grepl("rev_deps_cat", html, fixed = TRUE))
+  expect_false(grepl("n_deps_cat", html, fixed = TRUE))
+})
+
+test_that("val_pipeline_report includes Downloads (1yr) row from primary_risk_category", {
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(make_fake_qual_metadata(), qm_path)
+
+  pf <- make_fake_pre_filtered(9)
+  pf$primary_risk_category <- factor(
+    rep(c("Low", "Medium", "High"), length.out = nrow(pf)),
+    levels = c("Low", "Medium", "High")
+  )
+  pf$rev_deps_cat <- factor(
+    rep("Low", nrow(pf)), levels = c("Low", "Medium", "High")
+  )
+  saveRDS(pf, file.path(work, "pre_filtered_pkg_metrics.rds"))
+
+  out <- val_pipeline_report(
+    qual_metadata_path = qm_path,
+    qual_assessments_path = NA,
+    format = "html",
+    quiet = TRUE
+  )
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  expect_true(grepl("Downloads (1yr)", html, fixed = TRUE))
+  expect_false(grepl("primary_risk_category", html, fixed = TRUE))
 })

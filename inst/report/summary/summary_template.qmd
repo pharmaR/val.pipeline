@@ -225,10 +225,44 @@ cat("For each metric evaluated by the `remote_reduce` rules, the ",
 ```
 
 ```{r pre-filter-per-metric, eval = has_pre_filter}
+# Pretty labels for metric names shown in the report. Keys are the raw
+# column names on the pre_filtered_pkg_metrics data frame (either a
+# secondary `_cat` col or the primary_risk_category surrogate for the
+# `remote_reduce` primary metric — downloads_1yr).
+metric_labels <- c(
+  primary_risk_category = "Downloads (1yr)",
+  rev_deps_cat          = "Reverse dependencies",
+  n_deps_cat            = "Dependencies",
+  n_vig_cat             = "Vignettes",
+  news_curr_cat         = "NEWS currency",
+  src_cntrl_cat         = "Source control",
+  n_sites_cat           = "Website",
+  bugs_status_cat       = "Bug tracker status"
+)
+
+# Fallback: strip the _cat suffix and title-case each word.
+pretty_metric <- function(col) {
+  if (col %in% names(metric_labels)) return(unname(metric_labels[[col]]))
+  base <- sub("_cat$", "", col)
+  base <- gsub("_", " ", base)
+  substr(base, 1, 1) <- toupper(substr(base, 1, 1))
+  base
+}
+
+# Assemble the list of columns to summarise, in the order we want them
+# displayed: primary first (if present), then the secondary `_cat` cols
+# in the order they appear on the data frame.
 cat_cols <- grep("_cat$", names(pre_filtered), value = TRUE)
 cat_cols <- setdiff(cat_cols, "final_risk_cat")
-if (length(cat_cols) > 0L) {
-  per_metric <- lapply(cat_cols, function(cc) {
+summary_cols <- c(
+  if ("primary_risk_category" %in% names(pre_filtered)) {
+    "primary_risk_category"
+  },
+  cat_cols
+)
+
+if (length(summary_cols) > 0L) {
+  per_metric <- lapply(summary_cols, function(cc) {
     vals <- factor(as.character(pre_filtered[[cc]]),
                    levels = decision_levels)
     tab <- table(vals, useNA = "no")
@@ -239,7 +273,7 @@ if (length(cat_cols) > 0L) {
                    100 * n / tot)
     }
     data.frame(
-      Metric = sub("_cat$", "", cc),
+      Metric = pretty_metric(cc),
       Low    = fmt(tab[["Low"]]),
       Medium = fmt(tab[["Medium"]]),
       High   = fmt(tab[["High"]]),
@@ -249,7 +283,7 @@ if (length(cat_cols) > 0L) {
   per_metric_tbl <- do.call(rbind, per_metric)
   itable(per_metric_tbl, default_page_size = 15)
 } else {
-  cat("_No per-metric `_cat` columns available in ",
+  cat("_No per-metric risk-category columns available in ",
       "`pre_filtered_pkg_metrics.rds`._\n")
 }
 ```
