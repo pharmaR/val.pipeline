@@ -1511,3 +1511,123 @@ identify_failed_deps <- function(dep_pkgs, failed_pkgs) {
   if(length(matches) == 0) return(NA_character_)
   paste(sort(unique(matches)), collapse = ", ")
 }
+
+
+
+#' Pretty-Format a Single riskmetric Rule Condition
+#'
+#' Converts a rule condition expression (as returned by
+#' [build_decisions_df()] in the `condition` / `auto_accept` columns) into a
+#' short, human-readable string suitable for display in a threshold summary
+#' table. Used by the summary report template
+#' (`inst/report/summary/summary_template.qmd`).
+#'
+#' Supported patterns:
+#' * `~ .x > n` -> `"> n"` (with thousands separators for numeric `n`)
+#' * `~ .x < n`, `>=`, `<=`, `==`, `!=` similarly (using Unicode
+#'   symbols for `>=`, `<=`, `!=`)
+#' * `~ dplyr::between(.x, a, b)` -> `"a - b"`
+#' * `~ is.na(.x) | <cond>` -> `"<cond> or NA"`
+#' * `~ is.na(.x)` (alone) -> `"NA"`
+#' * Any other expression is returned as-is with the leading `~` stripped.
+#'
+#' @param expr_str A single character scalar. `NA` or empty strings return
+#'   `NA_character_`.
+#'
+#' @return A single character string, or `NA_character_` for empty input.
+#'
+#' @keywords internal
+pretty_rule_condition <- function(expr_str) {
+  if (length(expr_str) != 1L) {
+    stop("pretty_rule_condition() expects a length-1 input.",
+         call. = FALSE)
+  }
+  if (is.na(expr_str) || !nzchar(expr_str)) return(NA_character_)
+
+  s <- sub("^\\s*~\\s*", "", expr_str)
+  s <- gsub("\\s+", " ", trimws(s))
+
+  parts <- strsplit(s, "\\s*\\|\\s*")[[1]]
+  na_seen <- FALSE
+  cond_parts <- character(0)
+  for (p in parts) {
+    if (grepl("^is\\.na\\(\\.x\\)$", p)) {
+      na_seen <- TRUE
+    } else {
+      cond_parts <- c(cond_parts, p)
+    }
+  }
+
+  fmt_num <- function(n) {
+    n_num <- suppressWarnings(as.numeric(n))
+    if (is.na(n_num)) return(n)
+    formatC(n_num, format = "d", big.mark = ",")
+  }
+
+  render_one <- function(p) {
+    m <- regmatches(p, regexec(
+      "^dplyr::between\\(\\.x,\\s*([^,]+),\\s*([^)]+)\\)$", p))[[1]]
+    if (length(m) == 3L) {
+      return(paste0(fmt_num(m[2]), " \u2013 ", fmt_num(m[3])))
+    }
+    m <- regmatches(p, regexec(
+      "^\\.x\\s*(>=|<=|==|!=|>|<)\\s*(.+)$", p))[[1]]
+    if (length(m) == 3L) {
+      op_map <- c(">" = "> ", "<" = "< ", ">=" = "\u2265 ",
+                  "<=" = "\u2264 ", "==" = "= ", "!=" = "\u2260 ")
+      return(paste0(op_map[[m[2]]], fmt_num(m[3])))
+    }
+    p
+  }
+
+  rendered <- vapply(cond_parts, render_one, character(1))
+  out <- paste(rendered, collapse = " or ")
+  if (na_seen) out <- if (nzchar(out)) paste0(out, " or NA") else "NA"
+  out
+}
+
+
+
+#' Render a Data.Frame as an Interactive Table (HTML) or Plain Kable (PDF)
+#'
+#' Internal helper used by the summary report template
+#' (`inst/report/summary/summary_template.qmd`). When rendering to HTML,
+#' produces a filterable/sortable [reactable::reactable()] widget. When
+#' rendering to any other Pandoc target (e.g. typst for PDF), falls back to
+#' [knitr::kable()] so print-friendly outputs remain readable.
+#'
+#' @param df A data.frame or tibble.
+#' @param searchable,filterable Passed to [reactable::reactable()].
+#' @param default_page_size Passed as `defaultPageSize`.
+#' @param ... Additional arguments forwarded to [reactable::reactable()]
+#'   (HTML) or [knitr::kable()] (PDF).
+#'
+#' @return An htmlwidget (HTML) or `knitr_kable` object (PDF).
+#'
+#' @keywords internal
+render_summary_table <- function(df,
+                                 searchable = TRUE,
+                                 filterable = TRUE,
+                                 default_page_size = 25,
+                                 ...) {
+  is_html <- isTRUE(knitr::is_html_output())
+  if (is_html && nrow(df) > 0L) {
+    reactable::reactable(
+      df,
+      searchable = searchable,
+      filterable = filterable,
+      sortable = TRUE,
+      resizable = TRUE,
+      defaultPageSize = default_page_size,
+      showPageSizeOptions = TRUE,
+      pageSizeOptions = c(10, 25, 50, 100),
+      striped = TRUE,
+      highlight = TRUE,
+      compact = TRUE,
+      wrap = TRUE,
+      ...
+    )
+  } else {
+    knitr::kable(df, ...)
+  }
+}

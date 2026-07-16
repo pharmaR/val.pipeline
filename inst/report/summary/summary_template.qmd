@@ -10,6 +10,7 @@ params:
   qual_assessments_path: NULL
   val_date: NULL
   config_path: NULL
+  thresholds_path: NULL
 format:
   html:
     toc: true
@@ -35,6 +36,37 @@ knitr::opts_chunk$set(
 options(knitr.kable.NA = "")
 library(dplyr)
 library(knitr)
+
+is_html <- isTRUE(knitr::is_html_output())
+
+# Interactive filterable/sortable table for HTML output; plain kable for
+# typst/PDF. Kept self-contained (i.e. defined in the qmd rather than
+# imported from val.pipeline) so `devtools::load_all()` renders work
+# without the package being installed. The equivalent internal helper
+# `val.pipeline:::render_summary_table()` mirrors this logic for callers
+# that want to reuse it programmatically.
+itable <- function(df, ..., searchable = TRUE, filterable = TRUE,
+                   default_page_size = 25) {
+  if (is_html && nrow(df) > 0L) {
+    reactable::reactable(
+      df,
+      searchable = searchable,
+      filterable = filterable,
+      sortable = TRUE,
+      resizable = TRUE,
+      defaultPageSize = default_page_size,
+      showPageSizeOptions = TRUE,
+      pageSizeOptions = c(10, 25, 50, 100),
+      striped = TRUE,
+      highlight = TRUE,
+      compact = TRUE,
+      wrap = TRUE,
+      ...
+    )
+  } else {
+    knitr::kable(df, ...)
+  }
+}
 ```
 
 ```{r load-inputs}
@@ -127,17 +159,19 @@ reason_counts <- qual_metadata |>
   dplyr::count(final_decision, final_decision_reason, name = "packages",
                .drop = FALSE) |>
   dplyr::filter(packages > 0) |>
-  dplyr::arrange(final_decision, dplyr::desc(packages))
-kable(reason_counts,
-      col.names = c("Final decision", "Reason", "Packages"),
-      align = "llr")
+  dplyr::arrange(final_decision, dplyr::desc(packages)) |>
+  dplyr::rename(`Final decision` = final_decision,
+                Reason = final_decision_reason,
+                Packages = packages)
+itable(reason_counts, default_page_size = 10)
 ```
 
 # Packages by Risk Category
 
 The tables below list every package in each risk tier, with the reason and
 supporting note (driver metrics for `Risk Assessment`, failing dependency
-for `Dependency`, auto-accept metric list for `Auto-Accepted`).
+for `Dependency`, auto-accept metric list for `Auto-Accepted`). In HTML,
+use the search box and per-column filters to narrow down.
 
 ```{r pkg-tables-helper}
 pkg_table <- function(df, cat) {
@@ -165,19 +199,19 @@ pkg_table <- function(df, cat) {
 ## Low risk (`r sum(qual_metadata$final_decision == "Low", na.rm = TRUE)`)
 
 ```{r low-tbl}
-kable(pkg_table(qual_metadata, "Low"))
+itable(pkg_table(qual_metadata, "Low"))
 ```
 
 ## Medium risk (`r sum(qual_metadata$final_decision == "Medium", na.rm = TRUE)`)
 
 ```{r medium-tbl}
-kable(pkg_table(qual_metadata, "Medium"))
+itable(pkg_table(qual_metadata, "Medium"))
 ```
 
 ## High risk (`r sum(qual_metadata$final_decision == "High", na.rm = TRUE)`)
 
 ```{r high-tbl}
-kable(pkg_table(qual_metadata, "High"))
+itable(pkg_table(qual_metadata, "High"))
 ```
 
 # Runtime
@@ -264,7 +298,7 @@ numeric_col_names <- setdiff(
 
 ```{r numeric-summaries, eval = has_assessments}
 tbl <- purrr::map_dfr(numeric_col_names, ~ numeric_metric_summary(qa, .x))
-kable(tbl, align = "lrrrrr")
+itable(tbl, default_page_size = 25)
 ```
 
 ## Package coverage (`covr_coverage`)
@@ -312,9 +346,34 @@ kable(rcmd_tbl, align = "lrr")
 ```{r license, eval = has_assessments && "license" %in% names(qa)}
 lic_tbl <- qa |>
   dplyr::count(license, sort = TRUE, name = "packages") |>
-  dplyr::mutate(percent = sprintf("%.1f%%", 100 * packages / sum(packages)))
-kable(lic_tbl, col.names = c("License", "Packages", "Percent"),
-      align = "lrr")
+  dplyr::mutate(percent = sprintf("%.1f%%", 100 * packages / sum(packages))) |>
+  dplyr::rename(License = license, Packages = packages, Percent = percent)
+itable(lic_tbl, default_page_size = 15)
+```
+
+# Appendix: Metric Thresholds
+
+Human-readable summary of the risk-category thresholds pulled from the
+`decide` rule block of `config.yml` at report-generation time. Each row is
+one metric; each of the `Low`, `Medium`, `High` columns states the
+condition on the metric value that lands a package in that category. When
+a metric has an `auto_accept` threshold, meeting it short-circuits the
+per-metric evaluation. The `promote_min` config knob is intentionally
+omitted.
+
+```{r metric-thresholds}
+thresholds_df <- if (!is.null(params$thresholds_path) &&
+                     file.exists(params$thresholds_path)) {
+  readRDS(params$thresholds_path)
+} else {
+  NULL
+}
+
+if (!is.null(thresholds_df) && nrow(thresholds_df) > 0L) {
+  itable(thresholds_df, default_page_size = 25)
+} else {
+  cat("_(Metric thresholds table unavailable.)_\n")
+}
 ```
 
 # Appendix: Configuration

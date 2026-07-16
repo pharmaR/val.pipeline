@@ -175,6 +175,41 @@ val_pipeline_report <- function(
   qmd_path <- file.path(work_dir, "summary_template.qmd")
   file.copy(tmpl_src, qmd_path, overwrite = TRUE)
 
+  # Precompute the metric-thresholds table from the currently-installed
+  # (or loaded) config and stash it as an RDS in the working dir. The
+  # template reads it back rather than calling val.pipeline::* directly,
+  # which lets the template render even from a fresh R subprocess that
+  # doesn't have val.pipeline on its search path (e.g. during
+  # devtools::load_all() smoke tests).
+  thresholds_rds <- file.path(work_dir, "metric_thresholds.rds")
+  tryCatch({
+    thresholds_df <- build_decisions_df(rule_type = "decide") |>
+      dplyr::mutate(
+        pretty = vapply(condition, pretty_rule_condition, character(1))
+      ) |>
+      dplyr::select(metric, metric_type, decision, pretty, auto_accept) |>
+      tidyr::pivot_wider(
+        id_cols = c(metric, metric_type, auto_accept),
+        names_from = decision,
+        values_from = pretty
+      ) |>
+      dplyr::mutate(
+        auto_accept = vapply(auto_accept, pretty_rule_condition,
+                             character(1)),
+        metric_type = tools::toTitleCase(as.character(metric_type))
+      ) |>
+      dplyr::select(Metric = metric,
+                    Type = metric_type,
+                    dplyr::any_of(c("Low", "Medium", "High")),
+                    `Auto-Accept` = auto_accept) |>
+      dplyr::arrange(Type, Metric)
+    saveRDS(thresholds_df, thresholds_rds)
+  }, error = function(e) {
+    warning("Could not precompute metric thresholds table: ",
+            conditionMessage(e), call. = FALSE)
+    if (file.exists(thresholds_rds)) unlink(thresholds_rds)
+  })
+
   # Map friendly names to Quarto format identifiers
   format_map <- c(html = "html", pdf = "typst")
   quarto_formats <- unname(format_map[format])
@@ -185,7 +220,8 @@ val_pipeline_report <- function(
     qual_metadata_path = qual_metadata_path,
     qual_assessments_path = qa_path,
     val_date = val_date_str,
-    config_path = config_path
+    config_path = config_path,
+    thresholds_path = if (file.exists(thresholds_rds)) thresholds_rds else NULL
   )
 
   quarto::quarto_render(

@@ -19,6 +19,14 @@ cases: `"Auto-Accepted"` (auto-accept metrics), `"Risk Assessment"`
 (driver metrics whose per-metric `_cat` matched the final risk), and
 `"Dependency"` (failing dep pkg name(s), comma-separated — best effort per
 the caveat in issue #37). (#37)
+- `val_pipeline_report()`: HTML output now renders the per-risk-category
+package lists (and other multi-row tables) as filterable, sortable
+`{reactable}` widgets, and a new **Appendix: Metric Thresholds** table
+gives a human-readable summary of the `decide` rule block from
+`config.yml` with `Low` / `Medium` / `High` / `Auto-Accept` as their own
+columns (e.g. `120,000 – 240,000`, `< 35 or NA`). The `promote_min` knob
+is intentionally omitted. PDF output falls back to plain kable tables.
+Adds `{reactable}` as an `Imports` dependency. (#59)
 - Add `val_pipeline_report()`, a new exported function that renders a
 high-level HTML + PDF summary of a `val_pipeline()` / `val_build()` run
 suitable for GxP / QMS archival. It takes a `qual_metadata.rds` (and
