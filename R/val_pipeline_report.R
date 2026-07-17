@@ -215,8 +215,7 @@ val_pipeline_report <- function(
     subtitle <- paste0(
       "R ", paste(r_vers, collapse = ", "),
       " \u2014 ",
-      paste(val_dates, collapse = ", "),
-      " (", format(nrow(qm), big.mark = ","), " packages)"
+      paste(val_dates, collapse = ", ")
     )
   }
   val_date_str <- val_dates[1L]
