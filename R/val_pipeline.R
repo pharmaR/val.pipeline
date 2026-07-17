@@ -137,6 +137,25 @@ val_pipeline <- function(
         )
       )
   # see <- pre_filtered_pkg_metrics |> dplyr::filter(dwnlds > 1000000) 
+
+  # Persist the pre-filter candidate set eagerly (before val_build() runs), so
+  # an interrupted run still leaves the evaluated universe on disk for
+  # inspection and for a later re-render of val_pipeline_report(). Uses the
+  # same val_dir path convention val_build() computes, and creates the
+  # directory tree if it doesn't yet exist.
+  eager_r_dir <- file.path(out, glue::glue("R_{r_ver}"))
+  eager_val_dir <- file.path(eager_r_dir, val_date_txt)
+  if (!dir.exists(eager_val_dir)) {
+    dir.create(eager_val_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+  tryCatch(
+    saveRDS(pre_filtered_pkg_metrics,
+            file.path(eager_val_dir, "pre_filtered_pkg_metrics.rds")),
+    error = function(e) {
+      warning("Could not persist pre_filtered_pkg_metrics.rds: ",
+              conditionMessage(e), call. = FALSE)
+    }
+  )
   
   
   
@@ -230,20 +249,33 @@ val_pipeline <- function(
   # qualified <- qual |>
   #   dplyr::filter(final_decision == decisions[1])
   
-  # Using qual, create a high-level PDF report containing summary statistics
-  # about the qualification run. The report may contain things like: Three
-  # tables: Low, Medium, and High Risk pkgs. Each table should include package
-  # name, version, and the reason for the decision. The report should also
-  # include a summary of the number of packages in each category, as well as any
-  # notable trends or observations from the assessment process. The report
-  # should be generated in a format that is easy to read and understand, such as
-  # a PDF or HTML document. The report should be saved to the output directory
-  # specified in the function
-  
-  # Store as pins board?
-  # How to Provision PPM metadata for all pkgs
+  # Generate a high-level HTML + PDF summary report of the run, saved next to
+  # qual_metadata.rds in the val_build() output directory. Suitable for GxP /
+  # QMS archival. Failure to render should not fail the whole pipeline. The
+  # pre-filter candidate set was already persisted eagerly above (right after
+  # it was created) so an interrupted val_build() still leaves it on disk.
+  qm_path <- file.path(outtie$val_dir, "qual_metadata.rds")
+  qa_path <- file.path(outtie$val_dir, "qual_assessments.rds")
 
- return(qual)
+  if (file.exists(qm_path)) {
+    tryCatch(
+      val_pipeline_report(
+        qual_metadata_path = qm_path,
+        qual_assessments_path = if (file.exists(qa_path)) qa_path else NA,
+        out_dir = outtie$val_dir,
+        n_candidates = if(!exists("pre_filtered_pkg_metrics")) available.packages()[,1] |> length() else nrow(pre_filtered_pkg_metrics),
+        pipeline_runtime = difftime(Sys.time(), val_start, units = "secs")
+      ),
+      error = function(e) {
+        warning("val_pipeline_report() failed: ", conditionMessage(e),
+                call. = FALSE)
+      }
+    )
+  }
+
+  # Return the val_build() results (val_dir points to all evidence, incl. the
+  # newly rendered summary report).
+  return(outtie)
 }
 
 

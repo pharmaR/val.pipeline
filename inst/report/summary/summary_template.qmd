@@ -1,0 +1,620 @@
+---
+title: "`r params$title`"
+subtitle: "`r params$subtitle`"
+date-format: "YYYY-MM-DD"
+date: "`r params$val_date`"
+params:
+  title: "val.pipeline Qualification Summary"
+  subtitle: ""
+  qual_metadata_path: NULL
+  qual_assessments_path: NULL
+  val_date: NULL
+  config_path: NULL
+  thresholds_path: NULL
+  n_candidates: NULL
+  pre_filtered_path: NULL
+  pipeline_runtime: NULL
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    embed-resources: true
+    theme: [cosmo]
+    df-print: paged
+  typst:
+    toc: true
+    toc-depth: 3
+    section-numbering: 1.1.1
+    margin:
+      x: 2cm
+      y: 2cm
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE
+)
+options(knitr.kable.NA = "")
+library(dplyr)
+library(knitr)
+
+is_html <- isTRUE(knitr::is_html_output())
+
+# Interactive filterable/sortable table for HTML output; plain kable for
+# typst/PDF. Kept self-contained (i.e. defined in the qmd rather than
+# imported from val.pipeline) so `devtools::load_all()` renders work
+# without the package being installed. The equivalent internal helper
+# `val.pipeline:::render_summary_table()` mirrors this logic for callers
+# that want to reuse it programmatically.
+itable <- function(df, ..., searchable = TRUE, filterable = TRUE,
+                   default_page_size = 25) {
+  if (is_html && nrow(df) > 0L) {
+    reactable::reactable(
+      df,
+      searchable = searchable,
+      filterable = filterable,
+      sortable = TRUE,
+      resizable = TRUE,
+      defaultPageSize = default_page_size,
+      showPageSizeOptions = TRUE,
+      pageSizeOptions = c(10, 25, 50, 100),
+      striped = TRUE,
+      highlight = TRUE,
+      compact = TRUE,
+      wrap = TRUE,
+      ...
+    )
+  } else {
+    knitr::kable(df, ...)
+  }
+}
+```
+
+```{r load-inputs}
+qual_metadata <- readRDS(params$qual_metadata_path)
+qual_assessments <- if (!is.null(params$qual_assessments_path)) {
+  readRDS(params$qual_assessments_path)
+} else {
+  NULL
+}
+pre_filtered <- if (!is.null(params$pre_filtered_path) &&
+                      file.exists(params$pre_filtered_path)) {
+  readRDS(params$pre_filtered_path)
+} else {
+  NULL
+}
+
+has_assessments <- !is.null(qual_assessments)
+has_pre_filter <- !is.null(pre_filtered) &&
+                    all(c("package", "final_risk") %in% names(pre_filtered))
+
+# Backfill columns that older qual_metadata.rds runs may lack (the
+# `_note` columns were added in val.pipeline 0.0.1.9003 / issue #37).
+for (col in c("decision_reason_note", "final_decision_reason_note")) {
+  if (!col %in% names(qual_metadata)) {
+    qual_metadata[[col]] <- NA_character_
+  }
+}
+has_notes <- any(!is.na(qual_metadata$final_decision_reason_note))
+
+decision_levels <- c("Low", "Medium", "High")
+qual_metadata$final_decision <- factor(qual_metadata$final_decision,
+                                       levels = decision_levels)
+qual_metadata$decision <- factor(qual_metadata$decision,
+                                 levels = decision_levels)
+
+# Normalise pre_filtered final_risk to the same factor levels for consistent
+# ordering in tables. `val_categorize()` already returns it as a factor, but
+# older RDS files may not.
+if (has_pre_filter) {
+  pre_filtered$final_risk <- factor(as.character(pre_filtered$final_risk),
+                                    levels = decision_levels)
+  assessed_pkgs <- unique(qual_metadata$pkg)
+  pre_filtered$passed_to_build <- pre_filtered$package %in% assessed_pkgs
+}
+```
+
+# Run Metadata
+
+```{r run-metadata}
+r_ver <- unique(qual_metadata$r_ver)
+val_dates <- unique(as.character(qual_metadata$val_date))
+repos <- unique(unlist(strsplit(as.character(qual_metadata$repos), "\\s*,\\s*")))
+# Drop NAs before flattening: rows whose packages were categorised via
+# dependency propagation (never independently assessed by riskmetric)
+# leave `ref` / `metric_pkg` unset, and we don't want a literal "NA" to
+# leak into the human-readable metadata table.
+metric_pkg <- setdiff(unique(qual_metadata$metric_pkg), NA)
+ref_types <- setdiff(unique(qual_metadata$ref), NA)
+
+meta_rows <- list(
+  c("Report generated",      format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")),
+  c("Validation date(s)",    paste(val_dates, collapse = ", ")),
+  c("R version",             paste(r_ver, collapse = ", ")),
+  c("Assessment reference",  paste(ref_types, collapse = ", ")),
+  c("Metric package",        paste(metric_pkg, collapse = ", ")),
+  c("Repositories",          paste(repos, collapse = "; "))
+)
+if (!is.null(params$pipeline_runtime) &&
+      nzchar(as.character(params$pipeline_runtime))) {
+  meta_rows <- c(meta_rows, list(
+    c("val_pipeline() runtime", as.character(params$pipeline_runtime))
+  ))
+}
+if (!is.null(params$n_candidates)) {
+  meta_rows <- c(meta_rows, list(
+    c("Candidate packages evaluated",
+      format(as.integer(params$n_candidates), big.mark = ","))
+  ))
+}
+meta_rows <- c(meta_rows, list(
+  c("Packages assessed",     format(nrow(qual_metadata), big.mark = ",")),
+  c("qual_metadata path",    params$qual_metadata_path),
+  c("qual_assessments path", ifelse(has_assessments,
+                                    params$qual_assessments_path,
+                                    "(not provided)"))
+))
+meta_tbl <- tibble::tibble(
+  Item  = vapply(meta_rows, `[`, character(1), 1),
+  Value = vapply(meta_rows, `[`, character(1), 2)
+)
+kable(meta_tbl)
+```
+
+# Pre-Filter Summary
+
+```{r pre-filter-summary, results = "asis", eval = has_pre_filter}
+cat("The 'pre-filter step' runs `riskmetric`'s `remote_reduce` rules over ",
+    "the entire candidate universe (using recent remote metrics stored in ",
+    "`{riskscore}`) to identify ",
+    "packages worth running a full assessment on. Only packages ",
+    "categorised as **Low** risk here \u2014 plus any explicitly ",
+    "allow-listed in the `pass_primary` config \u2014 proceed to ",
+    "`val_build()`.\n\n", sep = "")
+```
+
+```{r pre-filter-summary-skip, results = "asis", eval = !has_pre_filter}
+cat("_No `pre_filtered_pkg_metrics.rds` was supplied or auto-detected ",
+    "alongside `qual_metadata.rds`. Historical runs predating this ",
+    "artifact will not include a pre-filter summary._\n\n", sep = "")
+```
+
+```{r pre-filter-passfail-hdr, results = "asis", eval = has_pre_filter}
+cat("## Pass / drop breakdown\n\n")
+```
+
+```{r pre-filter-passfail, eval = has_pre_filter}
+n_total <- nrow(pre_filtered)
+n_passed <- sum(pre_filtered$passed_to_build)
+n_dropped <- n_total - n_passed
+pf_pass <- data.frame(
+  Item = c("Candidate packages evaluated",
+           "Passed to val_build()",
+           "Dropped by pre-filter"),
+  n = c(n_total, n_passed, n_dropped),
+  stringsAsFactors = FALSE
+) |>
+  dplyr::arrange(dplyr::desc(n)) |>
+  dplyr::mutate(Count = format(n, big.mark = ",")) |>
+  dplyr::select(Item, Count)
+kable(pf_pass, align = "lr")
+```
+
+```{r pre-filter-counts-hdr, results = "asis", eval = has_pre_filter}
+cat("## Pre-filter risk distribution\n\n")
+```
+
+```{r pre-filter-counts, eval = has_pre_filter}
+pre_counts <- pre_filtered |>
+  dplyr::count(final_risk, .drop = FALSE, name = "n") |>
+  dplyr::mutate(
+    Percent = sprintf("%.1f%%", 100 * n / sum(n)),
+    n = format(n, big.mark = ",")
+  ) |>
+  dplyr::rename(`Pre-filter risk` = final_risk, Count = n)
+kable(pre_counts, align = "lrr")
+```
+
+```{r pre-filter-per-metric-hdr, results = "asis", eval = has_pre_filter}
+cat("## Per-metric risk distribution\n\n")
+cat("For each metric evaluated by the `remote_reduce` rules, the ",
+    "share of candidate packages that fell into each risk category. ",
+    "This mirrors the summary printed to the console during ",
+    "`val_pipeline()`.\n\n", sep = "")
+```
+
+```{r pre-filter-per-metric, eval = has_pre_filter}
+# Pretty labels for metric names shown in the report. Keys are the raw
+# column names on the pre_filtered_pkg_metrics data frame (either a
+# secondary `_cat` col or the primary_risk_category surrogate for the
+# `remote_reduce` primary metric — downloads_1yr).
+metric_labels <- c(
+  primary_risk_category = "Downloads (1yr)",
+  rev_deps_cat          = "Reverse dependencies",
+  n_deps_cat            = "Dependencies",
+  n_vig_cat             = "Vignettes",
+  news_curr_cat         = "NEWS currency",
+  src_cntrl_cat         = "Source control",
+  n_sites_cat           = "Website",
+  bugs_status_cat       = "Bug tracker status"
+)
+
+# Fallback: strip the _cat suffix and title-case each word.
+pretty_metric <- function(col) {
+  if (col %in% names(metric_labels)) return(unname(metric_labels[[col]]))
+  base <- sub("_cat$", "", col)
+  base <- gsub("_", " ", base)
+  substr(base, 1, 1) <- toupper(substr(base, 1, 1))
+  base
+}
+
+# Assemble the list of columns to summarise, in the order we want them
+# displayed: primary first (if present), then the secondary `_cat` cols
+# in the order they appear on the data frame.
+cat_cols <- grep("_cat$", names(pre_filtered), value = TRUE)
+cat_cols <- setdiff(cat_cols, "final_risk_cat")
+summary_cols <- c(
+  if ("primary_risk_category" %in% names(pre_filtered)) {
+    "primary_risk_category"
+  },
+  cat_cols
+)
+
+if (length(summary_cols) > 0L) {
+  per_metric <- lapply(summary_cols, function(cc) {
+    vals <- factor(as.character(pre_filtered[[cc]]),
+                   levels = decision_levels)
+    tab <- table(vals, useNA = "no")
+    tot <- sum(tab)
+    fmt <- function(n) {
+      if (tot == 0L) "0 (0.0%)"
+      else sprintf("%s (%.1f%%)", format(n, big.mark = ","),
+                   100 * n / tot)
+    }
+    data.frame(
+      Metric = pretty_metric(cc),
+      Low    = fmt(tab[["Low"]]),
+      Medium = fmt(tab[["Medium"]]),
+      High   = fmt(tab[["High"]]),
+      stringsAsFactors = FALSE
+    )
+  })
+  per_metric_tbl <- do.call(rbind, per_metric)
+  itable(per_metric_tbl, default_page_size = 15)
+} else {
+  cat("_No per-metric risk-category columns available in ",
+      "`pre_filtered_pkg_metrics.rds`._\n")
+}
+```
+
+```{r pre-filter-dropped-hdr, results = "asis", eval = has_pre_filter}
+n_dropped_ap <- sum(!pre_filtered$passed_to_build)
+cat("## Packages dropped by pre-filter\n\n")
+if (is_html) {
+  cat("The ", format(n_dropped_ap, big.mark = ","),
+      " packages below were evaluated against the `remote_reduce` rules ",
+      "but did not qualify for a full assessment run (either their ",
+      "pre-filter risk was above `Low`, or they were absent from the ",
+      "`pass_primary` allow-list). Their raw metric values are shown for ",
+      "context \u2014 these are the reasons `val_build()` never opened ",
+      "them.\n\n", sep = "")
+} else {
+  cat(format(n_dropped_ap, big.mark = ","),
+      " packages were evaluated against the `remote_reduce` rules but did ",
+      "not qualify for a full assessment run. The per-package listing is ",
+      "omitted from the PDF for length; render the HTML version of this ",
+      "report to view the filterable table of dropped candidates.\n\n",
+      sep = "")
+}
+```
+
+```{r pre-filter-dropped-table, eval = has_pre_filter && is_html}
+metric_cols <- c(
+  Package = "package",
+  Version = "version",
+  `Pre-filter risk` = "final_risk",
+  `Auto-pass` = "auto_pass",
+  `Downloads (1yr)` = "dwnlds",
+  `Reverse deps` = "rev_deps",
+  Dependencies = "n_deps",
+  Vignettes = "n_vig",
+  `NEWS current` = "news_curr",
+  `Source control` = "src_cntrl",
+  Website = "n_sites",
+  Repo = "repo_name"
+)
+present <- metric_cols[metric_cols %in% names(pre_filtered)]
+
+dropped_tbl <- pre_filtered |>
+  dplyr::filter(!passed_to_build) |>
+  dplyr::select(dplyr::all_of(unname(present))) |>
+  dplyr::arrange(dplyr::desc(final_risk),
+                 if ("dwnlds" %in% names(pre_filtered)) dplyr::desc(dwnlds)
+                 else dplyr::desc(package))
+names(dropped_tbl) <- names(present)
+
+for (col in c("Downloads (1yr)", "Reverse deps", "Dependencies")) {
+  if (col %in% names(dropped_tbl)) {
+    dropped_tbl[[col]] <- ifelse(
+      is.na(dropped_tbl[[col]]),
+      NA_character_,
+      format(as.numeric(dropped_tbl[[col]]), big.mark = ",",
+             scientific = FALSE, trim = TRUE)
+    )
+  }
+}
+itable(dropped_tbl, default_page_size = 25)
+```
+
+# Decision Summary
+
+## Final decision counts
+
+The `final_decision` column reflects the risk category after dependency
+propagation (a package is downgraded if any dependency was Medium/High).
+
+```{r final-decision-counts}
+final_counts <- qual_metadata |>
+  dplyr::count(final_decision, .drop = FALSE, name = "packages") |>
+  dplyr::mutate(percent = sprintf("%.1f%%", 100 * packages / sum(packages)))
+kable(final_counts, col.names = c("Final decision", "Packages", "Percent"),
+      align = "lrr")
+```
+
+## Initial vs. final decision
+
+Packages whose category changed because of dependency propagation.
+
+```{r decision-crosstab}
+xt <- qual_metadata |>
+  dplyr::count(decision, final_decision, .drop = FALSE) |>
+  tidyr::pivot_wider(names_from = final_decision, values_from = n,
+                     values_fill = 0L, names_expand = TRUE)
+kable(xt, caption = "Rows = initial decision, Columns = final decision")
+
+downgraded_n <- sum(qual_metadata$decision != qual_metadata$final_decision,
+                    na.rm = TRUE)
+```
+
+**`r downgraded_n`** package(s) were downgraded from their initial decision
+because of a failing (Medium/High) dependency.
+
+## Reasons driving the final decision
+
+```{r decision-reason-counts}
+reason_counts <- qual_metadata |>
+  dplyr::count(final_decision, final_decision_reason, name = "packages",
+               .drop = FALSE) |>
+  dplyr::filter(packages > 0) |>
+  dplyr::arrange(final_decision, dplyr::desc(packages)) |>
+  dplyr::rename(`Final decision` = final_decision,
+                Reason = final_decision_reason,
+                Packages = packages)
+itable(reason_counts, default_page_size = 10)
+```
+
+# Packages by Risk Category
+
+The tables below list every package in each risk tier, with the reason and
+supporting note (driver metrics for `Risk Assessment`, failing dependency
+for `Dependency`, auto-accept metric list for `Auto-Accepted`). In HTML,
+use the search box and per-column filters to narrow down.
+
+```{r pkg-tables-helper}
+pkg_table <- function(df, cat) {
+  out <- df |>
+    dplyr::filter(final_decision == cat) |>
+    dplyr::arrange(pkg) |>
+    dplyr::transmute(
+      Package = pkg,
+      Version = ver,
+      Reason = final_decision_reason,
+      Note = ifelse(is.na(final_decision_reason_note) |
+                      final_decision_reason_note == "",
+                    "", final_decision_reason_note)
+    )
+  if (nrow(out) == 0L) {
+    return(tibble::tibble(Package = character(),
+                          Version = character(),
+                          Reason = character(),
+                          Note = character()))
+  }
+  out
+}
+```
+
+## Low risk (`r sum(qual_metadata$final_decision == "Low", na.rm = TRUE)`)
+
+```{r low-tbl}
+itable(pkg_table(qual_metadata, "Low"))
+```
+
+## Medium risk (`r sum(qual_metadata$final_decision == "Medium", na.rm = TRUE)`)
+
+```{r medium-tbl}
+itable(pkg_table(qual_metadata, "Medium"))
+```
+
+## High risk (`r sum(qual_metadata$final_decision == "High", na.rm = TRUE)`)
+
+```{r high-tbl}
+itable(pkg_table(qual_metadata, "High"))
+```
+
+# Runtime
+
+```{r runtime-summary}
+has_runtime <- "assessment_runtime_mins" %in% names(qual_metadata)
+rt <- if (has_runtime) qual_metadata$assessment_runtime_mins else numeric(0)
+if (inherits(rt, "difftime")) rt <- as.numeric(rt)
+rt <- rt[!is.na(rt)]
+
+if (length(rt) > 0L) {
+  rt_tbl <- tibble::tribble(
+    ~Metric, ~`Minutes`,
+    "Packages with recorded runtime", length(rt),
+    "Total runtime (mins)",           round(sum(rt), 1),
+    "Total runtime (hours)",          round(sum(rt) / 60, 2),
+    "Mean per package (mins)",        round(mean(rt), 3),
+    "Median per package (mins)",      round(stats::median(rt), 3),
+    "Max per package (mins)",         round(max(rt), 2)
+  )
+  kable(rt_tbl, align = "lr")
+} else {
+  cat("_No `assessment_runtime_mins` recorded on this run._\n")
+}
+```
+
+## Ten slowest packages
+
+```{r slowest-pkgs}
+if (length(rt) > 0L) {
+  slow_df <- qual_metadata |>
+    dplyr::mutate(runtime_mins = as.numeric(assessment_runtime_mins)) |>
+    dplyr::filter(!is.na(runtime_mins)) |>
+    dplyr::arrange(dplyr::desc(runtime_mins)) |>
+    dplyr::slice_head(n = 10) |>
+    dplyr::transmute(
+      Package = pkg,
+      Version = ver,
+      `Final decision` = as.character(final_decision),
+      `Runtime (mins)` = round(runtime_mins, 2)
+    )
+  kable(slow_df, align = "llrr")
+} else {
+  cat("_(runtime data not available)_\n")
+}
+```
+
+```{r assessments-header, results = "asis", eval = has_assessments}
+cat("# Metric-Level Summaries\n\n",
+    "The following summaries are derived from `qual_assessments.rds` ",
+    "and describe the distribution of each `{riskmetric}` metric across ",
+    "the assessed packages.\n", sep = "")
+```
+
+```{r metric-helpers, eval = has_assessments}
+numeric_metric_summary <- function(df, col) {
+  x <- suppressWarnings(as.numeric(df[[col]]))
+  x <- x[!is.na(x)]
+  if (length(x) == 0L) return(NULL)
+  tibble::tibble(
+    Metric = col,
+    N = length(x),
+    Min = signif(min(x), 4),
+    Median = signif(stats::median(x), 4),
+    Mean = signif(mean(x), 4),
+    Max = signif(max(x), 4)
+  )
+}
+
+qa <- qual_assessments
+numeric_cols <- vapply(names(qa), function(nm) {
+  v <- qa[[nm]]
+  if (is.list(v)) return(FALSE)
+  suppressWarnings(nv <- as.numeric(v))
+  !all(is.na(nv)) && !nm %in% c("val_date", "version")
+}, logical(1))
+numeric_col_names <- setdiff(
+  names(qa)[numeric_cols],
+  c("package", "version", "val_date", "riskmetric_version", "ref")
+)
+```
+
+## Numeric metric distributions
+
+```{r numeric-summaries, eval = has_assessments}
+tbl <- purrr::map_dfr(numeric_col_names, ~ numeric_metric_summary(qa, .x))
+itable(tbl, default_page_size = 25)
+```
+
+## Package coverage (`covr_coverage`)
+
+```{r coverage, eval = has_assessments && "covr_coverage" %in% names(qa)}
+cov <- suppressWarnings(as.numeric(qa$covr_coverage))
+cov_tbl <- tibble::tibble(
+  Bucket = c("Not measured (NA)", "0%", "1-49%", "50-79%", "80-94%", "95-100%"),
+  Packages = c(
+    sum(is.na(cov)),
+    sum(cov == 0, na.rm = TRUE),
+    sum(cov > 0 & cov < 50, na.rm = TRUE),
+    sum(cov >= 50 & cov < 80, na.rm = TRUE),
+    sum(cov >= 80 & cov < 95, na.rm = TRUE),
+    sum(cov >= 95 & cov <= 100, na.rm = TRUE)
+  )
+) |>
+  dplyr::mutate(Percent = sprintf("%.1f%%", 100 * Packages / sum(Packages)))
+kable(cov_tbl, align = "lrr")
+```
+
+## R CMD check outcomes
+
+```{r rcmd-check, eval = has_assessments && all(c("r_cmd_check_errors","r_cmd_check_warnings") %in% names(qa))}
+err <- suppressWarnings(as.numeric(qa$r_cmd_check_errors))
+wrn <- suppressWarnings(as.numeric(qa$r_cmd_check_warnings))
+rcmd_tbl <- tibble::tibble(
+  Outcome = c("Clean (0 errors, 0 warnings)",
+              "Warnings only",
+              "Errors",
+              "Not measured (NA)"),
+  Packages = c(
+    sum(err == 0 & wrn == 0, na.rm = TRUE),
+    sum(err == 0 & wrn > 0, na.rm = TRUE),
+    sum(err > 0, na.rm = TRUE),
+    sum(is.na(err))
+  )
+) |>
+  dplyr::mutate(Percent = sprintf("%.1f%%", 100 * Packages / sum(Packages)))
+kable(rcmd_tbl, align = "lrr")
+```
+
+## License distribution
+
+```{r license, eval = has_assessments && "license" %in% names(qa)}
+lic_tbl <- qa |>
+  dplyr::count(license, sort = TRUE, name = "packages") |>
+  dplyr::mutate(percent = sprintf("%.1f%%", 100 * packages / sum(packages))) |>
+  dplyr::rename(License = license, Packages = packages, Percent = percent)
+itable(lic_tbl, default_page_size = 15)
+```
+
+# Appendix: Metric Thresholds
+
+Human-readable summary of the risk-category thresholds pulled from the
+`decide` rule block of `config.yml` at report-generation time. Each row is
+one metric; each of the `Low`, `Medium`, `High` columns states the
+condition on the metric value that lands a package in that category. When
+a metric has an `auto_accept` threshold, meeting it short-circuits the
+per-metric evaluation. The `promote_min` config knob is intentionally
+omitted.
+
+```{r metric-thresholds}
+thresholds_df <- if (!is.null(params$thresholds_path) &&
+                     file.exists(params$thresholds_path)) {
+  readRDS(params$thresholds_path)
+} else {
+  NULL
+}
+
+if (!is.null(thresholds_df) && nrow(thresholds_df) > 0L) {
+  itable(thresholds_df, default_page_size = 25)
+} else {
+  cat("_(Metric thresholds table unavailable.)_\n")
+}
+```
+
+# Appendix: Configuration
+
+```{r config, results = "asis"}
+if (!is.null(params$config_path) && file.exists(params$config_path)) {
+  cat("Configuration snapshot from the run (from `",
+      params$config_path, "`):\n\n", sep = "")
+  cat("```yaml\n")
+  cat(readLines(params$config_path), sep = "\n")
+  cat("\n```\n")
+} else {
+  cat("_(No `config.yml` alongside inputs; configuration snapshot omitted.)_\n")
+}
+```
