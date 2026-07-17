@@ -1,5 +1,16 @@
 # val.pipeline (development version)
 
+- **Performance**: `val_categorize()` now runs dramatically faster on
+large candidate universes. The internal `rip_cats()` helper previously
+wrapped its per-metric `dplyr::mutate(!!! cond_exprs)` call in
+`dplyr::rowwise()` / `dplyr::ungroup()`, which forced dplyr to
+re-evaluate each fully-vectorised `dplyr::case_when()` on 1-row slices
+of `pkgs_df`. Because the expressions built by `get_case_whens()`
+compose vectorised primitives (`is.na()`, `<`, `>`, `dplyr::between()`,
+`%in%`, `dplyr::case_when()`) the rowwise pass was redundant. Dropping
+it lets dplyr evaluate each expression once per column, cutting the
+categorisation step from many minutes to seconds on the full CRAN
+universe. Results are byte-identical to the previous implementation.
 - Found out that Posit provides their own validation documentation for several
 co-horts of packages they develop, so we've added them to the config's
 `approved_pkgs` config element by default. (#42)
