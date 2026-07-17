@@ -1127,7 +1127,7 @@ rip_cats_by_pkg <- function(
 #' @param else_cat A character string indicating the default category to assign
 #'   when none of the conditions are met.
 #'
-#' @importFrom dplyr mutate rowwise ungroup
+#' @importFrom dplyr mutate
 #' @importFrom purrr pwalk
 #' @importFrom glue glue
 #' @importFrom rlang !!! syms
@@ -1177,12 +1177,20 @@ rip_cats <- function(
       
       # else_cat <- "High" # for debugging
       # pkgs_df$dwnlds_cat <- NULL
+      #
+      # PERF: the expressions built by get_case_whens() are already fully
+      # vectorised (they compose `is.na()`, `<`, `>`, `dplyr::between()`,
+      # `%in%`, and `dplyr::case_when()` — all of which operate on whole
+      # columns). Wrapping the mutate() in `dplyr::rowwise()` was forcing
+      # dplyr to iterate row-by-row and re-evaluate every case_when() on a
+      # 1-row slice, which scales poorly with the size of `pkgs_df`
+      # (val_categorize() calls this on the full CRAN universe, ~20k pkgs).
+      # Dropping rowwise() / ungroup() and letting mutate() operate on
+      # entire columns gives identical results at a fraction of the cost.
       pkgs_df <<- pkgs_df |>
-        dplyr::rowwise() |>
         dplyr::mutate(!!! cond_exprs) |>
         dplyr::mutate(!!! cond_exprs_ids) %>%
-        {if(length(cond_exprs_aa) > 0) dplyr::mutate(., !!! cond_exprs_aa) else .} |>
-        dplyr::ungroup()
+        {if(length(cond_exprs_aa) > 0) dplyr::mutate(., !!! cond_exprs_aa) else .}
       
       
       # Report of changes for  alone

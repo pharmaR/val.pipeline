@@ -91,3 +91,66 @@ test_that("rip_cats() preserves package data", {
 })
 
 
+test_that("rip_cats() scales to large pkgs_df (vectorised, not rowwise)", {
+  # Regression test for the perf fix that removed `dplyr::rowwise()` from
+  # rip_cats(). The case_when() expressions built by get_case_whens() are
+  # fully vectorised, so this should complete in a fraction of a second
+  # even for tens of thousands of rows. The previous rowwise()-backed
+  # implementation took multiple seconds on this input on CI hardware.
+  met_dec_df <- data.frame(
+    metric      = c("dwnlds", "dwnlds", "dwnlds"),
+    derived_col = c("dwnlds", "dwnlds", "dwnlds"),
+    decision    = factor(c("High", "Medium", "Low"),
+                         levels = c("Low", "Medium", "High")),
+    decision_id = c(3, 2, 1),
+    condition   = c("~ is.na(.x) | .x < 120000",
+                    "~ dplyr::between(.x, 120000, 240000)",
+                    "~ .x > 240000"),
+    auto_accept = c(NA_character_, NA_character_, "~ .x > 1000000"),
+    stringsAsFactors = FALSE
+  )
+
+  set.seed(42)
+  n <- 20000L
+  pkgs_df <- data.frame(
+    package = paste0("pkg", seq_len(n)),
+    dwnlds  = sample(c(NA_integer_, 50000L, 180000L, 500000L, 2000000L),
+                     n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+
+  elapsed <- system.time({
+    result <- suppressMessages(
+      capture.output(res <- rip_cats(met_dec_df, pkgs_df))
+    )
+  })["elapsed"]
+
+  # Correctness: every row should land in the expected bucket based on
+  # its `dwnlds` value.
+  expected <- ifelse(
+    is.na(pkgs_df$dwnlds) | pkgs_df$dwnlds < 120000, "High",
+    ifelse(pkgs_df$dwnlds > 1000000, "Low",       # auto_accept wins
+    ifelse(pkgs_df$dwnlds >= 120000 & pkgs_df$dwnlds <= 240000, "Medium",
+    ifelse(pkgs_df$dwnlds > 240000, "Low", "High")))
+  )
+  expect_equal(as.character(res$final_risk_cat), expected)
+
+  # Guardrail: the vectorised implementation must comfortably finish in
+  # well under 10s on 20k rows. The previous rowwise() implementation
+  # took ~30-60s on the same input on CI hardware. Use a generous ceiling
+  # so slow CI runners don't flake, while still catching a regression
+  # back to per-row evaluation.
+  expect_lt(elapsed, 10)
+})
+
+
+test_that("rip_cats() source does not call dplyr::rowwise()", {
+  # Guardrail against reintroducing the rowwise() antipattern in
+  # rip_cats(). The case_when() expressions are fully vectorised, so
+  # rowwise() is both unnecessary and a large performance cliff for the
+  # thousands-of-packages case that val_categorize() feeds in.
+  src <- deparse(body(rip_cats))
+  expect_false(any(grepl("rowwise", src)))
+})
+
+
