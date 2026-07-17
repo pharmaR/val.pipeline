@@ -1666,3 +1666,104 @@ format_runtime_seconds <- function(secs) {
   parts <- c(parts, paste0(s, "s"))
   paste(parts, collapse = " ")
 }
+
+
+#' Write Qualified Package Lists per Source
+#'
+#' Given a `qual_metadata` data frame (typically the object saved by
+#' [val_build()] to `qual_metadata.rds`), write one newline-delimited
+#' text file per source (`repo_name`) into `out_dir`. Each file is named
+#' `qualified-<source>.txt` and contains, one package per line, the
+#' names of every package whose `final_decision` matches
+#' `qualified_decision`.
+#'
+#' These files are intended to be consumed as source configurations for
+#' the "validated" repository provisioned into a Posit Package Manager
+#' (PPM) instance in a GxP environment. Because PPM's source-file
+#' configuration expects one package name per line, no header, no
+#' quoting, and no trailing metadata, this helper deliberately writes a
+#' plain, alphabetised list.
+#'
+#' Rows whose `repo_name` is `NA` or `"unknown"` are skipped with a
+#' single message so an operator can investigate before provisioning.
+#'
+#' @param qual_metadata A data.frame with at least `pkg`, `repo_name`,
+#'   and `final_decision` columns.
+#' @param out_dir Character(1). Directory to write the text files into.
+#'   Created (recursively) if it doesn't yet exist.
+#' @param qualified_decision Character(1). The `final_decision` value
+#'   that marks a package as qualified for the validated repo. Defaults
+#'   to the lowest-risk decision from the config (typically `"Low"`).
+#'
+#' @return Invisibly, a named character vector: names are the source
+#'   labels (e.g. `"CRAN"`, `"BioC"`), values are the absolute paths of
+#'   the text files written. Empty if no qualified packages exist.
+#'
+#' @keywords internal
+write_qualified_pkg_lists <- function(
+    qual_metadata,
+    out_dir,
+    qualified_decision = pull_config(val = "decisions_lst",
+                                     rule_type = "default")[1]
+) {
+  stopifnot(
+    is.data.frame(qual_metadata),
+    is.character(out_dir), length(out_dir) == 1L, nzchar(out_dir),
+    is.character(qualified_decision), length(qualified_decision) == 1L
+  )
+
+  required_cols <- c("pkg", "repo_name", "final_decision")
+  missing_cols <- setdiff(required_cols, names(qual_metadata))
+  if (length(missing_cols) > 0L) {
+    stop(
+      "qual_metadata is missing required columns: ",
+      paste(missing_cols, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  if (!dir.exists(out_dir)) {
+    dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+
+  qualified <- qual_metadata[
+    !is.na(qual_metadata$final_decision) &
+      qual_metadata$final_decision == qualified_decision,
+    , drop = FALSE
+  ]
+
+  if (nrow(qualified) == 0L) {
+    message("No qualified packages found (final_decision == '",
+            qualified_decision, "'); no files written.")
+    return(invisible(character(0)))
+  }
+
+  unknown_rows <- is.na(qualified$repo_name) |
+    tolower(qualified$repo_name) == "unknown"
+  if (any(unknown_rows)) {
+    unknown_pkgs <- qualified$pkg[unknown_rows]
+    message(
+      "Skipping ", length(unknown_pkgs),
+      " qualified pkg(s) with unknown repo_name: ",
+      paste(unknown_pkgs, collapse = ", ")
+    )
+    qualified <- qualified[!unknown_rows, , drop = FALSE]
+  }
+
+  if (nrow(qualified) == 0L) {
+    return(invisible(character(0)))
+  }
+
+  written <- character(0)
+  for (src in sort(unique(qualified$repo_name))) {
+    pkgs <- sort(unique(qualified$pkg[qualified$repo_name == src]))
+    out_file <- file.path(out_dir, paste0("qualified-", src, ".txt"))
+    writeLines(pkgs, con = out_file)
+    written[[src]] <- normalizePath(out_file, winslash = "/",
+                                    mustWork = TRUE)
+    cat(paste0("--> Wrote ", length(pkgs), " qualified '", src,
+               "' pkg(s) to ", out_file, "\n"))
+  }
+
+  invisible(written)
+}

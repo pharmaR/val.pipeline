@@ -1,5 +1,16 @@
 # val.pipeline (development version)
 
+- `val_pipeline()` now writes one `qualified-<source>.txt` file per
+package source (`CRAN`, `BioC`, and any other configured source such as
+a GitHub / pharmaverse mirror) into the `val_build()` output directory,
+alongside `qual_metadata.rds`. Each file is a plain, newline-delimited,
+alphabetised list of qualified package names — no header, no quoting,
+no comments — so it can be dropped straight into the source
+configuration of the "validated" Posit Package Manager (PPM) repo
+provisioned into a GxP environment. Backed by the new internal helper
+`write_qualified_pkg_lists()`. Runs before `val_pipeline_report()` and,
+like it, is wrapped in `tryCatch()` so a write failure doesn't sink the
+whole pipeline.
 - **Performance**: `val_categorize()` now runs dramatically faster on
 large candidate universes. The internal `rip_cats()` helper previously
 wrapped its per-metric `dplyr::mutate(!!! cond_exprs)` call in

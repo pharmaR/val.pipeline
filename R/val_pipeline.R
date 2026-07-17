@@ -244,19 +244,34 @@ val_pipeline <- function(
   #
   # ---- Wrap up ----
   #
-  # Determine qualified pkgs to provision for 'validated' PPM repo. Then convert
-  # the vector into a text file where one package name is on each line.
-  # qualified <- qual |>
-  #   dplyr::filter(final_decision == decisions[1])
-  
+  # Write per-source lists of qualified packages (one pkg name per line)
+  # to `qualified-<source>.txt` files alongside qual_metadata.rds. These
+  # feed the Posit Package Manager source configuration for the
+  # "validated" repo provisioned into the GxP environment. Failure here
+  # should not fail the whole pipeline — the qualification evidence is
+  # already on disk.
+  qm_path <- file.path(outtie$val_dir, "qual_metadata.rds")
+  qa_path <- file.path(outtie$val_dir, "qual_assessments.rds")
+
+  if (file.exists(qm_path)) {
+    tryCatch(
+      write_qualified_pkg_lists(
+        qual_metadata = readRDS(qm_path),
+        out_dir = outtie$val_dir,
+        qualified_decision = decisions[1]
+      ),
+      error = function(e) {
+        warning("write_qualified_pkg_lists() failed: ",
+                conditionMessage(e), call. = FALSE)
+      }
+    )
+  }
+
   # Generate a high-level HTML + PDF summary report of the run, saved next to
   # qual_metadata.rds in the val_build() output directory. Suitable for GxP /
   # QMS archival. Failure to render should not fail the whole pipeline. The
   # pre-filter candidate set was already persisted eagerly above (right after
   # it was created) so an interrupted val_build() still leaves it on disk.
-  qm_path <- file.path(outtie$val_dir, "qual_metadata.rds")
-  qa_path <- file.path(outtie$val_dir, "qual_assessments.rds")
-
   if (file.exists(qm_path)) {
     tryCatch(
       val_pipeline_report(
