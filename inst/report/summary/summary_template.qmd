@@ -166,9 +166,10 @@ kable(meta_tbl)
 # Pre-Filter Summary
 
 ```{r pre-filter-summary, results = "asis", eval = has_pre_filter}
-cat("The pre-filter step runs `riskmetric`'s `remote_reduce` rules over ",
-    "the entire candidate universe (from `{riskscore}`) to identify ",
-    "packages worth spending a full assessment on. Only packages ",
+cat("The 'pre-filter step' runs `riskmetric`'s `remote_reduce` rules over ",
+    "the entire candidate universe (using recent remote metrics stored in ",
+    "`{riskscore}`) to identify ",
+    "packages worth running a full assessment on. Only packages ",
     "categorised as **Low** risk here \u2014 plus any explicitly ",
     "allow-listed in the `pass_primary` config \u2014 proceed to ",
     "`val_build()`.\n\n", sep = "")
