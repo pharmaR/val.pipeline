@@ -93,6 +93,12 @@ its pipeline (no code outside `R/val_decision.R` referenced those
 columns, so the change is additive). Older
 `pre_filtered_pkg_metrics.rds` files missing `primary_risk_category`
 still render \u2014 the Downloads row is simply skipped. (#59)
+- `val_pipeline_report()`: the per-package **Packages dropped by
+pre-filter** table now only renders in HTML output. The PDF version
+keeps the sub-section heading and dropped-count summary sentence but
+omits the (potentially very large) filterable listing, keeping the
+archival PDF short enough to navigate. Readers are pointed to the
+HTML rendering for the full listing. (#59)
 
 # val.pipeline 0.0.1
 

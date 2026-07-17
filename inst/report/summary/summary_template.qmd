@@ -291,16 +291,25 @@ if (length(summary_cols) > 0L) {
 ```{r pre-filter-dropped-hdr, results = "asis", eval = has_pre_filter}
 n_dropped_ap <- sum(!pre_filtered$passed_to_build)
 cat("## Packages dropped by pre-filter\n\n")
-cat("The ", format(n_dropped_ap, big.mark = ","),
-    " packages below were evaluated against the `remote_reduce` rules ",
-    "but did not qualify for a full assessment run (either their ",
-    "pre-filter risk was above `Low`, or they were absent from the ",
-    "`pass_primary` allow-list). Their raw metric values are shown for ",
-    "context \u2014 these are the reasons `val_build()` never opened ",
-    "them.\n\n", sep = "")
+if (is_html) {
+  cat("The ", format(n_dropped_ap, big.mark = ","),
+      " packages below were evaluated against the `remote_reduce` rules ",
+      "but did not qualify for a full assessment run (either their ",
+      "pre-filter risk was above `Low`, or they were absent from the ",
+      "`pass_primary` allow-list). Their raw metric values are shown for ",
+      "context \u2014 these are the reasons `val_build()` never opened ",
+      "them.\n\n", sep = "")
+} else {
+  cat(format(n_dropped_ap, big.mark = ","),
+      " packages were evaluated against the `remote_reduce` rules but did ",
+      "not qualify for a full assessment run. The per-package listing is ",
+      "omitted from the PDF for length; render the HTML version of this ",
+      "report to view the filterable table of dropped candidates.\n\n",
+      sep = "")
+}
 ```
 
-```{r pre-filter-dropped-table, eval = has_pre_filter}
+```{r pre-filter-dropped-table, eval = has_pre_filter && is_html}
 metric_cols <- c(
   Package = "package",
   Version = "version",

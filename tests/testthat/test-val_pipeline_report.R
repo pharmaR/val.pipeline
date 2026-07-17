@@ -406,6 +406,30 @@ test_that("val_pipeline_report renders Pre-Filter Summary when RDS present", {
   expect_true(grepl("pf_pkg02", html, fixed = TRUE))
 })
 
+test_that("summary_template gates dropped-packages table on HTML output", {
+  # Source-level guard: the per-package dropped table is intentionally
+  # omitted from PDF renders because a full CRAN-scale run can produce a
+  # dropped list large enough to make the archival PDF unwieldy. The
+  # sub-section heading and count-summary sentence still render in PDF;
+  # only the (potentially huge) filterable listing is HTML-only.
+  qmd <- system.file(
+    "report", "summary", "summary_template.qmd",
+    package = "val.pipeline"
+  )
+  if (!nzchar(qmd) || !file.exists(qmd)) {
+    qmd <- file.path("..", "..", "inst", "report", "summary",
+                     "summary_template.qmd")
+  }
+  skip_if_not(file.exists(qmd), "summary_template.qmd not found")
+  src <- paste(readLines(qmd, warn = FALSE), collapse = "\n")
+  expect_match(
+    src,
+    "pre-filter-dropped-table.*has_pre_filter\\s*&&\\s*is_html"
+  )
+  # PDF branch of the header chunk should explain the omission.
+  expect_true(grepl("omitted from the PDF", src, fixed = TRUE))
+})
+
 test_that("val_pipeline_report tolerates missing pre_filtered_pkg_metrics", {
   skip_if_no_quarto()
 
