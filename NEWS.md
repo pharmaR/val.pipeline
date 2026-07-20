@@ -1,5 +1,32 @@
 # val.pipeline (development version)
 
+- All `val_*` entry points (`val_pipeline()`, `val_build()`, `val_pkg()`,
+`val_categorize()`, `val_decision()`, `val_pipeline_report()`) gain a
+new `verbose` argument that dials console output up or down without
+touching source. Four tiers, cumulative:
+  - `"quiet"` (or `0`, `FALSE`): silent. Only `warning()` / `stop()` fire.
+  - `"minimal"` (or `1`): one line per package as it lands
+    (`   [Low]     dplyr v1.1.4                     (12s)`), plus
+    pipeline / build banners and top-level summary counts. Intended
+    for production runs.
+  - `"normal"` (or `2`, `TRUE`, the default): every progress marker
+    the pipeline emitted prior to this change (per-package `-->
+    downloaded`, `--> untarred`, `--> initial reference complete`,
+    `--> Report built`, etc.). Backwards-compatible \u2014 users who
+    don't pass `verbose` see no change.
+  - `"verbose"` (or `3`): everything at `"normal"` plus deep progress
+    crumbs previously emitted unconditionally (per-metric column
+    dumps, `#N of M:` counters, dependency-driven decision-update
+    lines). Intended for debugging.
+
+  The session option `val.pipeline.verbose` sets the default across a
+  session (e.g. `options(val.pipeline.verbose = "minimal")`); the
+  function argument wins when both are set. Internally a single
+  `val_msg()` helper reads the current tier and no-ops when a message
+  is below the threshold, so no `cat()` call in the package is
+  unconditional anymore \u2014 warnings and errors are the only
+  guaranteed console output.
+
 - `val_pipeline()` now writes one `qualified-<source>.txt` file per
 package source (`CRAN`, `BioC`, and `github` — every non-CRAN/BioC
 github-hosted source, regardless of its user-defined label in

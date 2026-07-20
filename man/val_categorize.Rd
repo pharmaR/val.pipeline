@@ -8,7 +8,8 @@ val_categorize(
   source = "riskscore",
   decisions = c("Low", "Medium", "High"),
   else_cat = "High",
-  decisions_df = build_decisions_df(rule_type = "remote_reduce")
+  decisions_df = build_decisions_df(rule_type = "remote_reduce"),
+  verbose = NULL
 )
 }
 \arguments{
@@ -20,6 +21,10 @@ data.frame.}
 \item{else_cat}{character, the default risk category if no conditions are met.}
 
 \item{decisions_df}{data.frame, the output of build_decisions_df()}
+
+\item{verbose}{Console verbosity control. One of \code{"quiet"},
+\code{"minimal"}, \code{"normal"} (default), or \code{"verbose"}. See
+the \code{val.pipeline} verbosity docs for tier definitions.}
 }
 \description{
 First whack at attempting to filter packages based on org-level criterion

@@ -24,7 +24,8 @@ get_repo_origin <- function(repo_src = NULL, pkg_name = NULL, names_only = FALSE
   if(length(matched) == 0) return("unknown")
   if(length(matched) > 1) {
     matched <- matched[1]
-    cat(glue::glue("\n\n!!! WARNING: Package '{pkg_name}' appears to come from multiple repos. Using '{names(matched)}' for decisioning.\n"))
+    val_msg(glue::glue("\n\n!!! WARNING: Package '{pkg_name}' appears to come from multiple repos. Using '{names(matched)}' for decisioning.\n"),
+            min_level = "normal")
   }
   # Normalise any non-CRAN / non-BioC github-hosted source to a plain
   # "github" label. This keeps downstream consumers (e.g.
@@ -96,7 +97,7 @@ strip_recording_df <- function(assessment) {
   purrr::walk(these_cols, \(col_name) {
     # col_name <- these_cols[1] # for debugging
     # col_name <- 'news_current'
-    cat("\n\nCol Name =", col_name, "\n")
+    val_msg("\n\nCol Name =", col_name, "\n", min_level = "verbose")
     val <- assessment[[col_name]]
     lite_val <- 
         structure(
@@ -199,10 +200,12 @@ update_opt_repos <- function(
       if(stringr::str_detect(curr_cran, "latest") |
          stringr::str_detect(curr_cran, as.character(Sys.Date()))
       ) {
-        cat(paste0("\n--> 'CRAN' repo is already set to latest snapshot. No update needed.\n"))
+        val_msg(paste0("\n--> 'CRAN' repo is already set to latest snapshot. No update needed.\n"),
+                min_level = "normal")
         return(opt_repos)
       } else {
-        cat(paste0("--> Updating 'CRAN' repo to use latest snapshot.\n"))
+        val_msg(paste0("--> Updating 'CRAN' repo to use latest snapshot.\n"),
+                min_level = "normal")
         new_cran <- file.path(base_url, "latest")
         opt_repos[[cran_pos]] <- new_cran
         return(opt_repos)
@@ -214,12 +217,14 @@ update_opt_repos <- function(
         if(stringr::str_detect(curr_cran, "latest") |
            stringr::str_detect(curr_cran, as.character(Sys.Date()))
         ) {
-          cat(paste0("--> Updating 'CRAN' repo to use validation date: ", val_date, "\n"))
+          val_msg(paste0("--> Updating 'CRAN' repo to use validation date: ", val_date, "\n"),
+                  min_level = "normal")
           new_cran <- gsub("latest", as.character(val_date), 
               gsub("\\d{4}-\\d{2}-\\d{2}", as.character(val_date), curr_cran)
           )
         } else {
-          cat(paste0("\n--> 'CRAN' repo is currently set to use date: ", stringr::str_extract(curr_cran, "\\d{4}-\\d{2}-\\d{2}"), "\n"))
+          val_msg(paste0("\n--> 'CRAN' repo is currently set to use date: ", stringr::str_extract(curr_cran, "\\d{4}-\\d{2}-\\d{2}"), "\n"),
+                  min_level = "normal")
           old_date <- stringr::str_extract(curr_cran, "\\d{4}-\\d{2}-\\d{2}")
           if(!is.na(old_date)) {
             new_cran <- gsub(old_date, as.character(val_date), curr_cran)
@@ -402,7 +407,8 @@ build_decisions_df <- function(
     decision_lst <- figgy$default_lst$decisions_lst
     rule_lst <- figgy$rule_lst
   } else {
-    cat(glue::glue("\n\n--> Building decision data.frame using rules from custom 'rule_lst'.\n"))
+    val_msg(glue::glue("\n\n--> Building decision data.frame using rules from custom 'rule_lst'.\n"),
+            min_level = "normal")
     if(!"decision_lst" %in% names(rule_lst)){
       decision_lst <- pull_config(val = "decisions_lst", rule_type = "default")
     } else {
@@ -1106,13 +1112,18 @@ rip_cats_by_pkg <- function(
       dplyr::select(-c(ends_with("_catid"), "final_risk_cataa"))
     
     
-    cat(glue::glue("\n\n--> '{label}' Metric Decision Categories Assigned:\n"))
-    pkgs_primed |>
-      dplyr::select(package, dplyr::ends_with("_cat")) |>
-      t() |> print()
+    val_msg(glue::glue("\n\n--> '{label}' Metric Decision Categories Assigned:\n"),
+            min_level = "normal")
+    val_print(
+      pkgs_primed |>
+        dplyr::select(package, dplyr::ends_with("_cat")) |>
+        t(),
+      min_level = "normal"
+    )
     
   } else {
-    cat(glue::glue("\n\n\n--> No '{label}' metrics found in 'dec_df' for this pkg's repo sources."))
+    val_msg(glue::glue("\n\n\n--> No '{label}' metrics found in 'dec_df' for this pkg's repo sources."),
+            min_level = "normal")
     pkgs_primed <- pkgs_df |>
       dplyr::mutate(
         final_risk_cat = factor(NA, levels = decisions)
@@ -1180,7 +1191,8 @@ rip_cats <- function(
       
       
       
-      cat(glue::glue("\n\n--> Decisions based off '{met}' metric:\n\n"))
+      val_msg(glue::glue("\n\n--> Decisions based off '{met}' metric:\n\n"),
+              min_level = "normal")
       cond_exprs <- get_case_whens(met_dec_df, der, else_cat)
       cond_exprs_ids <- get_case_whens(met_dec_df, der, else_cat, ids = TRUE)
       mn <- met_dec_df |> dplyr::filter(!is.na(auto_accept)) |> distinct(derived_col) |> pull(derived_col)
@@ -1207,7 +1219,7 @@ rip_cats <- function(
       # Report of changes for  alone
       # metric_lab <- "" # Could add a label
       Var1 <- pkgs_df[[glue::glue("{der}_cat")]]
-      print(
+      val_print(
         Var1 |>
           factor(levels = decisions) |>
           table() |>
@@ -1217,7 +1229,8 @@ rip_cats <- function(
               as.data.frame(),
             by = "Var1"
           ) |>
-          dplyr::select(Risk = Var1, Cnt = Freq.x, Pct = Freq.y)
+          dplyr::select(Risk = Var1, Cnt = Freq.x, Pct = Freq.y),
+        min_level = "normal"
       )
     })
     # pkgs$dwnlds_cat <- NULL
@@ -1258,9 +1271,10 @@ rip_cats <- function(
     
     # Report of changes for primary risk alone
     if(nrow(met_der) > 1) {
-      cat(glue::glue("\n\n--> Decisions based off {nrow(met_der)} risk metric(s):\n\n"))
+      val_msg(glue::glue("\n\n--> Decisions based off {nrow(met_der)} risk metric(s):\n\n"),
+              min_level = "normal")
       Var1 <- return_pkgs[["final_risk_cat"]]
-      print(
+      val_print(
         Var1 |>
           factor(levels = decisions) |>
           table() |>
@@ -1270,11 +1284,13 @@ rip_cats <- function(
               as.data.frame(),
             by = "Var1"
           ) |>
-          dplyr::select(Risk = Var1, Cnt = Freq.x, Pct = Freq.y)
+          dplyr::select(Risk = Var1, Cnt = Freq.x, Pct = Freq.y),
+        min_level = "normal"
       )
     }
   } else {
-    cat(glue::glue("\n\n--> No metrics found in 'met_dec_df' that are present in 'pkgs_df'.\n"))
+    val_msg(glue::glue("\n\n--> No metrics found in 'met_dec_df' that are present in 'pkgs_df'.\n"),
+            min_level = "normal")
     return_pkgs <- pkgs_df |>
       dplyr::mutate(final_risk_cat = factor(NA, levels = decisions))
   }
@@ -1364,7 +1380,8 @@ split_join_cats <- function(
     pkgs_return <- dplyr::bind_rows(cran_pkgs_all_metrics, non_cran_sans_dwnlds) 
     
   } else {
-    cat(glue::glue("\n--> No applicable '{label}' metrics found for pkg repo source(s).\n"))
+    val_msg(glue::glue("\n--> No applicable '{label}' metrics found for pkg repo source(s).\n"),
+            min_level = "normal")
     pkgs_return <- pkgs_data |>
       dplyr::mutate(final_risk_cat = factor(NA, levels = decisions))
   }
@@ -1826,8 +1843,9 @@ write_qualified_pkg_lists <- function(
     writeLines(pkgs, con = out_file)
     written[[src]] <- normalizePath(out_file, winslash = "/",
                                     mustWork = TRUE)
-    cat(paste0("--> Wrote ", length(pkgs), " qualified '", src,
-               "' pkg(s) to ", out_file, "\n"))
+    val_msg(paste0("--> Wrote ", length(pkgs), " qualified '", src,
+                   "' pkg(s) to ", out_file, "\n"),
+            min_level = "normal")
   }
 
   invisible(written)

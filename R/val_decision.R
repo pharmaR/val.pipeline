@@ -17,6 +17,9 @@
 #'   met.
 #' @param avail_pkgs data.frame, the output of available.packages()
 #' @param decisions_df data.frame, the output of build_decisions_df()
+#' @param verbose Console verbosity control. One of `"quiet"`,
+#'   `"minimal"`, `"normal"` (default), or `"verbose"`. See
+#'   the `val.pipeline` verbosity docs for tier definitions.
 #'
 #' @importFrom dplyr filter pull mutate case_when between rename left_join
 #'   across if_else everything select
@@ -30,12 +33,14 @@ val_decision <- function(
     decisions = c("Low", "Medium", "High"),
     else_cat = "High",
     avail_pkgs = available.packages() |> as.data.frame(),
-    decisions_df = build_decisions_df(rule_type = "decide")
+    decisions_df = build_decisions_df(rule_type = "decide"),
+    verbose = NULL
 ) {
   # Verify pkg is not null
   if(is.null(pkg)) {
     stop("Must provide a package name to 'pkg'")
   }
+  apply_verbose(verbose)
   
   # verify decisions_df is compliant
   if(!all(c("metric", "decision", "condition", "metric_type", "accept_condition") %in% colnames(decisions_df))) {
@@ -123,13 +128,16 @@ val_decision <- function(
     
     # Share reason for secondary metric assessment
     if(tolower(repo_name) != "cran" & prime_decision != decisions[1]) {
-      cat(glue::glue("\n\n\n--> Package '{pkg}' is NOT from a CRAN source and has 'failed' with a primary decision of '{prime_decision}'.\n\n"))
+      val_msg(glue::glue("\n\n\n--> Package '{pkg}' is NOT from a CRAN source and has 'failed' with a primary decision of '{prime_decision}'.\n\n"),
+              min_level = "normal")
     } else if(prime_decision == "unknown") {
-      cat(glue::glue("\n\n\n--> Package '{pkg}' earned a primary decision of '{prime_decision}'.\n\n"))
+      val_msg(glue::glue("\n\n\n--> Package '{pkg}' earned a primary decision of '{prime_decision}'.\n\n"),
+              min_level = "normal")
     }
     
     # State conclusion
-    cat(glue::glue("\n\n--> Package '{pkg}' needs secondary metric assessments.\n\n"))
+    val_msg(glue::glue("\n\n--> Package '{pkg}' needs secondary metric assessments.\n\n"),
+            min_level = "normal")
     
     #
     # ---- Perform 'Secondary' Checks ----
@@ -186,7 +194,8 @@ val_decision <- function(
     
   } else {
      # else CRAN or not CRAN but decision == "low", then no need to continue
-    cat(glue::glue("\n\n--> Package '{pkg}' does NOT need secondary metric assessments.\n")) 
+    val_msg(glue::glue("\n\n--> Package '{pkg}' does NOT need secondary metric assessments.\n"),
+            min_level = "normal") 
     pkgs_final <- primed_pkgs |>
       dplyr::select(
         package, final_risk = final_risk_cat,
@@ -197,8 +206,9 @@ val_decision <- function(
   #
   # ---- Return data for filtering (presumably)
   # 
-  cat("\n\n--> Risk Decision for package '", pkg, "': ",
-      as.character(pkgs_final$final_risk), "\n", sep = "")
+  val_msg("\n\n--> Risk Decision for package '", pkg, "': ",
+          as.character(pkgs_final$final_risk), "\n", sep = "",
+          min_level = "normal")
   # print(
   #   pkgs_final$final_risk |>
   #     # factor(levels = c("Low", "Medium", "High")) |> # not needed
@@ -226,6 +236,9 @@ val_decision <- function(
 #' @param decisions character vector, the risk categories to use.
 #' @param else_cat character, the default risk category if no conditions are met.
 #' @param decisions_df data.frame, the output of build_decisions_df()
+#' @param verbose Console verbosity control. One of `"quiet"`,
+#'   `"minimal"`, `"normal"` (default), or `"verbose"`. See
+#'   the `val.pipeline` verbosity docs for tier definitions.
 #'
 #' @importFrom dplyr filter pull mutate case_when between rename left_join
 #'   across if_else everything select
@@ -238,9 +251,11 @@ val_categorize <- function(
     source = "riskscore",
     decisions = c("Low", "Medium", "High"),
     else_cat = "High",
-    decisions_df = build_decisions_df(rule_type = "remote_reduce")
+    decisions_df = build_decisions_df(rule_type = "remote_reduce"),
+    verbose = NULL
 ) {
   # Uses riskscore::assessed_latest and riskscore::scored_latest
+  apply_verbose(verbose)
   
   # verify decisions_df is compliant
   if(!all(c("metric", "decision", "condition", "metric_type", "accept_condition") %in% colnames(decisions_df))) {
@@ -258,10 +273,12 @@ val_categorize <- function(
     #                         ref = "latest")
     pv <- utils::packageVersion("riskscore") # verify ‘v0.1.0'
     riskscore_run_date <- riskscore::assessed_latest$riskmetric_run_date |> unique()
-    cat(paste0("\n--> Using {riskscore} Version: 'v", pv, "', last compiled on '",
-               riskscore_run_date,"'.\n"))
+    val_msg(paste0("\n--> Using {riskscore} Version: 'v", pv, "', last compiled on '",
+                   riskscore_run_date,"'.\n"),
+            min_level = "normal")
     if(Sys.Date() - as.Date(riskscore_run_date) > 60) {
-      cat(glue::glue("\n\n!!! WARNING: the latest riskscore assessment date is more than 60 days old, compared to today's validation date. Consider updating {{riskscore}} w/ a fresh run.\n"))
+      val_msg(glue::glue("\n\n!!! WARNING: the latest riskscore assessment date is more than 60 days old, compared to today's validation date. Consider updating {{riskscore}} w/ a fresh run.\n"),
+              min_level = "normal")
     }
     
     opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
@@ -288,7 +305,8 @@ val_categorize <- function(
         }
       })
     
-    cat("\n\nCategorizing available packages. Starting w/", nrow(avail_pkgs), "pkgs.\n")
+    val_msg("\n\nCategorizing available packages. Starting w/",
+            nrow(avail_pkgs), "pkgs.\n", min_level = "normal")
 
     # Sometimes, the package field is a list() in the 2025-10-01 riskscore
     # build. So, we need to unlist it first
@@ -301,15 +319,17 @@ val_categorize <- function(
     }
     
     # How many pkgs are in the riskscore data vs available.packages()?
-    cat(glue::glue("\n--> There are {prettyNum(nrow(riskscore::assessed_latest), big.mark = ',')} packages with assessments in the latest riskscore data & {prettyNum(nrow(avail_pkgs), big.mark = ',')} packages available.\n"))
+    val_msg(glue::glue("\n--> There are {prettyNum(nrow(riskscore::assessed_latest), big.mark = ',')} packages with assessments in the latest riskscore data & {prettyNum(nrow(avail_pkgs), big.mark = ',')} packages available.\n"),
+            min_level = "normal")
 
     # Pkgs not in available.packages()
     missing_ap <- package_col[!(package_col %in% avail_pkgs$Package)]
     if(length(missing_ap) > 0) {
-      cat(glue::glue("\nNote: There are {length(missing_ap)} packages in the riskscore data that are NOT in available.packages(). These will be ignored, because they have likely been removed from their CRAN-like repo since the last riskscore build. OR, the current option('repos') urls are excluding them.\n\n"))
-      print(utils::head(missing_ap, 20))
+      val_msg(glue::glue("\nNote: There are {length(missing_ap)} packages in the riskscore data that are NOT in available.packages(). These will be ignored, because they have likely been removed from their CRAN-like repo since the last riskscore build. OR, the current option('repos') urls are excluding them.\n\n"),
+              min_level = "normal")
+      val_print(utils::head(missing_ap, 20), min_level = "normal")
 
-      if(length(missing_ap) > 20) cat("...\n")
+      if(length(missing_ap) > 20) val_msg("...\n", min_level = "normal")
     }
     
     # Pkgs not in riskscore data
@@ -318,9 +338,10 @@ val_categorize <- function(
     # val_build() using pkg_sources? Yes!
     missing_rs <- avail_pkgs$Package[!(avail_pkgs$Package %in% package_col)]
     if(length(missing_rs) > 0) {
-      cat(glue::glue("\n\n!!! WARNING: There are {length(missing_rs)} packages in available.packages() that are NOT in the riskscore data.\n"))
-      print(utils::head(missing_rs, 20))
-      if(length(missing_rs) > 20) cat("...\n")
+      val_msg(glue::glue("\n\n!!! WARNING: There are {length(missing_rs)} packages in available.packages() that are NOT in the riskscore data.\n"),
+              min_level = "normal")
+      val_print(utils::head(missing_rs, 20), min_level = "normal")
+      if(length(missing_rs) > 20) val_msg("...\n", min_level = "normal")
     }
     # options("repos")
     # dput(missing_rs)
@@ -503,7 +524,8 @@ val_categorize <- function(
     )
     
   } else {
-    cat("\n\n-->No 'Primary' metrics found in 'decisions_df'.")
+    val_msg("\n\n-->No 'Primary' metrics found in 'decisions_df'.",
+            min_level = "normal")
     # Set as "Medium" risk for now, which allows it to get promoted to "low"
     # risk as needed.
     primed_pkgs <- pkgs |>
@@ -592,7 +614,8 @@ val_categorize <- function(
     
     # Make note of Pkgs that shifted thanks to exceptions
     if(!all(is.na(promos$primary_risk_category))) {
-      cat("\n--> Exceptions to Primary metric decisions based on meeting ALL of the following metric criterion:\n\n")
+      val_msg("\n--> Exceptions to Primary metric decisions based on meeting ALL of the following metric criterion:\n\n",
+              min_level = "normal")
       diff_table <- {
         promos$final_risk |>
           factor(levels = levels(decisions_df$decision)) |>
@@ -604,11 +627,12 @@ val_categorize <- function(
       }
       
       # print note on promotions to console
-      cat("\n")
-      print(
+      val_msg("\n", min_level = "normal")
+      val_print(
         diff_table |>
           as.data.frame() |>
-          dplyr::rename(`Risk Shifted` = Var1, Added = Freq)
+          dplyr::rename(`Risk Shifted` = Var1, Added = Freq),
+        min_level = "normal"
       )
     }
     
@@ -637,8 +661,8 @@ val_categorize <- function(
   #
   # ---- Return data for filtering (presumably) ----
   # 
-  cat("\n")
-  print(
+  val_msg("\n", min_level = "normal")
+  val_print(
     pkgs_final$final_risk |>
       # factor(levels = c("Low", "Medium", "High")) |> # not needed
       table() |>
@@ -648,7 +672,8 @@ val_categorize <- function(
           as.data.frame(),
         by = "Var1"
       ) |>
-      dplyr::rename("Final Risk" = Var1, Cnt = Freq.x, Pct = Freq.y)
+      dplyr::rename("Final Risk" = Var1, Cnt = Freq.x, Pct = Freq.y),
+    min_level = "normal"
   )
   
   return(pkgs_final)

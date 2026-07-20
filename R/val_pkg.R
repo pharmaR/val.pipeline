@@ -19,6 +19,10 @@
 #'   "risk.assessr" indicating which package to use for the assessment.
 #' @param out_dir Character(1). Directory to store outputs.
 #' @param val_date Date. Date of validation. Default is current date.
+#' @param verbose Console verbosity control. One of `"quiet"`,
+#'   `"minimal"`, `"normal"` (default), or `"verbose"`. See
+#'   the `val.pipeline` verbosity docs for tier definitions. Defaults to whatever the
+#'   session option `val.pipeline.verbose` is set to (or `"normal"`).
 #'
 #' @importFrom glue glue
 #' @importFrom utils download.file untar capture.output
@@ -38,7 +42,8 @@ val_pkg <- function(
     ref = c("source", "remote"),
     metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
     out_dir,
-    val_date = Sys.Date()
+    val_date = Sys.Date(),
+    verbose = NULL
 ) {
   # i <- 1 # for debugging
   # pkg <- pkgs[i] # for debugging
@@ -48,11 +53,13 @@ val_pkg <- function(
   ref <- match.arg(ref)
   metric_pkg <- match.arg(metric_pkg)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
+  apply_verbose(verbose)
   
   pkg_v <- paste(pkg, ver, sep = "_")
   start <- Sys.time()
   start_txt <- format(start, '%H:%M:%S', tz = 'US/Eastern', usetz = TRUE)
-  cat(paste0("\nNew Package: ", pkg, " v", ver," @ ", start_txt,"\n"))
+  val_msg(paste0("\nNew Package: ", pkg, " v", ver," @ ", start_txt,"\n"),
+          min_level = "normal")
   
   #
   # ---- Setup ----
@@ -104,7 +111,7 @@ val_pkg <- function(
       wrn_msg <- glue::glue("Unable to download the source files for {pkg} from '{tarball_url}'.")
       warning(wrn_msg)
     } else {
-      cat("\n-->", pkg_v,"downloaded.\n")
+      val_msg("\n-->", pkg_v,"downloaded.\n", min_level = "verbose")
     }
     
     #
@@ -112,7 +119,7 @@ val_pkg <- function(
     #
     tar_file <- file.path(tarballs, glue::glue("{pkg_v}.tar.gz"))
     utils::untar(tar_file, exdir = sourced)
-    cat("\n-->", pkg_v,"untarred.\n")
+    val_msg("\n-->", pkg_v,"untarred.\n", min_level = "verbose")
   }
   
   
@@ -176,7 +183,8 @@ val_pkg <- function(
     # "covr_coverage" for final output. However, 
     init_pkg_ref <- riskmetric::pkg_ref(pkg, source = 
         if(stringr::str_detect(tolower(repo_name), "bioc")) "pkg_bioc_remote" else "pkg_cran_remote")
-    cat("\n-->", pkg_v, "initial reference complete.\n")
+    val_msg("\n-->", pkg_v, "initial reference complete.\n",
+            min_level = "verbose")
     
     # Pull available {riskmetric} assessments
     init_metrics <- riskmetric::all_assessments()
@@ -211,8 +219,9 @@ val_pkg <- function(
     init_assessed_end <- Sys.time()
     init_ass_mins <- difftime(init_assessed_end, start, units = "mins")
     init_ass_mins_txt <- utils::capture.output(init_assessed_end - start)
-    cat("\n-->", pkg_v, "initial assessment complete.\n")
-    cat("----> (", init_ass_mins_txt, ")\n")
+    val_msg("\n-->", pkg_v, "initial assessment complete.\n",
+            min_level = "normal")
+    val_msg("----> (", init_ass_mins_txt, ")\n", min_level = "normal")
     
     
     # Create workable DF of assessments
@@ -272,26 +281,30 @@ val_pkg <- function(
     if(src_ref == "pkg_cran_remote") {
       pkg_assessment <- init_pkg_assessment
       pkg_scores <- init_pkg_scores
-      cat("\n-->", pkg_v, "used initial 'pkg_cran_remote' assessment.\n")
+      val_msg("\n-->", pkg_v, "used initial 'pkg_cran_remote' assessment.\n",
+              min_level = "normal")
       exclude_met <- NULL
     } else {
       
       # Setup 'pkg_source' reference
       pkg_ref <- riskmetric::pkg_ref(file.path(sourced, pkg), source = "pkg_source")
-      cat("\n-->", pkg_v,"referrenced w/ 'pkg_source'.\n")
+      val_msg("\n-->", pkg_v,"referrenced w/ 'pkg_source'.\n",
+              min_level = "normal")
       
       # Pull available {riskmetric} assessments
       assess_metrics <- riskmetric::all_assessments()
       
       if (auto_accepted) {
         # Run assessment WITHOUT "covr_coverage"!
-        cat("\n-->", pkg_v, "auto-accepted. Will compile final 'pkg_source' assessment w/o 'covr_coverage' metric to save compute time.\n")
+        val_msg("\n-->", pkg_v, "auto-accepted. Will compile final 'pkg_source' assessment w/o 'covr_coverage' metric to save compute time.\n",
+                min_level = "normal")
         assess_metrics$assess_covr_coverage <- NULL
         exclude_met <- "covr_coverage"
         
       } else {
         # Run assessment WITH "covr_coverage"
-        cat("\n-->", pkg_v, "was NOT auto-accepted. Will compile final 'pkg_source' assessment, including 'covr_coverage' metric.\n")
+        val_msg("\n-->", pkg_v, "was NOT auto-accepted. Will compile final 'pkg_source' assessment, including 'covr_coverage' metric.\n",
+                min_level = "normal")
         exclude_met <- NULL
       }
       
@@ -351,8 +364,8 @@ val_pkg <- function(
   assessed_end <- Sys.time()
   ass_mins <- difftime(assessed_end, start, units = "mins")
   ass_mins_txt <- utils::capture.output(assessed_end - start)
-  cat("\n-->", pkg_v,"assessed.\n")
-  cat("----> (", ass_mins_txt, ")\n")
+  val_msg("\n-->", pkg_v,"assessed.\n", min_level = "normal")
+  val_msg("----> (", ass_mins_txt, ")\n", min_level = "normal")
   
   # Create workable DF of assessments
   assessment_record <- workable_assessments(
@@ -386,7 +399,8 @@ val_pkg <- function(
   # ---- Apply Decisions ----
   #
   
-  cat("\n--> Making a risk decision for", pkg_v,"...\n\n")
+  val_msg("\n--> Making a risk decision for", pkg_v,"...\n\n",
+          min_level = "verbose")
   
   # Use org-level criterion to set thresholds and Update final decision (if not
   # already 'high risk') AND then filter packages to a final 'qualified' list
@@ -466,9 +480,11 @@ val_pkg <- function(
     .default = NA_character_
   )
 
-  cat("\n-->", pkg_v,"decision reason:\n---->", decision_reason, "\n")
+  val_msg("\n-->", pkg_v,"decision reason:\n---->", decision_reason, "\n",
+          min_level = "normal")
   if(!is.na(decision_reason_note)) {
-    cat("---->", pkg_v, "driver metric(s):", decision_reason_note, "\n")
+    val_msg("---->", pkg_v, "driver metric(s):", decision_reason_note, "\n",
+            min_level = "normal")
   }
   
   
@@ -495,7 +511,7 @@ val_pkg <- function(
   )
   # pr
   
-  cat("\n-->", pkg_v,"Report built.\n")
+  val_msg("\n-->", pkg_v,"Report built.\n", min_level = "normal")
   
   
   
@@ -532,7 +548,9 @@ val_pkg <- function(
   # meta_list <- readRDS(file.path(assessed, glue::glue("{pkg_v}_meta.rds")))
   # meta_list$rev_deps
   saveRDS(meta_list, file.path(assessed, glue::glue("{pkg_v}_meta.rds")))
-  cat("\n-->", pkg_v,"meta bundle saved.\n")
+  val_msg("\n-->", pkg_v,"meta bundle saved.\n", min_level = "normal")
+  val_pkg_summary_line(pkg, ver, decision$final_risk,
+                       elapsed_secs = as.numeric(ass_mins, units = "secs"))
   
   return(meta_list)
 }

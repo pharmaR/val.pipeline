@@ -69,6 +69,11 @@
 #'   to the Run Metadata table. Not persisted in the evidence RDS files
 #'   because it's a pipeline-level (not per-package) fact.
 #' @param quiet Logical. Suppress Quarto rendering output. Default `FALSE`.
+#' @param verbose Console verbosity control. One of `"quiet"`,
+#'   `"minimal"`, `"normal"` (default), or `"verbose"`. See
+#'   the `val.pipeline` verbosity docs for tier definitions. The final "Wrote
+#'   val.pipeline summary report(s)" confirmation is emitted only at
+#'   `"normal"` or above.
 #'
 #' @return Invisibly, a character vector of the rendered report file paths.
 #'
@@ -94,8 +99,10 @@ val_pipeline_report <- function(
   n_candidates = NULL,
   pre_filtered_path = NULL,
   pipeline_runtime = NULL,
-  quiet = FALSE
+  quiet = FALSE,
+  verbose = NULL
 ) {
+  apply_verbose(verbose)
   stopifnot(
     is.character(qual_metadata_path),
     length(qual_metadata_path) == 1L,
@@ -333,7 +340,7 @@ val_pipeline_report <- function(
     produced <- c(produced, dest)
   }
 
-  if (length(produced) > 0L && !quiet) {
+  if (length(produced) > 0L && !quiet && val_verbosity_at_least("minimal")) {
     message("Wrote val.pipeline summary report(s):\n  ",
             paste(produced, collapse = "\n  "))
   }

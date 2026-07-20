@@ -11,7 +11,8 @@ val_decision(
   decisions = c("Low", "Medium", "High"),
   else_cat = "High",
   avail_pkgs = as.data.frame(available.packages()),
-  decisions_df = build_decisions_df(rule_type = "decide")
+  decisions_df = build_decisions_df(rule_type = "decide"),
+  verbose = NULL
 )
 }
 \arguments{
@@ -31,6 +32,10 @@ met.}
 \item{avail_pkgs}{data.frame, the output of available.packages()}
 
 \item{decisions_df}{data.frame, the output of build_decisions_df()}
+
+\item{verbose}{Console verbosity control. One of \code{"quiet"},
+\code{"minimal"}, \code{"normal"} (default), or \code{"verbose"}. See
+the \code{val.pipeline} verbosity docs for tier definitions.}
 }
 \description{
 Categorize packages based on org-level criterion / thresholds at the

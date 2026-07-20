@@ -25,6 +25,12 @@
 #'   Sys.getenv("RISK_OUTPATH", unset = getwd()).
 #' @param opt_repos Named character vector. Repositories to use. Default is
 #'   opt_repos from config.
+#' @param verbose Console verbosity control. One of `"quiet"`,
+#'   `"minimal"`, `"normal"` (default), or `"verbose"`. See
+#'   the `val.pipeline` verbosity docs for tier definitions. Also accepts an integer 0-3
+#'   or a logical (`TRUE` = `"normal"`, `FALSE` = `"quiet"`). The
+#'   session option `val.pipeline.verbose` is used when this argument
+#'   is left as the default and set to `NULL`.
 #' @return A list containing the validation directory and a data frame of
 #'   package assessments.
 #'
@@ -44,13 +50,15 @@ val_pipeline <- function(
   out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
   opt_repos = 
     c(CRAN = "https://packagemanager.posit.co/cran/latest",
-      BioC = 'https://bioconductor.org/packages/3.22/bioc')
+      BioC = 'https://bioconductor.org/packages/3.22/bioc'),
+  verbose = NULL
   ){
 
   # Assess args
   ref <- match.arg(ref)
   metric_pkg <- match.arg(metric_pkg)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
+  apply_verbose(verbose)
 
   # Since running this script is such a computationally intensive process, the
   # start of this script would actually begin by filtering packages
@@ -71,7 +79,8 @@ val_pipeline <- function(
   # val_date <-as.Date("2025-10-07") # hardcode for testing
   # val_date <- as.Date(val_start)
   val_date_txt <- gsub("-", "", val_date)
-  cat(paste0("\n\n\nValidation pipeline initiated: R v", r_ver, " @ ", val_start_txt,"\n\n"))
+  val_msg(paste0("\n\n\nValidation pipeline initiated: R v", r_ver, " @ ", val_start_txt,"\n\n"),
+          min_level = "minimal")
   
   
   # 
@@ -201,7 +210,9 @@ val_pipeline <- function(
     dplyr::pull(package)
   
   
-  cat("\n--> Final Decision Category Counts for'pre' assessment risk: \n----> Returned", prettyNum(length(build_pkgs), big.mark = ","), "pkgs for build.\n")
+  val_msg("\n--> Final Decision Category Counts for'pre' assessment risk: \n----> Returned",
+          prettyNum(length(build_pkgs), big.mark = ","), "pkgs for build.\n",
+          min_level = "minimal")
   
   
   
