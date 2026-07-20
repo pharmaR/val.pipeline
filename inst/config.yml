@@ -1,6 +1,6 @@
 default:
   remote_only: [withr, VGAM, shinyBS, fitdistrplus, collapse, gamlss.dist, gss, segmented, RSiena, qtl, openxlsx2, BayesXsrc] # withr - crashes, VGAM 10h, shinyBS 5h, collapse 1.6h, fitdistrplus 1.7h, gamlss.dist 52m, gss 52m, segmented 45m, RSiena 1.6hr, qtl 22hr, openxlsx2 60m, BayesXsrc 45m,
-  pass_primary: [logrx] # Pkgs that shouldn't be immediately filtered from (1) val_categorize() or (2) from primary metrics in val_decision(). Usually, these packages have low downloads, but we want these packages to recieve their full day in court & retrieve code coverage metrics.
+  pass_primary: [logrx, admiral, ggsurvfit, sdtm.oak, cardinal, cards, admiralonco, tidytlg, pharmaversesdtm, pharmaverseadam, rlistings, sdtmchecks, metatools, cardx, admiraldev, admiralophtha, datacutr, admiralci, envsetup] # Pkgs that shouldn't be immediately filtered from (1) val_categorize() or (2) from primary metrics in val_decision(). Usually, these packages have low downloads, but we want these packages to recieve their full day in court & retrieve code coverage metrics.
   approved_pkgs: [
     tidyverse, ggplot2, dplyr, tidyr, readr, purrr, tibble, stringr, forcats, lubridate,
     DBI, haven, httr, readxl, googlesheets4, googledrive, rvest, jsonlite, xml2,
