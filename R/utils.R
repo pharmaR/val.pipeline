@@ -1684,8 +1684,10 @@ format_runtime_seconds <- function(secs) {
 #' quoting, and no trailing metadata, this helper deliberately writes a
 #' plain, alphabetised list.
 #'
-#' Rows whose `repo_name` is `NA` or `"unknown"` are skipped with a
-#' single message so an operator can investigate before provisioning.
+#' Rows whose `repo_name` is `NA` or `"unknown"` are folded into a
+#' single `qualified-NA.txt` file so no qualified package ever silently
+#' drops out of provisioning. An informative message is emitted so an
+#' operator can investigate and re-route those packages if needed.
 #'
 #' @param qual_metadata A data.frame with at least `pkg`, `repo_name`,
 #'   and `final_decision` columns.
@@ -1743,15 +1745,14 @@ write_qualified_pkg_lists <- function(
   if (any(unknown_rows)) {
     unknown_pkgs <- qualified$pkg[unknown_rows]
     message(
-      "Skipping ", length(unknown_pkgs),
-      " qualified pkg(s) with unknown repo_name: ",
+      "Routing ", length(unknown_pkgs),
+      " qualified pkg(s) with unknown repo_name to 'qualified-NA.txt': ",
       paste(unknown_pkgs, collapse = ", ")
     )
-    qualified <- qualified[!unknown_rows, , drop = FALSE]
-  }
-
-  if (nrow(qualified) == 0L) {
-    return(invisible(character(0)))
+    # Fold NA and 'unknown' into a single 'NA' bucket so nothing is
+    # dropped from provisioning — the operator can then triage
+    # qualified-NA.txt manually.
+    qualified$repo_name[unknown_rows] <- "NA"
   }
 
   written <- character(0)

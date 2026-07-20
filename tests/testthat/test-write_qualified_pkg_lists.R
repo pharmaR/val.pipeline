@@ -40,7 +40,7 @@ test_that("write_qualified_pkg_lists() handles GitHub sources", {
 })
 
 
-test_that("write_qualified_pkg_lists() skips unknown / NA repo_name rows", {
+test_that("write_qualified_pkg_lists() routes unknown / NA repo_name rows to qualified-NA.txt", {
   qm <- data.frame(
     pkg            = c("dplyr", "ghost1", "ghost2"),
     repo_name      = c("CRAN",  "unknown", NA_character_),
@@ -51,12 +51,13 @@ test_that("write_qualified_pkg_lists() skips unknown / NA repo_name rows", {
   out_dir <- withr::local_tempdir()
   expect_message(
     paths <- write_qualified_pkg_lists(qm, out_dir, qualified_decision = "Low"),
-    "Skipping 2 qualified pkg\\(s\\) with unknown repo_name"
+    "Routing 2 qualified pkg\\(s\\) with unknown repo_name to 'qualified-NA.txt'"
   )
-  expect_named(paths, "CRAN")
+  expect_named(paths, c("CRAN", "NA"))
   expect_equal(readLines(file.path(out_dir, "qualified-CRAN.txt")), "dplyr")
+  expect_equal(readLines(file.path(out_dir, "qualified-NA.txt")),
+               c("ghost1", "ghost2"))
   expect_false(file.exists(file.path(out_dir, "qualified-unknown.txt")))
-  expect_false(file.exists(file.path(out_dir, "qualified-NA.txt")))
 })
 
 

@@ -42,7 +42,9 @@ configuration expects one package name per line, no header, no
 quoting, and no trailing metadata, this helper deliberately writes a
 plain, alphabetised list.
 
-Rows whose \code{repo_name} is \code{NA} or \code{"unknown"} are skipped with a
-single message so an operator can investigate before provisioning.
+Rows whose \code{repo_name} is \code{NA} or \code{"unknown"} are folded into a
+single \code{qualified-NA.txt} file so no qualified package ever silently
+drops out of provisioning. An informative message is emitted so an
+operator can investigate and re-route those packages if needed.
 }
 \keyword{internal}
