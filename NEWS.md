@@ -1,5 +1,31 @@
 # val.pipeline (development version)
 
+- `val_pipeline()` now writes one `qualified-<source>.txt` file per
+package source (`CRAN`, `BioC`, and `github` — every non-CRAN/BioC
+github-hosted source, regardless of its user-defined label in
+`opt_repos`, is normalised to a single `github` bucket by
+`get_repo_origin()`) into the `val_build()` output directory,
+alongside `qual_metadata.rds`. Each file is a plain, newline-delimited,
+alphabetised list of qualified package names — no header, no quoting,
+no comments — so it can be dropped straight into the source
+configuration of the "validated" Posit Package Manager (PPM) repo
+provisioned into a GxP environment. Qualified packages whose source
+can't be identified (`repo_name` is `NA` or `"unknown"`) are folded
+into a single `qualified-NA.txt` bucket so no qualified package
+silently drops out of provisioning. As part of this change,
+`val_pkg()` now persists a plain-string `repo_name` column (e.g.
+`"CRAN"`, `"BioC"`, `"github"`, `"unknown"`) alongside the existing
+named-character `repos` URL field into each package's `_meta.rds`, so
+downstream consumers of `qual_metadata.rds` don't have to re-derive
+the source label by URL-matching against the current session's
+`getOption("repos")`. If an older `qual_metadata.rds` predating the
+`repo_name` column is passed in, `write_qualified_pkg_lists()`
+transparently reverse-engineers the label per-row from the `repos`
+URL column via `get_repo_origin()` so historical files can still be
+processed without a re-run. Backed by the new internal helper
+`write_qualified_pkg_lists()`. Runs before `val_pipeline_report()` and,
+like it, is wrapped in `tryCatch()` so a write failure doesn't sink the
+whole pipeline.
 - **Performance**: `val_categorize()` now runs dramatically faster on
 large candidate universes. The internal `rip_cats()` helper previously
 wrapped its per-metric `dplyr::mutate(!!! cond_exprs)` call in

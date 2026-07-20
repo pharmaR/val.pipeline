@@ -79,6 +79,13 @@ val_pkg <- function(
     dplyr::pull(Repository)  # keep '/src/contrib/` ending
   repo_src <- repo_src_contrib |> dirname() |> dirname() # trim off '/src/contrib'
   repo_name <- get_repo_origin(repo_src = repo_src, pkg_name = pkg)
+  # Plain-string label for the source repo (e.g. "CRAN", "BioC",
+  # "github_pharmaverse", or "unknown"). Persisted into meta_list below
+  # so downstream consumers of qual_metadata.rds (notably
+  # write_qualified_pkg_lists()) don't have to re-derive the source by
+  # matching URLs against the current session's repos option.
+  repo_label <- get_repo_origin(repo_src = repo_src, pkg_name = pkg,
+                                names_only = TRUE)
   
   # Decisions
   decisions <- pull_config(val = "decisions_lst", rule_type = "default")
@@ -504,6 +511,9 @@ val_pkg <- function(
     r_ver = getRversion(),
     sys_info = list(R.Version()),
     repos = repo_name, # A named character
+    # Plain-string label for the source repo (e.g. "CRAN", "BioC",
+    # "github_pharmaverse", or "unknown"). See derivation above.
+    repo_name = repo_label,
     val_date = val_date,
     ref = ref,
     metric_pkg = metric_pkg,

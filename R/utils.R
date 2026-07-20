@@ -20,14 +20,25 @@
 get_repo_origin <- function(repo_src = NULL, pkg_name = NULL, names_only = FALSE) {
   curr_repos <- getOption("repos")
   if(is.null(curr_repos)) return("unknown")
-  repo_name <- curr_repos[stringr::str_detect(repo_src, curr_repos)] %>%
-    {if(names_only) names(.) else .}
-  if(length(repo_name) == 0) repo_name <- "unknown"
-  if(length(repo_name) > 1) {
-    repo_name <- repo_name[1]
-    cat(glue::glue("\n\n!!! WARNING: Package '{pkg_name}' appears to come from multiple repos. Using '{repo_name[1]}' for decisioning.\n"))
+  matched <- curr_repos[stringr::str_detect(repo_src, curr_repos)]
+  if(length(matched) == 0) return("unknown")
+  if(length(matched) > 1) {
+    matched <- matched[1]
+    cat(glue::glue("\n\n!!! WARNING: Package '{pkg_name}' appears to come from multiple repos. Using '{names(matched)}' for decisioning.\n"))
   }
-  repo_name
+  # Normalise any non-CRAN / non-BioC github-hosted source to a plain
+  # "github" label. This keeps downstream consumers (e.g.
+  # write_qualified_pkg_lists() writing qualified-<source>.txt files
+  # for PPM) from having to know about every user-defined GitHub
+  # label like "github_pharmaverse", "github_openpharma", etc.
+  label <- names(matched)
+  if (!is.null(label) &&
+      grepl("github", matched, ignore.case = TRUE) &&
+      !(toupper(label) %in% c("CRAN", "BIOC"))) {
+    label <- "github"
+    names(matched) <- "github"
+  }
+  if (names_only) label else matched
 }
 
 #' Strip Recording (for list() objects)
@@ -1665,4 +1676,159 @@ format_runtime_seconds <- function(secs) {
   if (h > 0L || m > 0L) parts <- c(parts, paste0(m, "m"))
   parts <- c(parts, paste0(s, "s"))
   paste(parts, collapse = " ")
+}
+
+
+#' Write Qualified Package Lists per Source
+#'
+#' Given a `qual_metadata` data frame (typically the object saved by
+#' [val_build()] to `qual_metadata.rds`), write one newline-delimited
+#' text file per source (`repo_name`) into `out_dir`. Each file is named
+#' `qualified-<source>.txt` and contains, one package per line, the
+#' names of every package whose `final_decision` matches
+#' `qualified_decision`. `<source>` is the value of the `repo_name`
+#' column produced by [val_pkg()] — typically `CRAN`, `BioC`, or
+#' `github` (every non-CRAN/BioC github-hosted source is normalised to
+#' a single `github` bucket by [get_repo_origin()]).
+#'
+#' These files are intended to be consumed as source configurations for
+#' the "validated" repository provisioned into a Posit Package Manager
+#' (PPM) instance in a GxP environment. Because PPM's source-file
+#' configuration expects one package name per line, no header, no
+#' quoting, and no trailing metadata, this helper deliberately writes a
+#' plain, alphabetised list.
+#'
+#' Rows whose `repo_name` is `NA` or `"unknown"` are folded into a
+#' single `qualified-NA.txt` file so no qualified package ever silently
+#' drops out of provisioning. An informative message is emitted so an
+#' operator can investigate and re-route those packages if needed.
+#'
+#' If `qual_metadata` predates the `repo_name` column (i.e. was
+#' produced by an older `val_build()`), the helper will reverse-engineer
+#' it row-by-row from the `repos` install URL by round-tripping through
+#' [get_repo_origin()] against the current session's
+#' `getOption("repos")`. Any URL that no longer maps to a configured
+#' repo resolves to `"unknown"` and lands in `qualified-NA.txt`. If
+#' neither `repo_name` nor `repos` is present the helper errors — the
+#' source of every qualified package can't be recovered from thin air.
+#'
+#' @param qual_metadata A data.frame with at least `pkg` and
+#'   `final_decision` columns, plus either `repo_name` (preferred) or
+#'   the older `repos` column (which stores the install URL and can be
+#'   reverse-engineered via [get_repo_origin()]).
+#' @param out_dir Character(1). Directory to write the text files into.
+#'   Created (recursively) if it doesn't yet exist.
+#' @param qualified_decision Character(1). The `final_decision` value
+#'   that marks a package as qualified for the validated repo. Defaults
+#'   to the lowest-risk decision from the config (typically `"Low"`).
+#'
+#' @return Invisibly, a named character vector: names are the source
+#'   labels (e.g. `"CRAN"`, `"BioC"`), values are the absolute paths of
+#'   the text files written. Empty if no qualified packages exist.
+#'
+#' @keywords internal
+write_qualified_pkg_lists <- function(
+    qual_metadata,
+    out_dir,
+    qualified_decision = pull_config(val = "decisions_lst",
+                                     rule_type = "default")[1]
+) {
+  stopifnot(
+    is.data.frame(qual_metadata),
+    is.character(out_dir), length(out_dir) == 1L, nzchar(out_dir),
+    is.character(qualified_decision), length(qualified_decision) == 1L
+  )
+
+  # Hard requirements — no way to reverse-engineer these two.
+  hard_required <- c("pkg", "final_decision")
+  hard_missing <- setdiff(hard_required, names(qual_metadata))
+  if (length(hard_missing) > 0L) {
+    stop(
+      "qual_metadata is missing required columns: ",
+      paste(hard_missing, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  # `repo_name` is our per-source split key. Newer qual_metadata.rds
+  # files (produced by val_pkg() after this feature landed) have it
+  # directly. Older files don't — but they do carry the raw install
+  # URL in the `repos` column, so we can reverse-engineer `repo_name`
+  # by matching those URLs against the current session's
+  # getOption("repos"). That's exactly what get_repo_origin() does, so
+  # we just delegate row-by-row. Any URL that no longer matches any
+  # configured repo lands as "unknown" and gets routed to
+  # qualified-NA.txt below.
+  if (!("repo_name" %in% names(qual_metadata))) {
+    if (!("repos" %in% names(qual_metadata))) {
+      stop(
+        "qual_metadata has neither a 'repo_name' nor a 'repos' column ",
+        "— cannot determine per-package sources. This file was likely ",
+        "produced by an old val_build() that predates source tracking.",
+        call. = FALSE
+      )
+    }
+    message(
+      "qual_metadata has no 'repo_name' column — reverse-engineering ",
+      "from the 'repos' URL column via getOption(\"repos\"). Provide a ",
+      "matching opt_repos in this session for best results."
+    )
+    qual_metadata$repo_name <- vapply(
+      seq_len(nrow(qual_metadata)),
+      function(i) {
+        url <- qual_metadata$repos[i]
+        if (is.null(url) || length(url) == 0L || is.na(url) || !nzchar(url)) {
+          return("unknown")
+        }
+        get_repo_origin(repo_src = url,
+                        pkg_name = qual_metadata$pkg[i],
+                        names_only = TRUE)
+      },
+      character(1)
+    )
+  }
+
+  if (!dir.exists(out_dir)) {
+    dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+
+  qualified <- qual_metadata[
+    !is.na(qual_metadata$final_decision) &
+      qual_metadata$final_decision == qualified_decision,
+    , drop = FALSE
+  ]
+
+  if (nrow(qualified) == 0L) {
+    message("No qualified packages found (final_decision == '",
+            qualified_decision, "'); no files written.")
+    return(invisible(character(0)))
+  }
+
+  unknown_rows <- is.na(qualified$repo_name) |
+    tolower(qualified$repo_name) == "unknown"
+  if (any(unknown_rows)) {
+    unknown_pkgs <- qualified$pkg[unknown_rows]
+    message(
+      "Routing ", length(unknown_pkgs),
+      " qualified pkg(s) with unknown repo_name to 'qualified-NA.txt': ",
+      paste(unknown_pkgs, collapse = ", ")
+    )
+    # Fold NA and 'unknown' into a single 'NA' bucket so nothing is
+    # dropped from provisioning — the operator can then triage
+    # qualified-NA.txt manually.
+    qualified$repo_name[unknown_rows] <- "NA"
+  }
+
+  written <- character(0)
+  for (src in sort(unique(qualified$repo_name))) {
+    pkgs <- sort(unique(qualified$pkg[qualified$repo_name == src]))
+    out_file <- file.path(out_dir, paste0("qualified-", src, ".txt"))
+    writeLines(pkgs, con = out_file)
+    written[[src]] <- normalizePath(out_file, winslash = "/",
+                                    mustWork = TRUE)
+    cat(paste0("--> Wrote ", length(pkgs), " qualified '", src,
+               "' pkg(s) to ", out_file, "\n"))
+  }
+
+  invisible(written)
 }
