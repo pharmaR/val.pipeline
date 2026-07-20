@@ -22,9 +22,14 @@ test_that("write_qualified_pkg_lists() writes one file per source with one pkg p
 
 
 test_that("write_qualified_pkg_lists() handles GitHub sources", {
+  # After get_repo_origin() normalisation, every github-hosted source
+  # (regardless of how it was labelled in the user's opt_repos config)
+  # will land in qual_metadata's repo_name column as simply "github",
+  # so all qualified github pkgs collapse into a single
+  # qualified-github.txt file.
   qm <- data.frame(
     pkg            = c("admiral", "pharmaverseadam", "dplyr"),
-    repo_name      = c("github_pharmaverse", "github_pharmaverse", "CRAN"),
+    repo_name      = c("github",  "github",          "CRAN"),
     final_decision = c("Low", "Low", "Low"),
     stringsAsFactors = FALSE
   )
@@ -32,9 +37,9 @@ test_that("write_qualified_pkg_lists() handles GitHub sources", {
   out_dir <- withr::local_tempdir()
   paths <- write_qualified_pkg_lists(qm, out_dir, qualified_decision = "Low")
 
-  expect_true(file.exists(file.path(out_dir, "qualified-github_pharmaverse.txt")))
+  expect_true(file.exists(file.path(out_dir, "qualified-github.txt")))
   expect_equal(
-    readLines(file.path(out_dir, "qualified-github_pharmaverse.txt")),
+    readLines(file.path(out_dir, "qualified-github.txt")),
     c("admiral", "pharmaverseadam")
   )
 })

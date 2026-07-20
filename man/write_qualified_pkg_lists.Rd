@@ -32,7 +32,10 @@ Given a \code{qual_metadata} data frame (typically the object saved by
 text file per source (\code{repo_name}) into \code{out_dir}. Each file is named
 \verb{qualified-<source>.txt} and contains, one package per line, the
 names of every package whose \code{final_decision} matches
-\code{qualified_decision}.
+\code{qualified_decision}. \verb{<source>} is the value of the \code{repo_name}
+column produced by \code{\link[=val_pkg]{val_pkg()}} — typically \code{CRAN}, \code{BioC}, or
+\code{github} (every non-CRAN/BioC github-hosted source is normalised to
+a single \code{github} bucket by \code{\link[=get_repo_origin]{get_repo_origin()}}).
 }
 \details{
 These files are intended to be consumed as source configurations for

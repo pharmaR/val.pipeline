@@ -73,3 +73,62 @@ test_that("get_repo_origin works with Posit Package Manager URLs", {
   result_names <- get_repo_origin("https://packagemanager.posit.co/cran/2024-06-01", "testpkg", names_only = TRUE)
   expect_equal(result_names, "CRAN")
 })
+
+
+test_that("get_repo_origin normalises non-CRAN/BioC github sources to 'github'", {
+  # Any user-defined label pointing at a github.com URL should collapse
+  # to a single 'github' bucket so downstream consumers (e.g.
+  # write_qualified_pkg_lists() writing qualified-<source>.txt files
+  # for PPM) don't need to know about every user-defined GitHub label.
+  mock_repos <- c(
+    CRAN = "https://cran.r-project.org",
+    github_pharmaverse = "https://github.com/pharmaverse",
+    github_openpharma  = "https://github.com/openpharma"
+  )
+  old_repos <- getOption("repos"); on.exit(options(repos = old_repos)); options(repos = mock_repos)
+
+  # names_only = TRUE returns the normalised label.
+  expect_equal(
+    get_repo_origin("https://github.com/pharmaverse", "admiral", names_only = TRUE),
+    "github"
+  )
+  expect_equal(
+    get_repo_origin("https://github.com/openpharma", "cardx", names_only = TRUE),
+    "github"
+  )
+
+  # names_only = FALSE preserves the URL as the value and rewrites the
+  # name to 'github'.
+  full <- get_repo_origin("https://github.com/pharmaverse", "admiral")
+  expect_equal(unname(full), "https://github.com/pharmaverse")
+  expect_equal(names(full), "github")
+
+  # A CRAN-labelled entry is left alone (no accidental github collapse).
+  expect_equal(
+    get_repo_origin("https://cran.r-project.org", "dplyr", names_only = TRUE),
+    "CRAN"
+  )
+})
+
+
+test_that("get_repo_origin does not normalise a repo explicitly labelled 'CRAN' or 'BioC' even if URL contains github", {
+  # Guardrail: an admin who (perhaps unusually) labels their CRAN or BioC
+  # mirror with a github-hosted URL should NOT have that source silently
+  # rebadged as 'github'.
+  mock_repos <- c(
+    CRAN = "https://github.com/rstudio/cranmirror",
+    BioC = "https://github.com/bioconductor/bioc_mirror"
+  )
+  old_repos <- getOption("repos"); on.exit(options(repos = old_repos)); options(repos = mock_repos)
+
+  expect_equal(
+    get_repo_origin("https://github.com/rstudio/cranmirror", "dplyr",
+                    names_only = TRUE),
+    "CRAN"
+  )
+  expect_equal(
+    get_repo_origin("https://github.com/bioconductor/bioc_mirror", "limma",
+                    names_only = TRUE),
+    "BioC"
+  )
+})

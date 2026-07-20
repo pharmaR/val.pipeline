@@ -20,14 +20,25 @@
 get_repo_origin <- function(repo_src = NULL, pkg_name = NULL, names_only = FALSE) {
   curr_repos <- getOption("repos")
   if(is.null(curr_repos)) return("unknown")
-  repo_name <- curr_repos[stringr::str_detect(repo_src, curr_repos)] %>%
-    {if(names_only) names(.) else .}
-  if(length(repo_name) == 0) repo_name <- "unknown"
-  if(length(repo_name) > 1) {
-    repo_name <- repo_name[1]
-    cat(glue::glue("\n\n!!! WARNING: Package '{pkg_name}' appears to come from multiple repos. Using '{repo_name[1]}' for decisioning.\n"))
+  matched <- curr_repos[stringr::str_detect(repo_src, curr_repos)]
+  if(length(matched) == 0) return("unknown")
+  if(length(matched) > 1) {
+    matched <- matched[1]
+    cat(glue::glue("\n\n!!! WARNING: Package '{pkg_name}' appears to come from multiple repos. Using '{names(matched)}' for decisioning.\n"))
   }
-  repo_name
+  # Normalise any non-CRAN / non-BioC github-hosted source to a plain
+  # "github" label. This keeps downstream consumers (e.g.
+  # write_qualified_pkg_lists() writing qualified-<source>.txt files
+  # for PPM) from having to know about every user-defined GitHub
+  # label like "github_pharmaverse", "github_openpharma", etc.
+  label <- names(matched)
+  if (!is.null(label) &&
+      grepl("github", matched, ignore.case = TRUE) &&
+      !(toupper(label) %in% c("CRAN", "BIOC"))) {
+    label <- "github"
+    names(matched) <- "github"
+  }
+  if (names_only) label else matched
 }
 
 #' Strip Recording (for list() objects)
@@ -1675,7 +1686,10 @@ format_runtime_seconds <- function(secs) {
 #' text file per source (`repo_name`) into `out_dir`. Each file is named
 #' `qualified-<source>.txt` and contains, one package per line, the
 #' names of every package whose `final_decision` matches
-#' `qualified_decision`.
+#' `qualified_decision`. `<source>` is the value of the `repo_name`
+#' column produced by [val_pkg()] — typically `CRAN`, `BioC`, or
+#' `github` (every non-CRAN/BioC github-hosted source is normalised to
+#' a single `github` bucket by [get_repo_origin()]).
 #'
 #' These files are intended to be consumed as source configurations for
 #' the "validated" repository provisioned into a Posit Package Manager
