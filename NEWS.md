@@ -1,5 +1,20 @@
 # val.pipeline (development version)
 
+- New `classify_pkg_source()` helper (internal) that determines a
+package's source of origin using a URL-first, DESCRIPTION-fallback
+strategy. Step 1 delegates to `get_repo_origin()` (URL match against
+`opt_repos`), which preserves existing behaviour for users whose
+`opt_repos` still lists distinct CRAN / BioC / GitHub URLs. When that
+returns `"unknown"` — most notably in the "merged PPM repo" scenario
+where every package is served from a single URL — the helper falls back
+to inspecting the package's `DESCRIPTION`: `biocViews` → `"BioC"`,
+`Repository: CRAN` → `"CRAN"`, `RemoteType: github` → `"github"`, and
+finally a `github.com/<owner>/<repo>` pattern in `URL`/`BugReports` →
+`"github"`. Returns `"unknown"` if no signal resolves. Wired into
+`val_pkg()` so `meta_list$repo_name` (and therefore
+`qual_metadata.rds`) is populated by the classifier rather than by the
+raw URL match alone.
+
 - **Performance**: `val_categorize()` now runs dramatically faster on
 large candidate universes. The internal `rip_cats()` helper previously
 wrapped its per-metric `dplyr::mutate(!!! cond_exprs)` call in

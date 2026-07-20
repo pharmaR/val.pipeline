@@ -30,6 +30,131 @@ get_repo_origin <- function(repo_src = NULL, pkg_name = NULL, names_only = FALSE
   repo_name
 }
 
+
+#' Classify a Package's Source of Origin (URL-first, DESCRIPTION-fallback)
+#'
+#' Determine whether a package came from CRAN, Bioconductor (`"BioC"`),
+#' or GitHub (`"github"`), returning `"unknown"` when neither signal
+#' resolves. Designed to survive a merged Posit Package Manager (PPM)
+#' repo where every package appears to come from a single URL — in that
+#' scenario the URL match is uninformative and the DESCRIPTION fallback
+#' does the real work.
+#'
+#' Priority order (first hit wins):
+#' \enumerate{
+#'   \item URL match — delegates to [get_repo_origin()] with
+#'     `names_only = TRUE`. If it returns anything other than
+#'     `"unknown"`, that label is returned. This preserves
+#'     backwards-compatibility for existing multi-entry `opt_repos`
+#'     configurations.
+#'   \item `biocViews` present and non-empty in DESCRIPTION → `"BioC"`.
+#'     This field is mandatory for Bioconductor packages and
+#'     effectively never present on CRAN/GitHub packages.
+#'   \item `Repository: CRAN` in DESCRIPTION → `"CRAN"`. CRAN adds
+#'     this field to the tarballs it publishes.
+#'   \item `RemoteType: github` in DESCRIPTION → `"github"`. Written
+#'     by `remotes::install_github()` / `pak` when installing from
+#'     GitHub.
+#'   \item `URL` or `BugReports` contains a `github.com/<owner>/<repo>`
+#'     pattern → `"github"`. Weakest signal (many CRAN packages also
+#'     list a GitHub URL for issue tracking), applied only after
+#'     `biocViews` / `Repository: CRAN` have been ruled out.
+#'   \item Fallback → `"unknown"`.
+#' }
+#'
+#' @param repo_src Character. Repository URL (with or without
+#'   `/src/contrib`) — passed straight through to [get_repo_origin()].
+#'   Can be `NULL` to skip step 1 and go straight to DESCRIPTION.
+#' @param pkg_name Character(1). Package name, used only for warning
+#'   messages emitted by [get_repo_origin()].
+#' @param desc_path Character(1) or `NULL`. Path to the DESCRIPTION
+#'   file inspected in steps 2-5. May also be a directory containing
+#'   `DESCRIPTION`, or the path to an extracted source tree. When
+#'   `NULL` or the file is unreadable, steps 2-5 are skipped.
+#'
+#' @return Character(1). One of `"CRAN"`, `"BioC"`, `"github"`, or
+#'   `"unknown"` (or whatever custom label the URL match in step 1
+#'   resolved to when the user has a custom-labelled entry in
+#'   `opt_repos`).
+#'
+#' @examples
+#' \dontrun{
+#' # In a val_pkg() context — pass the extracted source's DESCRIPTION
+#' # as the fallback source of truth:
+#' classify_pkg_source(
+#'   repo_src = "https://packagemanager.posit.co/validated/latest",
+#'   pkg_name = "admiral",
+#'   desc_path = file.path(out_dir, "sourced", "admiral", "DESCRIPTION")
+#' )
+#' }
+#'
+#' @keywords internal
+classify_pkg_source <- function(repo_src = NULL,
+                                pkg_name = NULL,
+                                desc_path = NULL) {
+  # ---- Step 1: URL-based match (preserve existing behaviour) ----
+  if (!is.null(repo_src) && length(repo_src) > 0L) {
+    from_url <- get_repo_origin(repo_src = repo_src,
+                                pkg_name = pkg_name,
+                                names_only = TRUE)
+    if (!is.null(from_url) && length(from_url) == 1L &&
+        !is.na(from_url) && nzchar(from_url) && from_url != "unknown") {
+      return(from_url)
+    }
+  }
+
+  # ---- Step 2+: DESCRIPTION-based fallback ----
+  if (is.null(desc_path) || length(desc_path) != 1L || is.na(desc_path) ||
+      !nzchar(desc_path)) {
+    return("unknown")
+  }
+  if (dir.exists(desc_path)) {
+    desc_path <- file.path(desc_path, "DESCRIPTION")
+  }
+  if (!file.exists(desc_path)) {
+    return("unknown")
+  }
+
+  desc <- tryCatch(
+    {
+      raw <- read.dcf(desc_path)
+      if (nrow(raw) == 0L) NULL else raw[1L, ]
+    },
+    error = function(e) NULL,
+    warning = function(w) NULL
+  )
+  if (is.null(desc)) return("unknown")
+
+  field <- function(name) {
+    if (!(name %in% names(desc))) return(NA_character_)
+    val <- desc[[name]]
+    if (is.null(val) || is.na(val) || !nzchar(val)) return(NA_character_)
+    val
+  }
+
+  # Step 2: mandatory Bioconductor marker.
+  if (!is.na(field("biocViews"))) return("BioC")
+
+  # Step 3: CRAN adds this at publish time.
+  repo_field <- field("Repository")
+  if (!is.na(repo_field) && tolower(repo_field) == "cran") return("CRAN")
+
+  # Step 4: remotes/pak leaves this behind when installing from GitHub.
+  remote_type <- field("RemoteType")
+  if (!is.na(remote_type) && tolower(remote_type) == "github") return("github")
+
+  # Step 5: author-supplied github URL, only after CRAN/BioC ruled out.
+  urls <- c(field("URL"), field("BugReports"))
+  urls <- urls[!is.na(urls)]
+  gh_pat <- "github\\.com/[^/[:space:],]+/[^/[:space:],]+"
+  if (length(urls) > 0L &&
+      any(grepl(gh_pat, urls, ignore.case = TRUE))) {
+    return("github")
+  }
+
+  "unknown"
+}
+
 #' Strip Recording (for list() objects)
 #'
 #' Remove .recording attribute from all elements of the assessment,

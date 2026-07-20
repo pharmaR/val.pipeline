@@ -108,6 +108,26 @@ val_pkg <- function(
     cat("\n-->", pkg_v,"untarred.\n")
   }
   
+  # Classify the pkg's source of origin: URL match first (preserves the
+  # existing multi-entry opt_repos behaviour) then DESCRIPTION-based
+  # fallback so the origin can still be identified even when every
+  # source was merged into a single PPM repo. Persisted below as
+  # meta_list$repo_name and consumed downstream by
+  # write_qualified_pkg_lists() when emitting qualified-<source>.txt.
+  # In 'source' mode the tarball has been extracted to sourced/<pkg>/;
+  # in 'remote' mode the DESCRIPTION is served out of the installed
+  # library. We hand classify_pkg_source() a best-effort path in both
+  # cases and let it decide whether to use it.
+  desc_path <- if (ref == "source") {
+    file.path(sourced, pkg, "DESCRIPTION")
+  } else {
+    tryCatch(system.file("DESCRIPTION", package = pkg),
+             error = function(e) "")
+  }
+  repo_label <- classify_pkg_source(repo_src = repo_src,
+                                    pkg_name = pkg,
+                                    desc_path = desc_path)
+  
   
   #
   # ---- Grab Dependencies ----
@@ -504,6 +524,15 @@ val_pkg <- function(
     r_ver = getRversion(),
     sys_info = list(R.Version()),
     repos = repo_name, # A named character
+    # Plain-string source label derived by classify_pkg_source() —
+    # tries URL match first (via get_repo_origin()), then falls back
+    # to DESCRIPTION signals (biocViews, Repository: CRAN, RemoteType,
+    # URL/BugReports) so a package's origin can still be recovered
+    # even when opt_repos has collapsed every source into a single
+    # merged Posit Package Manager URL. One of "CRAN", "BioC",
+    # "github", or "unknown" (or a user-defined opt_repos label when
+    # the URL match returned one).
+    repo_name = repo_label,
     val_date = val_date,
     ref = ref,
     metric_pkg = metric_pkg,
