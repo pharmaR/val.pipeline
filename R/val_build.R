@@ -39,6 +39,10 @@
 #'   packages that have already been assessed. Default is FALSE.
 #' @param opt_repos Named character vector specifying the repository options for
 #'   package installation. Default is CRAN.
+#' @param verbose Console verbosity control. One of `"quiet"`,
+#'   `"minimal"`, `"normal"` (default), or `"verbose"`. See
+#'   the `val.pipeline` verbosity docs for tier definitions. Defaults to whatever the
+#'   session option `val.pipeline.verbose` is set to (or `"normal"`).
 #'
 #' @importFrom glue glue
 #' @importFrom tidyr unite
@@ -68,7 +72,8 @@ val_build <- function(
     replace = FALSE,
     opt_repos = 
     c(CRAN = "https://packagemanager.posit.co/cran/latest",
-      BioC = 'https://bioconductor.org/packages/3.22/bioc')
+      BioC = 'https://bioconductor.org/packages/3.22/bioc'),
+    verbose = NULL
     ){
   
   #
@@ -94,6 +99,7 @@ val_build <- function(
   ref <- match.arg(ref)
   metric_pkg <- match.arg(metric_pkg)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
+  apply_verbose(verbose)
   
   # store R Version
   r_ver = getRversion()
@@ -103,7 +109,8 @@ val_build <- function(
   val_start_txt <- format(val_start, '%Y-%m-%d %H:%M:%S', tz = 'US/Eastern', usetz = TRUE)
   val_date <- as.Date(val_date)
   val_date_txt <- gsub("-", "", val_date)
-  cat(paste0("\n\n\nNew Validation build: R v", r_ver, " @ ", val_start_txt,"\n\n"))
+  val_msg(paste0("\n\n\nNew Validation build: R v", r_ver, " @ ", val_start_txt,"\n\n"),
+          min_level = "normal")
   
   
   #
@@ -193,7 +200,8 @@ val_build <- function(
     dplyr::filter(Package %in% pkgs) |>
     dplyr::pull(Version)
   pkgs_length <- length(pkgs)
-  cat("\n-->", pkgs_length, "package(s) to process.\n\n")
+  val_msg("\n-->", pkgs_length, "package(s) to process.\n\n",
+          min_level = "minimal")
   
   
   # Prompt the user to confirm they want to continue when assessing a lot of pkgs
@@ -250,7 +258,8 @@ val_build <- function(
     
     # output a message letting users know where we are
     pkg_cnt <- which(pkgs == pkg)
-    cat(paste0("\n\n#", pkg_cnt, " of ", pkgs_length, ":"))
+    val_msg(paste0("\n\n#", pkg_cnt, " of ", pkgs_length, ":"),
+            min_level = "normal")
     
     pkg_v <- paste(pkg, ver, sep = "_")
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
@@ -270,23 +279,28 @@ val_build <- function(
           out_dir = val_dir,
           val_date = val_date)
       } else {
-        cat(paste0("\nAttempted New Package: ", pkg, " v", ver,", but already assessed.\n\n"))
+        val_msg(paste0("\nAttempted New Package: ", pkg, " v", ver,", but already assessed.\n\n"),
+                min_level = "normal")
         pkg_meta <- readRDS(pkg_meta_file)
-        
-        cat("\n-->", pkg_v,"Using assessment previously stored.\n")
+
+        val_msg("\n-->", pkg_v,"Using assessment previously stored.\n",
+                min_level = "normal")
+        val_pkg_summary_line(pkg, ver, pkg_meta$decision, suffix = "(cached)")
       }
       
       # if a pkg fails, make sure it's reverse dependencies don't run an assessment
       # if(pkg == "sys") pkg_meta$decision = "Medium" # for debugging
       if(pkg_meta$decision != decisions[1]) {
-        cat(paste0("\n\n--> ", pkg, " v", ver," was assessed with a '", pkg_meta$decision,"' risk. All packages that depend on it will also be marked as '", decisions[length(decisions)],"' risk.\n\n"))
+        val_msg(paste0("\n\n--> ", pkg, " v", ver," was assessed with a '", pkg_meta$decision,"' risk. All packages that depend on it will also be marked as '", decisions[length(decisions)],"' risk.\n\n"),
+                min_level = "normal")
         dont_run <<- c(dont_run, pkg_meta$rev_deps) |> unique()
         failed_pkgs <<- c(failed_pkgs, pkg) |> unique()
       }
       
     } else {
       # ---- Pkg is in 'dont_run'! ----
-      cat(paste0("\nAttempted New Package: ", pkg, " v", ver,", but one of it's dependencies already failed so skipping assessment and marking risk as '", decisions[length(decisions)], "'.\n\n"))
+      val_msg(paste0("\nAttempted New Package: ", pkg, " v", ver,", but one of it's dependencies already failed so skipping assessment and marking risk as '", decisions[length(decisions)], "'.\n\n"),
+              min_level = "normal")
       
       # grab depends
       depends <- 
@@ -346,7 +360,8 @@ val_build <- function(
       )
       # save the pkg_meta
       saveRDS(pkg_meta, pkg_meta_file)
-      cat("\n-->", pkg_v,"meta bundle saved.\n")
+      val_msg("\n-->", pkg_v,"meta bundle saved.\n", min_level = "verbose")
+      val_pkg_summary_line(pkg, ver, pkg_meta$decision, suffix = "(dep-skip)")
     }
     
     # return!
@@ -358,7 +373,10 @@ val_build <- function(
   # Message
   # dont_run |> length()
   skipped_pkgs <- pkgs[pkgs %in% dont_run]
-  cat("\n--> All", pkgs_length, "packages processed;", skipped_pkgs |> length(),"of which were avoided due to a dependency failing it's risk assessment.\n")
+  val_msg("\n--> All", pkgs_length, "packages processed;",
+          skipped_pkgs |> length(),
+          "of which were avoided due to a dependency failing it's risk assessment.\n",
+          min_level = "minimal")
 
   
   
@@ -421,7 +439,7 @@ val_build <- function(
   
   
   
-  cat("\n--> Collated pkg metadata.\n")
+  val_msg("\n--> Collated pkg metadata.\n", min_level = "normal")
   
   #
   # ---- Update final decisions ----
@@ -452,7 +470,7 @@ val_build <- function(
     pkgs_df <<- reject_iteration(pkgs_df, dec_reject, deps, decisions, failed)
   }
   
-  cat("\n--> Assigned 'final' decisions.\n")
+  val_msg("\n--> Assigned 'final' decisions.\n", min_level = "minimal")
   
   # Save the final qualification frame BEFORE the per-package meta RDS
   # update walk below. Prior versions saved this at the very end of val_build(),
@@ -460,7 +478,9 @@ val_build <- function(
   # interim pkgs_df0 snapshot (final_decision NA for every val_pkg()-assessed
   # row). See #53.
   saveRDS(pkgs_df, file.path(val_dir, "qual_metadata.rds"))
-  cat(paste0("\n--> Saved qualification evidence to ", file.path(val_dir, "qual_metadata.rds"), "\n"))
+  val_msg(paste0("\n--> Saved qualification evidence to ",
+                 file.path(val_dir, "qual_metadata.rds"), "\n"),
+          min_level = "minimal")
   
   
   
@@ -490,16 +510,18 @@ val_build <- function(
         dep_meta$final_decision_reason_note <- note
         dep_meta$final_decision <- decisions[length(decisions)]
         saveRDS(dep_meta, f)
-        cat(paste0("\n\n--> Updated ", dep_meta$pkg, " v", dep_meta$ver," from '", dep_meta$decision,"' to '", dep_meta$final_decision,"' in meta bundle .rds.\n"))
+        val_msg(paste0("\n\n--> Updated ", dep_meta$pkg, " v", dep_meta$ver," from '", dep_meta$decision,"' to '", dep_meta$final_decision,"' in meta bundle .rds.\n"),
+                min_level = "verbose")
       })
     }
   })
   
-  cat("\n--> Updated", nrow(changed_pkgs),"pkg metadata files.\n")
+  val_msg("\n--> Updated", nrow(changed_pkgs),"pkg metadata files.\n",
+          min_level = "normal")
   
   val_end <- Sys.time()
   val_end_txt <- utils::capture.output(val_end - val_start)
-  cat("\n--> Build", val_end_txt,"\n")
+  val_msg("\n--> Build", val_end_txt,"\n", min_level = "minimal")
   
   # Return object 
   return(list(

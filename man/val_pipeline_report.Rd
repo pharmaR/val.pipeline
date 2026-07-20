@@ -15,7 +15,8 @@ val_pipeline_report(
   n_candidates = NULL,
   pre_filtered_path = NULL,
   pipeline_runtime = NULL,
-  quiet = FALSE
+  quiet = FALSE,
+  verbose = NULL
 )
 }
 \arguments{
@@ -65,6 +66,12 @@ to the Run Metadata table. Not persisted in the evidence RDS files
 because it's a pipeline-level (not per-package) fact.}
 
 \item{quiet}{Logical. Suppress Quarto rendering output. Default \code{FALSE}.}
+
+\item{verbose}{Console verbosity control. One of \code{"quiet"},
+\code{"minimal"}, \code{"normal"} (default), or \code{"verbose"}. See
+the \code{val.pipeline} verbosity docs for tier definitions. The final "Wrote
+val.pipeline summary report(s)" confirmation is emitted only at
+\code{"normal"} or above.}
 }
 \value{
 Invisibly, a character vector of the rendered report file paths.

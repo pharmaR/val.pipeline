@@ -11,7 +11,8 @@ val_pkg(
   ref = c("source", "remote"),
   metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
   out_dir,
-  val_date = Sys.Date()
+  val_date = Sys.Date(),
+  verbose = NULL
 )
 }
 \arguments{
@@ -31,6 +32,11 @@ package directly from the repo.}
 \item{out_dir}{Character(1). Directory to store outputs.}
 
 \item{val_date}{Date. Date of validation. Default is current date.}
+
+\item{verbose}{Console verbosity control. One of \code{"quiet"},
+\code{"minimal"}, \code{"normal"} (default), or \code{"verbose"}. See
+the \code{val.pipeline} verbosity docs for tier definitions. Defaults to whatever the
+session option \code{val.pipeline.verbose} is set to (or \code{"normal"}).}
 }
 \value{
 A list containing package metadata, assessment results, and

@@ -14,7 +14,8 @@ val_build(
   out = "riskassessment",
   replace = FALSE,
   opt_repos = c(CRAN = "https://packagemanager.posit.co/cran/latest", BioC =
-    "https://bioconductor.org/packages/3.22/bioc")
+    "https://bioconductor.org/packages/3.22/bioc"),
+  verbose = NULL
 )
 }
 \arguments{
@@ -49,6 +50,11 @@ packages that have already been assessed. Default is FALSE.}
 
 \item{opt_repos}{Named character vector specifying the repository options for
 package installation. Default is CRAN.}
+
+\item{verbose}{Console verbosity control. One of \code{"quiet"},
+\code{"minimal"}, \code{"normal"} (default), or \code{"verbose"}. See
+the \code{val.pipeline} verbosity docs for tier definitions. Defaults to whatever the
+session option \code{val.pipeline.verbose} is set to (or \code{"normal"}).}
 }
 \value{
 A list containing:

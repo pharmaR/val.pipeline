@@ -13,7 +13,8 @@ val_pipeline(
   replace = FALSE,
   out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
   opt_repos = c(CRAN = "https://packagemanager.posit.co/cran/latest", BioC =
-    "https://bioconductor.org/packages/3.22/bioc")
+    "https://bioconductor.org/packages/3.22/bioc"),
+  verbose = NULL
 )
 }
 \arguments{
@@ -39,6 +40,13 @@ Sys.getenv("RISK_OUTPATH", unset = getwd()).}
 
 \item{opt_repos}{Named character vector. Repositories to use. Default is
 opt_repos from config.}
+
+\item{verbose}{Console verbosity control. One of \code{"quiet"},
+\code{"minimal"}, \code{"normal"} (default), or \code{"verbose"}. See
+the \code{val.pipeline} verbosity docs for tier definitions. Also accepts an integer 0-3
+or a logical (\code{TRUE} = \code{"normal"}, \code{FALSE} = \code{"quiet"}). The
+session option \code{val.pipeline.verbose} is used when this argument
+is left as the default and set to \code{NULL}.}
 }
 \value{
 A list containing the validation directory and a data frame of
