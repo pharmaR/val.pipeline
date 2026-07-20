@@ -27,12 +27,12 @@ remote_reduce:
   downloads_1yr:
     cond:
       # High: ~ 
-      High: ~ is.na(.x) | .x < 120000
-      Medium: ~ dplyr::between(.x, 120000, 240000)
+      High: ~ is.na(.x) | .x < 80000
+      Medium: ~ dplyr::between(.x, 80000, 240000)
       Low: ~ .x > 240000
     type: primary
     accept_cats: Low
-    promote_min: ~ .x > 80000 # bare minimum needed for promo
+    promote_min: ~ .x > 60000 # bare minimum needed for promo
     auto_accept: ~ .x > 1000000 # anything above this is gold & doesn't need all the rules
   reverse_dependencies:
     cond:
