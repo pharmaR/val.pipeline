@@ -1703,8 +1703,19 @@ format_runtime_seconds <- function(secs) {
 #' drops out of provisioning. An informative message is emitted so an
 #' operator can investigate and re-route those packages if needed.
 #'
-#' @param qual_metadata A data.frame with at least `pkg`, `repo_name`,
-#'   and `final_decision` columns.
+#' If `qual_metadata` predates the `repo_name` column (i.e. was
+#' produced by an older `val_build()`), the helper will reverse-engineer
+#' it row-by-row from the `repos` install URL by round-tripping through
+#' [get_repo_origin()] against the current session's
+#' `getOption("repos")`. Any URL that no longer maps to a configured
+#' repo resolves to `"unknown"` and lands in `qualified-NA.txt`. If
+#' neither `repo_name` nor `repos` is present the helper errors — the
+#' source of every qualified package can't be recovered from thin air.
+#'
+#' @param qual_metadata A data.frame with at least `pkg` and
+#'   `final_decision` columns, plus either `repo_name` (preferred) or
+#'   the older `repos` column (which stores the install URL and can be
+#'   reverse-engineered via [get_repo_origin()]).
 #' @param out_dir Character(1). Directory to write the text files into.
 #'   Created (recursively) if it doesn't yet exist.
 #' @param qualified_decision Character(1). The `final_decision` value
@@ -1728,13 +1739,52 @@ write_qualified_pkg_lists <- function(
     is.character(qualified_decision), length(qualified_decision) == 1L
   )
 
-  required_cols <- c("pkg", "repo_name", "final_decision")
-  missing_cols <- setdiff(required_cols, names(qual_metadata))
-  if (length(missing_cols) > 0L) {
+  # Hard requirements — no way to reverse-engineer these two.
+  hard_required <- c("pkg", "final_decision")
+  hard_missing <- setdiff(hard_required, names(qual_metadata))
+  if (length(hard_missing) > 0L) {
     stop(
       "qual_metadata is missing required columns: ",
-      paste(missing_cols, collapse = ", "),
+      paste(hard_missing, collapse = ", "),
       call. = FALSE
+    )
+  }
+
+  # `repo_name` is our per-source split key. Newer qual_metadata.rds
+  # files (produced by val_pkg() after this feature landed) have it
+  # directly. Older files don't — but they do carry the raw install
+  # URL in the `repos` column, so we can reverse-engineer `repo_name`
+  # by matching those URLs against the current session's
+  # getOption("repos"). That's exactly what get_repo_origin() does, so
+  # we just delegate row-by-row. Any URL that no longer matches any
+  # configured repo lands as "unknown" and gets routed to
+  # qualified-NA.txt below.
+  if (!("repo_name" %in% names(qual_metadata))) {
+    if (!("repos" %in% names(qual_metadata))) {
+      stop(
+        "qual_metadata has neither a 'repo_name' nor a 'repos' column ",
+        "— cannot determine per-package sources. This file was likely ",
+        "produced by an old val_build() that predates source tracking.",
+        call. = FALSE
+      )
+    }
+    message(
+      "qual_metadata has no 'repo_name' column — reverse-engineering ",
+      "from the 'repos' URL column via getOption(\"repos\"). Provide a ",
+      "matching opt_repos in this session for best results."
+    )
+    qual_metadata$repo_name <- vapply(
+      seq_len(nrow(qual_metadata)),
+      function(i) {
+        url <- qual_metadata$repos[i]
+        if (is.null(url) || length(url) == 0L || is.na(url) || !nzchar(url)) {
+          return("unknown")
+        }
+        get_repo_origin(repo_src = url,
+                        pkg_name = qual_metadata$pkg[i],
+                        names_only = TRUE)
+      },
+      character(1)
     )
   }
 

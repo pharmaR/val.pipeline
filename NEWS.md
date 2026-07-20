@@ -18,7 +18,11 @@ silently drops out of provisioning. As part of this change,
 named-character `repos` URL field into each package's `_meta.rds`, so
 downstream consumers of `qual_metadata.rds` don't have to re-derive
 the source label by URL-matching against the current session's
-`getOption("repos")`. Backed by the new internal helper
+`getOption("repos")`. If an older `qual_metadata.rds` predating the
+`repo_name` column is passed in, `write_qualified_pkg_lists()`
+transparently reverse-engineers the label per-row from the `repos`
+URL column via `get_repo_origin()` so historical files can still be
+processed without a re-run. Backed by the new internal helper
 `write_qualified_pkg_lists()`. Runs before `val_pipeline_report()` and,
 like it, is wrapped in `tryCatch()` so a write failure doesn't sink the
 whole pipeline.

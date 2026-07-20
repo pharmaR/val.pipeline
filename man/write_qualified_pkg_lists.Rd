@@ -11,8 +11,10 @@ write_qualified_pkg_lists(
 )
 }
 \arguments{
-\item{qual_metadata}{A data.frame with at least \code{pkg}, \code{repo_name},
-and \code{final_decision} columns.}
+\item{qual_metadata}{A data.frame with at least \code{pkg} and
+\code{final_decision} columns, plus either \code{repo_name} (preferred) or
+the older \code{repos} column (which stores the install URL and can be
+reverse-engineered via \code{\link[=get_repo_origin]{get_repo_origin()}}).}
 
 \item{out_dir}{Character(1). Directory to write the text files into.
 Created (recursively) if it doesn't yet exist.}
@@ -49,5 +51,14 @@ Rows whose \code{repo_name} is \code{NA} or \code{"unknown"} are folded into a
 single \code{qualified-NA.txt} file so no qualified package ever silently
 drops out of provisioning. An informative message is emitted so an
 operator can investigate and re-route those packages if needed.
+
+If \code{qual_metadata} predates the \code{repo_name} column (i.e. was
+produced by an older \code{val_build()}), the helper will reverse-engineer
+it row-by-row from the \code{repos} install URL by round-tripping through
+\code{\link[=get_repo_origin]{get_repo_origin()}} against the current session's
+\code{getOption("repos")}. Any URL that no longer maps to a configured
+repo resolves to \code{"unknown"} and lands in \code{qualified-NA.txt}. If
+neither \code{repo_name} nor \code{repos} is present the helper errors — the
+source of every qualified package can't be recovered from thin air.
 }
 \keyword{internal}
