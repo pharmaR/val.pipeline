@@ -15,6 +15,6 @@ should appear. One of \code{c("minimal", "normal", "verbose")}.}
 \description{
 Drop-in replacement for \code{cat()} used throughout the \verb{val_*} internals.
 No-ops when the current session tier is below \code{min_level}. Warnings
-and errors are never gated \u2014 only console chatter is.
+and errors are never gated -- only console chatter is.
 }
 \keyword{internal}
