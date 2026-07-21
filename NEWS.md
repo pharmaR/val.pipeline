@@ -23,9 +23,15 @@ step can do so without duplicating work:
   `val_prep_pipeline()` internally).
 
 - **New**: `write_pipeline_toml()` helper writes the `[project]`
-`pipeline.toml` format `rv` expects (inline `repositories`,
+`pipeline.toml` format `rv` expects (array-of-inline-tables
+`repositories` with `alias` + `url`,
 one-package-per-line `dependencies` array). Reusable outside the
 pipeline. Adds `tomledit` to `Imports`.
+
+- **Refactor**: the "resolve full dependency tree, sort by
+dep-frequency" block that was duplicated between `val_prep_pipeline()`
+and `val_build()` is now a single exported helper,
+`resolve_pkg_tree()`, which both call. No behaviour change.
 
 - **Enhancement (`verbose = "minimal"`)**: the per-package summary line
 now leads with an abbreviated `[HH:MM]` timestamp (US/Eastern) and a

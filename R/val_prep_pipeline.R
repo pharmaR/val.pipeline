@@ -47,10 +47,9 @@
 #'   prep + build phases, and [write_pipeline_toml()] for the underlying
 #'   toml writer.
 #'
-#' @importFrom dplyr as_tibble filter pull select arrange desc mutate
+#' @importFrom dplyr as_tibble filter pull select
 #' @importFrom tibble rownames_to_column
 #' @importFrom glue glue
-#' @importFrom utils available.packages
 #'
 #' @export
 val_prep_pipeline <- function(
@@ -177,53 +176,17 @@ val_prep_pipeline <- function(
   #
   # ---- Full dependency-tree resolution ----
   #
-  # This block matches the one at the top of val_build() (issue: split
-  # for early toml emission). Doing it here means the caller can install
-  # the full sorted pkg set with `rv` before val_build() runs, and
-  # val_build() itself can skip the resolution when it receives a
-  # `prep` argument.
-  avail_pkgs <- utils::available.packages() |> as.data.frame()
-
-  if (is.null(deps)) {
-    full_dep_tree <- build_pkgs
-  } else {
-    deps_low <- tolower(deps)
-    which_deps <- dplyr::case_when(
-      all(c("depends", "suggests") %in% deps_low) ~ "most",
-      deps_low == "depends" ~ "strong",
-      deps_low == "suggests" ~ "Suggests",
-      .default = NULL
-    )[1]
-    if(!which_deps %in% c("most", "strong", "Suggests")) stop("problem with 'which_deps'")
-
-    dep_tree <- tools::package_dependencies(
-      packages = build_pkgs,
-      which = which_deps,
-      recursive = deps_recursive
-    )
-
-    # sort avail_pkgs so pkgs with many downstream users go first
-    pkg_freqs <- dep_tree |> unlist(use.names = FALSE) |> table()
-    avail_pkgs <- avail_pkgs |>
-      dplyr::mutate(dep_freq = pkg_freqs[Package]) |>
-      dplyr::mutate(dep_freq = ifelse(is.na(dep_freq), 0, dep_freq)) |>
-      dplyr::arrange(dplyr::desc(dep_freq), Package)
-
-    full_dep_tree <- dep_tree |>
-      unlist(use.names = FALSE) |>
-      c(names(dep_tree)) |>
-      unique() |>
-      sort()
-  }
-
-  pkgs <-
-    avail_pkgs |>
-    dplyr::filter(Package %in% full_dep_tree) |>
-    dplyr::pull(Package)
-
-  vers <- avail_pkgs |>
-    dplyr::filter(Package %in% pkgs) |>
-    dplyr::pull(Version)
+  # Delegates to the shared resolve_pkg_tree() helper so the same
+  # dep-frequency-sorted `pkgs` / `vers` / `avail_pkgs` triple lands
+  # here as in val_build()'s no-prep path.
+  tree       <- resolve_pkg_tree(
+    pkg_names      = build_pkgs,
+    deps           = deps,
+    deps_recursive = deps_recursive
+  )
+  pkgs       <- tree$pkgs
+  vers       <- tree$vers
+  avail_pkgs <- tree$avail_pkgs
 
   val_msg("\n-->", length(pkgs), "package(s) resolved for build.\n\n",
           min_level = "minimal")
