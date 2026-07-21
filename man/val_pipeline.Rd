@@ -14,7 +14,8 @@ val_pipeline(
   out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
   opt_repos = c(CRAN = "https://packagemanager.posit.co/cran/latest", BioC =
     "https://bioconductor.org/packages/3.22/bioc"),
-  verbose = NULL
+  verbose = NULL,
+  prep = NULL
 )
 }
 \arguments{
@@ -47,6 +48,16 @@ the \code{val.pipeline} verbosity docs for tier definitions. Also accepts an int
 or a logical (\code{TRUE} = \code{"normal"}, \code{FALSE} = \code{"quiet"}). The
 session option \code{val.pipeline.verbose} is used when this argument
 is left as the default and set to \code{NULL}.}
+
+\item{prep}{Optional \code{val_prep} object returned by
+\code{\link[=val_prep_pipeline]{val_prep_pipeline()}}. When supplied, \code{val_pipeline()} skips the
+entire pre-filter / dependency-resolution phase and jumps straight
+to the \code{val_build()} step, reusing the packages, repositories and
+run directory captured by \code{val_prep_pipeline()}. This is the fast
+path callers should take when they've already emitted a
+\code{pipeline.toml} and installed the snapshot via \code{rv}. When \code{NULL}
+(default), \code{val_pipeline()} calls \code{val_prep_pipeline()} itself so
+existing one-shot workflows continue to work unchanged.}
 }
 \value{
 A list containing the validation directory and a data frame of

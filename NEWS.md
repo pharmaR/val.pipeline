@@ -1,5 +1,38 @@
 # val.pipeline (development version)
 
+- **New**: `val_pipeline()` has been split into two phases so callers
+who want to install a snapshot with `rv` before the (expensive) build
+step can do so without duplicating work:
+
+  - `val_prep_pipeline()` — runs everything up through pre-filter,
+    `pass_primary` inclusion, and full dependency-tree resolution
+    (the block that used to live at the top of `val_build()`),
+    then writes a `pipeline.toml` file to `<val_dir>/pipeline.toml`
+    listing every package the run intends to assess plus the
+    val-date-adjusted CRAN + BioC repositories. Returns a
+    `val_prep` object.
+
+  - `val_pipeline(prep = <val_prep>)` and
+    `val_build(prep = <val_prep>)` both accept the prep result and
+    fast-path straight to the build phase, reusing the resolved
+    `pkgs`, `vers`, `avail_pkgs`, `val_dir` and `opt_repos` rather
+    than recomputing them.
+
+  Fully backwards-compatible: `val_pipeline()` with no `prep`
+  argument still runs both phases end-to-end (it just calls
+  `val_prep_pipeline()` internally).
+
+- **New**: `write_pipeline_toml()` helper writes the `[project]`
+`pipeline.toml` format `rv` expects (array-of-inline-tables
+`repositories` with `alias` + `url`,
+one-package-per-line `dependencies` array). Reusable outside the
+pipeline. Adds `tomledit` to `Imports`.
+
+- **Refactor**: the "resolve full dependency tree, sort by
+dep-frequency" block that was duplicated between `val_prep_pipeline()`
+and `val_build()` is now a single exported helper,
+`resolve_pkg_tree()`, which both call. No behaviour change.
+
 - **Enhancement (`verbose = "minimal"`)**: the per-package summary line
 now leads with an abbreviated `[HH:MM]` timestamp (US/Eastern) and a
 right-aligned `(idx/total)` position counter so long `val_build()` runs

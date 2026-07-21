@@ -86,3 +86,27 @@ qualification_results <- val_pipeline(
 )
 ```
 
+### Split-phase run (with `rv` install between phases)
+
+For GxP-style workflows where the exact snapshot of packages to be
+assessed needs to be installed with `rv` *before* the (expensive)
+`val_build()` step begins, `val_pipeline()` can be split in two:
+
+``` r
+# Phase 1: pre-filter, resolve full dep tree, emit pipeline.toml
+prep <- val_prep_pipeline(
+  ref = "source",
+  metric_pkg = "riskmetric",
+  deps = "depends",
+  deps_recursive = TRUE,
+  val_date = Sys.Date(),
+  out = Sys.getenv("RISK_OUTPATH", unset = getwd())
+)
+# `prep$toml_path` points at <val_dir>/pipeline.toml — feed it to rv
+# to install the snapshot into your library before continuing.
+
+# Phase 2: continue the pipeline (fast-paths past the prep step)
+qualification_results <- val_pipeline(prep = prep)
+```
+
+

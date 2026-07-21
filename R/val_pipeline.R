@@ -31,6 +31,15 @@
 #'   or a logical (`TRUE` = `"normal"`, `FALSE` = `"quiet"`). The
 #'   session option `val.pipeline.verbose` is used when this argument
 #'   is left as the default and set to `NULL`.
+#' @param prep Optional `val_prep` object returned by
+#'   [val_prep_pipeline()]. When supplied, `val_pipeline()` skips the
+#'   entire pre-filter / dependency-resolution phase and jumps straight
+#'   to the `val_build()` step, reusing the packages, repositories and
+#'   run directory captured by `val_prep_pipeline()`. This is the fast
+#'   path callers should take when they've already emitted a
+#'   `pipeline.toml` and installed the snapshot via `rv`. When `NULL`
+#'   (default), `val_pipeline()` calls `val_prep_pipeline()` itself so
+#'   existing one-shot workflows continue to work unchanged.
 #' @return A list containing the validation directory and a data frame of
 #'   package assessments.
 #'
@@ -51,189 +60,62 @@ val_pipeline <- function(
   opt_repos = 
     c(CRAN = "https://packagemanager.posit.co/cran/latest",
       BioC = 'https://bioconductor.org/packages/3.22/bioc'),
-  verbose = NULL
+  verbose = NULL,
+  prep = NULL
   ){
 
   # Assess args
   ref <- match.arg(ref)
   metric_pkg <- match.arg(metric_pkg)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
+  if (!is.null(prep) && !inherits(prep, "val_prep")) {
+    stop("`prep` must be a `val_prep` object returned by val_prep_pipeline().",
+         call. = FALSE)
+  }
   apply_verbose(verbose)
 
-  # Since running this script is such a computationally intensive process, the
-  # start of this script would actually begin by filtering packages
-  # based on primarily pkg downloads, and then we'd feed that list to pkg_names.
-  
-  
-  
-  # 
-  # ---- Set time variables ----
   #
-  # store R Version
-  r_ver = getRversion()
-  
-  # Grab val date, output messaging
-  val_start <- Sys.time()
-  val_start_txt <- format(val_start, '%Y-%m-%d %H:%M:%S', tz = 'US/Eastern', usetz = TRUE)
-  
-  # val_date <-as.Date("2025-10-07") # hardcode for testing
-  # val_date <- as.Date(val_start)
-  val_date_txt <- gsub("-", "", val_date)
-  val_msg(paste0("\n\n\nValidation pipeline initiated: R v", r_ver, " @ ", val_start_txt,"\n\n"),
-          min_level = "minimal")
-  
-  
-  # 
-  # ---- Pull config variables ----
+  # ---- Prep phase ----
   #
-  # For now, let's just filter using cranlogs to determine downloaded pkgs
-  # opt_repos = c(val_build_repo = "https://cran.r-project.org") # put in config
-  opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
-  decisions <- pull_config(val = "decisions_lst", rule_type = "default")
-  
-  
-  
-  #
-  # ---- Set capture 'old' options ----
-  #
-  old <- options()
-  on.exit(function() options(old))
-  
-  # set the options
-  options(repos = opt_repos)
-  # options('repos')
-  
-  #
-  # ---- val_categorize() ----
-  #.
-  
-  # Assess the 'dplyr' pkg to identify which metrics are available for
-  # 'pkg_cran_remote' Need one pkg from CRAN & one from BioConductor in case our
-  # config only specifies one.
-  viable_metrics <- c("dplyr", "Biobase") |>
-    riskmetric::pkg_ref(source = "pkg_cran_remote") |>
-    dplyr::as_tibble() |>
-    dplyr::filter(!is.na(version)) |> # remove either pkg if not found
-    riskmetric::pkg_assess() |>
-    riskmetric::pkg_score() |>
-    dplyr::select(-c(package, version, pkg_ref, pkg_score)) |>
-    t() |>
-    as.data.frame() |>
-    dplyr::filter(!is.na(V1)) |>
-    # make rownames a column
-    tibble::rownames_to_column(var = "metric") |>
-    dplyr::pull(metric)
-  
-  if("r_cmd_check" %in% viable_metrics){
-    vm <- viable_metrics[which(viable_metrics != "r_cmd_check")]
-    viable_metrics <- c(vm, "r_cmd_check_warnings", "r_cmd_check_errors")
+  # Either run val_prep_pipeline() ourselves (one-shot mode, backwards
+  # compatible), or reuse a caller-supplied prep result (split-run
+  # mode, so a `rv` install can happen between the two phases).
+  if (is.null(prep)) {
+    prep <- val_prep_pipeline(
+      ref             = ref,
+      metric_pkg      = metric_pkg,
+      deps            = deps,
+      deps_recursive  = deps_recursive,
+      val_date        = val_date,
+      out             = out,
+      opt_repos       = opt_repos,
+      verbose         = verbose
+    )
   }
-  
-  # "filter" packages 
-  # > 22k here (on CRAN alone). Eventually, want to use PACKAGES file here For
-  # now, will use pkg_cran_remote via {riskscore} to gain a  High level summary
-  # of pkgs
-  
-  pre_filtered_pkg_metrics <- 
-    val_categorize(
-      source = "riskscore",
-      # avail_pkgs = available.packages() |> as.data.frame(),
-      decisions = decisions,
-      else_cat = decisions[length(decisions)],
-      decisions_df = build_decisions_df(
-        rule_type = "remote_reduce",
-        viable_metrics = viable_metrics
-        )
-      )
-  # see <- pre_filtered_pkg_metrics |> dplyr::filter(dwnlds > 1000000) 
 
-  # Persist the pre-filter candidate set eagerly (before val_build() runs), so
-  # an interrupted run still leaves the evaluated universe on disk for
-  # inspection and for a later re-render of val_pipeline_report(). Uses the
-  # same val_dir path convention val_build() computes, and creates the
-  # directory tree if it doesn't yet exist.
-  eager_r_dir <- file.path(out, glue::glue("R_{r_ver}"))
-  eager_val_dir <- file.path(eager_r_dir, val_date_txt)
-  if (!dir.exists(eager_val_dir)) {
-    dir.create(eager_val_dir, recursive = TRUE, showWarnings = FALSE)
-  }
-  tryCatch(
-    saveRDS(pre_filtered_pkg_metrics,
-            file.path(eager_val_dir, "pre_filtered_pkg_metrics.rds")),
-    error = function(e) {
-      warning("Could not persist pre_filtered_pkg_metrics.rds: ",
-              conditionMessage(e), call. = FALSE)
-    }
-  )
-  
-  
-  
-  #
-  # ---- Set repos option to val_date date if needed ----
-  #
-  
-  opt_repos <- update_opt_repos(val_date = val_date, opt_repos = opt_repos)
-  options(repos = opt_repos, pkgType = "source", scipen = 999)
-    # options("repos") # verify
-  
-  
-  #
-  # ---- Filter / Reduce pkgs ----
-  #
-  
-  # Note: has to be decisions[1] ("Low") only because of the way we allowed
-  # 'High' risk pkgs to get promoted to "Medium" in `pre_filtered_pkg_metrics`.
-  # Specifically, a 'High' Risk pkg could have a severly low annual downloads #.
-  
-  # Currently, not being used
-  failed_pkgs <-
-    pre_filtered_pkg_metrics |>
-    dplyr::filter(!final_risk %in% decisions[1])
-  # dplyr::filter(rev_deps > 100) 
-  # dplyr::filter(dwnlds > 120000) 
-  
-  
-  # Grab pkg names that are allowed to pass the remote_reduce filtering event.
-  # These are typically lower download pkgs that derserve their day in court
-  pass_remote_pkgs  <- pull_config(val = "pass_primary", rule_type = "default")
-  
-  # Grab packages that have passed the filtering event, or those that were approved
-  # to pass the primary decision guantlet via the pass_primary config
-  passed_pkgs <-
-    pre_filtered_pkg_metrics |>
-    dplyr::filter(
-      package %in% pass_remote_pkgs |
-      final_risk %in% decisions[1])
-  
-    
-  build_pkgs <- passed_pkgs |>
-    dplyr::pull(package)
-  
-  
-  val_msg("\n--> Final Decision Category Counts for'pre' assessment risk: \n----> Returned",
-          prettyNum(length(build_pkgs), big.mark = ","), "pkgs for build.\n",
-          min_level = "minimal")
-  
-  
-  
-  
+  val_start <- prep$val_start %||% Sys.time()
+  decisions <- prep$decisions %||%
+    pull_config(val = "decisions_lst", rule_type = "default")
+
+  # Keep options aligned with the prep run when picking up from disk.
+  old <- options()
+  on.exit(options(old), add = TRUE)
+  options(repos = prep$opt_repos, pkgType = "source", scipen = 999)
+
   #
   # ---- val_build() ----
   #
-  
-  # Validation build
   outtie <- val_build(
-    pkg_names = build_pkgs, # Not sorted
-    
-    # everything else
-    ref = ref, 
-    metric_pkg = metric_pkg,
-    deps = deps,
-    deps_recursive = deps_recursive,
-    val_date = val_date, 
-    replace = replace,
-    out = out,
-    opt_repos = opt_repos
+    pkg_names       = prep$pkgs,
+    ref             = ref,
+    metric_pkg      = metric_pkg,
+    deps            = deps,
+    deps_recursive  = deps_recursive,
+    val_date        = prep$val_date,
+    replace         = replace,
+    out             = out,
+    opt_repos       = prep$opt_repos,
+    prep            = prep
   )
   
   
@@ -289,7 +171,8 @@ val_pipeline <- function(
         qual_metadata_path = qm_path,
         qual_assessments_path = if (file.exists(qa_path)) qa_path else NA,
         out_dir = outtie$val_dir,
-        n_candidates = if(!exists("pre_filtered_pkg_metrics")) available.packages()[,1] |> length() else nrow(pre_filtered_pkg_metrics),
+        n_candidates = prep$n_candidates %||%
+          (available.packages()[,1] |> length()),
         pipeline_runtime = difftime(Sys.time(), val_start, units = "secs")
       ),
       error = function(e) {

@@ -59,6 +59,14 @@
 #' - pkg_assess: A data frame containing detailed (`riskmetric`) assessment
 #'   records for each package.
 #'
+#' @param prep Optional `val_prep` object returned by
+#'   [val_prep_pipeline()]. When supplied, `val_build()` skips its own
+#'   dependency-tree resolution and directory setup, reusing the
+#'   already-sorted `pkgs`, `vers`, `avail_pkgs`, `val_dir` and
+#'   `opt_repos` from the prep result. This is the fast path callers
+#'   should take when they've already emitted a `pipeline.toml` and
+#'   installed the snapshot via `rv`.
+#'
 #' @export
 #' 
 val_build <- function(
@@ -73,7 +81,8 @@ val_build <- function(
     opt_repos = 
     c(CRAN = "https://packagemanager.posit.co/cran/latest",
       BioC = 'https://bioconductor.org/packages/3.22/bioc'),
-    verbose = NULL
+    verbose = NULL,
+    prep = NULL
     ){
   
   #
@@ -99,6 +108,10 @@ val_build <- function(
   ref <- match.arg(ref)
   metric_pkg <- match.arg(metric_pkg)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
+  if (!is.null(prep) && !inherits(prep, "val_prep")) {
+    stop("`prep` must be a `val_prep` object returned by val_prep_pipeline().",
+         call. = FALSE)
+  }
   apply_verbose(verbose)
   
   # store R Version
@@ -134,71 +147,30 @@ val_build <- function(
   #
   # ---- Which pkgs, ordered ----
   #
-  
-  # Make available.packages into a data.frame
-  avail_pkgs <- available.packages() |> as.data.frame()
-  
-  # grab the packages we need
-  if(is.null(pkg_names)) {
-    # if no pkgs_names give, assume we are supposed to analyze all pkgs available
-    pkgs <- avail_pkgs$Package
-    
+
+  if (!is.null(prep)) {
+    # Fast path: caller supplied a `val_prep` object from
+    # val_prep_pipeline(). Reuse the already-resolved pkgs/vers and the
+    # dep-frequency-sorted avail_pkgs (needed later for repo-source lookup),
+    # and skip the full dependency-tree resolution.
+    pkgs        <- prep$pkgs
+    vers        <- prep$vers
+    avail_pkgs  <- prep$avail_pkgs
+    # Prefer the prep result's snapshot for these too so both legs share
+    # a single source of truth.
+    if (!is.null(prep$val_date))  val_date  <- prep$val_date
+    if (!is.null(prep$val_date))  val_date_txt <- gsub("-", "", val_date)
+    if (!is.null(prep$opt_repos)) opt_repos <- prep$opt_repos
   } else {
-    # if pkg_names is provided, then we need to 
-    if(is.null(deps)) {
-      # if no deps given, then just use the pkgs provided
-      full_dep_tree <- pkg_names
-      
-    } else {
-      # If deps are provided, then we need to get the dependencies
-      # and add them to the list of pkgs to assess
-      
-      deps_low <- tolower(deps)
-      which_deps <- dplyr::case_when(
-        all(c("depends", "suggests") %in% deps_low) ~ "most",
-        deps_low == "depends" ~ "strong",
-        deps_low == "suggests" ~ "Suggests",
-        .default = NULL)[1]
-      
-      # check that the which_deps is valid
-      if(!which_deps %in% c("most", "strong", "Suggests")) stop("problem with 'which_deps'")
-      
-      dep_tree <- tools::package_dependencies(
-        packages = pkg_names,
-        # db = available.packages(),
-        which = which_deps,
-        # recursive = TRUE) # For debugging
-        recursive = deps_recursive)
-       
-      # sort avail_pkgs based on how often a pkg appears in the dep_tree
-      # if a pkgs is observed as a dependency often, we'd want to run an
-      # assessment on those pkgs first! Why? Because if it fails, then we
-      # can avoid running assessments on pkgs that depend on it.
-      pkg_freqs <- dep_tree |> unlist(use.names = FALSE) |> table()
-      
-      avail_pkgs <- avail_pkgs |>
-        dplyr::mutate(dep_freq = pkg_freqs[Package]) |>
-        dplyr::mutate(dep_freq = ifelse(is.na(dep_freq), 0, dep_freq)) |>
-        dplyr::arrange(dplyr::desc(dep_freq), Package) #|>
-        # dplyr::select(-dep_freq) # keep it
-      
-      full_dep_tree <- dep_tree |>
-        unlist(use.names = FALSE) |> 
-        c(names(dep_tree)) |>
-        unique() |>
-        sort()
-    }
-    
-    # select pkgs FROM avail_pkgs so that the pkg names and versions are aligned
-    # i.e. in the correct order
-    pkgs <-
-      avail_pkgs |>
-      dplyr::filter(Package %in% full_dep_tree) |>
-      dplyr::pull(Package)
+    tree       <- resolve_pkg_tree(
+      pkg_names      = pkg_names,
+      deps           = deps,
+      deps_recursive = deps_recursive
+    )
+    pkgs       <- tree$pkgs
+    vers       <- tree$vers
+    avail_pkgs <- tree$avail_pkgs
   }
-  vers <- avail_pkgs |>
-    dplyr::filter(Package %in% pkgs) |>
-    dplyr::pull(Version)
   pkgs_length <- length(pkgs)
   val_msg("\n-->", pkgs_length, "package(s) to process.\n\n",
           min_level = "minimal")
