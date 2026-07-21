@@ -114,7 +114,7 @@ val_verbosity_at_least <- function(min_level = "normal") {
 #'
 #' Drop-in replacement for `cat()` used throughout the `val_*` internals.
 #' No-ops when the current session tier is below `min_level`. Warnings
-#' and errors are never gated \u2014 only console chatter is.
+#' and errors are never gated -- only console chatter is.
 #'
 #' @param ... Passed through verbatim to [cat()].
 #' @param min_level Character(1). The minimum tier at which this message
