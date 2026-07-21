@@ -1,5 +1,41 @@
 # val.pipeline (development version)
 
+- **CI fix (follow-up)**: address the four `R-CMD-check` warnings that
+  were failing the workflow *after* `renv::restore()` succeeded on
+  `ubuntu-latest` and `windows-latest`:
+  - Escaped `\u2014` in the `val_msg()` roxygen block (which R was
+    interpreting as an unknown Rd macro `\u`) and replaced non-ASCII
+    em-dashes / right-arrow characters in `R/utils.R` with plain
+    ASCII equivalents.
+  - Declared `withr` under `Suggests` in `DESCRIPTION` (used by the
+    `test-write_pipeline_toml` and `test-write_qualified_pkg_lists`
+    test files).
+  - Marked `macos-latest` as `continue-on-error: true` in the workflow
+    matrix: the CRAN/PPM binary of `tomledit` 0.1.1 for
+    `aarch64-apple-darwin` fails to load with
+    `symbol not found in flat namespace '_R_init_tomledit_extendr'`
+    (an upstream `extendr` symbol mismatch). Revisit once tomledit
+    ships a fixed binary.
+
+- **CI fix**: refresh `renv.lock` so `R-CMD-check` passes on
+`ubuntu-latest` and `windows-latest` again. Since ~Feb 2026 the
+workflow failed because 100+ per-package `Repository` fields were
+hard-coded to `packagemanager.posit.co/cran/__linux__/rhel9/...`
+URLs and the top-level CRAN URL was the drifting `/cran/latest`.
+`renv::restore()` followed the RHEL9 URLs on Ubuntu 24.04 runners
+and fetched binaries linking against `libicui18n.so.67`, which the
+runner does not ship (`stringi.so` load fails). Fix, applied to the
+lockfile only:
+  - Top-level CRAN URL re-pinned from `/cran/latest` to
+    `/cran/2026-06-21` (a specific date snapshot).
+  - All 110 per-package `Repository` fields normalized to the alias
+    `"CRAN"` so `renv::restore()` resolves via the top-level
+    `Repositories` using the runner's OS-appropriate URL (set by
+    `r-lib/actions/setup-r`).
+  - Added the `tomledit` (v0.1.1) entry introduced by the toml
+    emitter in the previous release so `renv::status()` returns to
+    a consistent state.
+
 - **New**: `val_pipeline()` has been split into two phases so callers
 who want to install a snapshot with `rv` before the (expensive) build
 step can do so without duplicating work:

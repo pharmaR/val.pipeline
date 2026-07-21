@@ -1203,7 +1203,7 @@ rip_cats <- function(
       #
       # PERF: the expressions built by get_case_whens() are already fully
       # vectorised (they compose `is.na()`, `<`, `>`, `dplyr::between()`,
-      # `%in%`, and `dplyr::case_when()` — all of which operate on whole
+      # `%in%`, and `dplyr::case_when()` -- all of which operate on whole
       # columns). Wrapping the mutate() in `dplyr::rowwise()` was forcing
       # dplyr to iterate row-by-row and re-evaluate every case_when() on a
       # 1-row slice, which scales poorly with the size of `pkgs_df`
@@ -1411,7 +1411,7 @@ split_join_cats <- function(
 #' @param deps Character. The dependency scope from the enclosing
 #'   `val_build()` call (`"depends"` or `"suggests"`). Only when `"Suggests"`
 #'   is present will Suggests-failures propagate.
-#' @param decisions Character vector. Ordered risk categories, low → high
+#' @param decisions Character vector. Ordered risk categories, low -> high
 #'   (e.g. `c("Low", "Medium", "High")`). Only used to identify the "not
 #'   failed" baseline (`decisions[1]`) when `failed_pkgs` is `NULL`.
 #' @param failed_pkgs Character vector of package names to treat as failed
@@ -1455,7 +1455,7 @@ reject_iteration <- function(pkg_dat, dec_reject, deps, decisions,
       ),
       # When a pkg is downgraded because a dep (or suggest, if deps includes
       # "Suggests") failed, list the failing dep pkg name(s) in the note.
-      # Best-effort — may under-report if a chain of failures wasn't fully
+      # Best-effort -- may under-report if a chain of failures wasn't fully
       # captured in `failed_pkgs` at this iteration (see issue #37).
       final_decision_reason_note = dplyr::case_when(
         decision_reason == "Pre-Approved package" ~ decision_reason_note,
@@ -1474,7 +1474,7 @@ reject_iteration <- function(pkg_dat, dec_reject, deps, decisions,
 #' underlying `rip_cats_*` helpers), return the names of the per-metric
 #' categorization columns (`<metric>_cat`) whose category equals the
 #' `final_risk` for that row. Only metrics that "tie" the final risk category
-#' are returned — i.e. the metrics that drove the package out of the lowest
+#' are returned -- i.e. the metrics that drove the package out of the lowest
 #' risk category.
 #'
 #' Used by [val_pkg()] to populate `decision_reason_note` with the specific
@@ -1704,7 +1704,7 @@ format_runtime_seconds <- function(secs) {
 #' `qualified-<source>.txt` and contains, one package per line, the
 #' names of every package whose `final_decision` matches
 #' `qualified_decision`. `<source>` is the value of the `repo_name`
-#' column produced by [val_pkg()] — typically `CRAN`, `BioC`, or
+#' column produced by [val_pkg()] -- typically `CRAN`, `BioC`, or
 #' `github` (every non-CRAN/BioC github-hosted source is normalised to
 #' a single `github` bucket by [get_repo_origin()]).
 #'
@@ -1726,7 +1726,7 @@ format_runtime_seconds <- function(secs) {
 #' [get_repo_origin()] against the current session's
 #' `getOption("repos")`. Any URL that no longer maps to a configured
 #' repo resolves to `"unknown"` and lands in `qualified-NA.txt`. If
-#' neither `repo_name` nor `repos` is present the helper errors — the
+#' neither `repo_name` nor `repos` is present the helper errors -- the
 #' source of every qualified package can't be recovered from thin air.
 #'
 #' @param qual_metadata A data.frame with at least `pkg` and
@@ -1756,7 +1756,7 @@ write_qualified_pkg_lists <- function(
     is.character(qualified_decision), length(qualified_decision) == 1L
   )
 
-  # Hard requirements — no way to reverse-engineer these two.
+  # Hard requirements -- no way to reverse-engineer these two.
   hard_required <- c("pkg", "final_decision")
   hard_missing <- setdiff(hard_required, names(qual_metadata))
   if (length(hard_missing) > 0L) {
@@ -1769,7 +1769,7 @@ write_qualified_pkg_lists <- function(
 
   # `repo_name` is our per-source split key. Newer qual_metadata.rds
   # files (produced by val_pkg() after this feature landed) have it
-  # directly. Older files don't — but they do carry the raw install
+  # directly. Older files don't -- but they do carry the raw install
   # URL in the `repos` column, so we can reverse-engineer `repo_name`
   # by matching those URLs against the current session's
   # getOption("repos"). That's exactly what get_repo_origin() does, so
@@ -1780,13 +1780,13 @@ write_qualified_pkg_lists <- function(
     if (!("repos" %in% names(qual_metadata))) {
       stop(
         "qual_metadata has neither a 'repo_name' nor a 'repos' column ",
-        "— cannot determine per-package sources. This file was likely ",
+        "-- cannot determine per-package sources. This file was likely ",
         "produced by an old val_build() that predates source tracking.",
         call. = FALSE
       )
     }
     message(
-      "qual_metadata has no 'repo_name' column — reverse-engineering ",
+      "qual_metadata has no 'repo_name' column -- reverse-engineering ",
       "from the 'repos' URL column via getOption(\"repos\"). Provide a ",
       "matching opt_repos in this session for best results."
     )
@@ -1831,7 +1831,7 @@ write_qualified_pkg_lists <- function(
       paste(unknown_pkgs, collapse = ", ")
     )
     # Fold NA and 'unknown' into a single 'NA' bucket so nothing is
-    # dropped from provisioning — the operator can then triage
+    # dropped from provisioning -- the operator can then triage
     # qualified-NA.txt manually.
     qualified$repo_name[unknown_rows] <- "NA"
   }
