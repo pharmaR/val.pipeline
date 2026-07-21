@@ -228,6 +228,15 @@ keeps the sub-section heading and dropped-count summary sentence but
 omits the (potentially very large) filterable listing, keeping the
 archival PDF short enough to navigate. Readers are pointed to the
 HTML rendering for the full listing. (#59)
+- Speed up the post-assessment collation step in `val_build()` by
+replacing the O(n^2) `purrr::reduce(dplyr::bind_rows)` pattern used
+to stitch per-package `_assess_record.rds` files and per-package
+meta bundles into a single frame with a single O(n)
+`dplyr::bind_rows(list_of_frames)` call, cutting many minutes off
+runs with ~1000+ packages. Also emit `--> Saved ...` lines at
+`minimal` verbosity for `qual_assessments.rds` and
+`qual_metadata0.rds` so minimal-tier runs surface those write
+milestones the same way `qual_metadata.rds` already does. (#69)
 
 # val.pipeline 0.0.1
 
