@@ -1,5 +1,25 @@
 # val.pipeline (development version)
 
+- **Enhancement (`verbose = "minimal"`)**: the per-package summary line
+now leads with an abbreviated `[HH:MM]` timestamp (US/Eastern) and a
+right-aligned `(idx/total)` position counter so long `val_build()` runs
+show at a glance both when each package landed and how far into the
+list we are. Format is now roughly:
+
+  ```
+     [09:25] (   1/1195) [Low]     dplyr v1.1.4          (12s)
+     [09:25] (   2/1195) [Medium]  ggplot2 v3.5.1        (2m 18s)
+     ...
+     [10:47] (1195/1195) [Low]     zoo v1.8-12           (3s)
+  ```
+
+  Implemented via new optional `pkg_idx` / `pkg_total` / `timestamp`
+  args on `val_pkg_summary_line()`; `val_build()` threads the counter
+  through to all three summary-line call sites (the cached, dep-skip,
+  and normal branches). Standalone `val_pkg()` calls (which don't know
+  where they sit in a run) still render the timestamp and omit the
+  counter cleanly rather than printing `(NA/NA)`.
+
 - **Bug fix**: `val_pkg()` (and therefore `val_pipeline()` / `val_build()`) no
 longer crashes with `Error in dplyr::case_when(): object 'aa_metrics' not
 found` when processing a package whose initial assessment doesn't hit any

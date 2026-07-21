@@ -4,7 +4,16 @@
 \alias{val_pkg_summary_line}
 \title{Emit a one-line-per-package summary at the "minimal" tier}
 \usage{
-val_pkg_summary_line(pkg, ver, decision, elapsed_secs = NULL, suffix = NULL)
+val_pkg_summary_line(
+  pkg,
+  ver,
+  decision,
+  elapsed_secs = NULL,
+  suffix = NULL,
+  pkg_idx = NULL,
+  pkg_total = NULL,
+  timestamp = NULL
+)
 }
 \arguments{
 \item{pkg, ver}{Character(1). Package name and version.}
@@ -18,6 +27,19 @@ non-\code{NULL}. Pass \code{NULL} for skipped / cached packages.}
 
 \item{suffix}{Character(1), optional trailing tag (e.g.
 \code{"(cached)"}, \code{"(dep-skip)"}) rendered after the elapsed time.}
+
+\item{pkg_idx, pkg_total}{Integer(1) or \code{NULL}. Optional
+position-in-run counter (e.g. \code{1} and \code{1195}) rendered as
+\code{"(1/1195)"} between the timestamp and the decision tag.
+When either is \code{NULL} (the default), the counter is omitted so
+standalone callers (e.g. a direct \code{val_pkg()} call outside a
+\code{val_build()} loop) don't need to fabricate a fake index.}
+
+\item{timestamp}{\code{POSIXct(1)}, \code{character(1)}, or \code{NULL}. Optional
+wall-clock stamp for when this package's summary is emitted.
+Rendered as \code{"[HH:MM]"} in \code{US/Eastern}. When \code{NULL} (the
+default), \code{Sys.time()} is used so callers don't have to compute
+it themselves.}
 }
 \description{
 Formats a compact "\code{   [decision]  <pkg> v<ver>  (elapsed)}"

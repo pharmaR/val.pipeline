@@ -113,8 +113,11 @@ test_that("val_pkg_summary_line() formats compactly at minimal+, stays silent at
     val_pkg_summary_line("dplyr", "1.1.4", "Low", elapsed_secs = 12)
   )
   expect_length(out, 1L)
-  expect_match(out, "^\\s+\\[Low\\]\\s+dplyr v1\\.1\\.4")
+  # Timestamp bracket + decision + pkg + elapsed. No counter when pkg_idx
+  # / pkg_total are NULL (standalone-call default).
+  expect_match(out, "^\\s+\\[\\d{2}:\\d{2}\\]\\s+\\[Low\\]\\s+dplyr v1\\.1\\.4")
   expect_match(out, "\\(12s\\)$")
+  expect_false(grepl("/", out))  # no counter
 
   # medium/high tags and suffix
   expect_output(
@@ -133,6 +136,70 @@ test_that("val_pkg_summary_line() formats compactly at minimal+, stays silent at
     val_pkg_summary_line("cli", "3.6.1", "Low", elapsed_secs = 5),
     regexp = NA
   )
+})
+
+
+test_that("val_pkg_summary_line() renders position-in-run counter when supplied", {
+  op <- options(val.pipeline.verbose = "minimal")
+  on.exit(options(op), add = TRUE)
+
+  # Right-aligns the index to the total's character width so long
+  # runs stay visually columnar.
+  out1 <- capture.output(
+    val_pkg_summary_line("dplyr", "1.1.4", "Low", elapsed_secs = 12,
+                         pkg_idx = 1, pkg_total = 1195)
+  )
+  expect_match(out1, "\\(   1/1195\\)")
+
+  out2 <- capture.output(
+    val_pkg_summary_line("last", "9.9.9", "Low", elapsed_secs = 3,
+                         pkg_idx = 1195, pkg_total = 1195)
+  )
+  expect_match(out2, "\\(1195/1195\\)")
+
+  # Small totals get correspondingly narrow indices.
+  out3 <- capture.output(
+    val_pkg_summary_line("cli", "3.6.1", "Low", elapsed_secs = 5,
+                         pkg_idx = 3, pkg_total = 7)
+  )
+  expect_match(out3, "\\(3/7\\)")
+
+  # Partial input (only one of the two) omits the counter rather than
+  # rendering something misleading like "(NA/10)".
+  out4 <- capture.output(
+    val_pkg_summary_line("x", "1", "Low",
+                         pkg_idx = 3, pkg_total = NULL)
+  )
+  expect_false(grepl("/", out4))
+})
+
+
+test_that("val_pkg_summary_line() renders an abbreviated HH:MM timestamp", {
+  op <- options(val.pipeline.verbose = "minimal")
+  on.exit(options(op), add = TRUE)
+
+  # Explicit POSIXct is honoured verbatim (in US/Eastern).
+  ts <- as.POSIXct("2026-07-21 06:30:00", tz = "US/Eastern")
+  out <- capture.output(
+    val_pkg_summary_line("cli", "3.6.1", "Low", elapsed_secs = 5,
+                         pkg_idx = 1, pkg_total = 10, timestamp = ts)
+  )
+  expect_match(out, "\\[06:30\\]")
+
+  # Character(1) passes through verbatim, letting callers pre-format if
+  # they want a different timezone.
+  out2 <- capture.output(
+    val_pkg_summary_line("cli", "3.6.1", "Low",
+                         timestamp = "12:34")
+  )
+  expect_match(out2, "\\[12:34\\]")
+
+  # NULL / non-POSIX defaults to Sys.time() in HH:MM.
+  out3 <- capture.output(
+    val_pkg_summary_line("cli", "3.6.1", "Low",
+                         timestamp = NULL)
+  )
+  expect_match(out3, "\\[\\d{2}:\\d{2}\\]")
 })
 
 

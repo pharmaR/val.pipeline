@@ -158,13 +158,53 @@ val_print <- function(x, min_level = "normal", ...) {
 #'   non-`NULL`. Pass `NULL` for skipped / cached packages.
 #' @param suffix Character(1), optional trailing tag (e.g.
 #'   `"(cached)"`, `"(dep-skip)"`) rendered after the elapsed time.
+#' @param pkg_idx,pkg_total Integer(1) or `NULL`. Optional
+#'   position-in-run counter (e.g. `1` and `1195`) rendered as
+#'   `"(1/1195)"` between the timestamp and the decision tag.
+#'   When either is `NULL` (the default), the counter is omitted so
+#'   standalone callers (e.g. a direct `val_pkg()` call outside a
+#'   `val_build()` loop) don't need to fabricate a fake index.
+#' @param timestamp `POSIXct(1)`, `character(1)`, or `NULL`. Optional
+#'   wall-clock stamp for when this package's summary is emitted.
+#'   Rendered as `"[HH:MM]"` in `US/Eastern`. When `NULL` (the
+#'   default), `Sys.time()` is used so callers don't have to compute
+#'   it themselves.
 #' @keywords internal
 val_pkg_summary_line <- function(pkg,
                                  ver,
                                  decision,
                                  elapsed_secs = NULL,
-                                 suffix = NULL) {
+                                 suffix = NULL,
+                                 pkg_idx = NULL,
+                                 pkg_total = NULL,
+                                 timestamp = NULL) {
   if (!val_verbosity_at_least("minimal")) return(invisible(NULL))
+
+  # Wall-clock stamp. Compute here rather than in the caller so every
+  # summary line reflects the moment it actually prints, not the
+  # moment the package started assessing (which for slow pkgs can be
+  # tens of minutes apart).
+  if (is.null(timestamp)) timestamp <- Sys.time()
+  ts_str <- if (inherits(timestamp, c("POSIXct", "POSIXlt", "POSIXt"))) {
+    format(timestamp, "%H:%M", tz = "US/Eastern")
+  } else if (is.character(timestamp) && length(timestamp) == 1L) {
+    timestamp
+  } else {
+    format(Sys.time(), "%H:%M", tz = "US/Eastern")
+  }
+  ts_str <- paste0("[", ts_str, "]")
+
+  # Position-in-run counter. Rendered right-aligned so long runs stay
+  # visually columnar (e.g. `   (1/1195)` vs `(1195/1195)`).
+  if (!is.null(pkg_idx) && !is.null(pkg_total) &&
+      is.finite(as.numeric(pkg_idx)) &&
+      is.finite(as.numeric(pkg_total))) {
+    total_w <- nchar(as.character(pkg_total))
+    idx_str <- formatC(as.character(pkg_idx), width = total_w)
+    counter_str <- paste0("(", idx_str, "/", pkg_total, ") ")
+  } else {
+    counter_str <- ""
+  }
 
   dec_str <- formatC(paste0("[", as.character(decision), "]"),
                      width = 9, flag = "-")
@@ -184,7 +224,7 @@ val_pkg_summary_line <- function(pkg,
     paste0(" ", suffix)
   }
 
-  cat(paste0("   ", dec_str, " ", pkg_v_str, " ",
+  cat(paste0("   ", ts_str, " ", counter_str, dec_str, " ", pkg_v_str, " ",
              elapsed_str, suffix_str, "\n"))
   invisible(NULL)
 }

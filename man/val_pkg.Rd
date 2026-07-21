@@ -12,7 +12,9 @@ val_pkg(
   metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
   out_dir,
   val_date = Sys.Date(),
-  verbose = NULL
+  verbose = NULL,
+  pkg_idx = NULL,
+  pkg_total = NULL
 )
 }
 \arguments{
@@ -37,6 +39,13 @@ package directly from the repo.}
 \code{"minimal"}, \code{"normal"} (default), or \code{"verbose"}. See
 the \code{val.pipeline} verbosity docs for tier definitions. Defaults to whatever the
 session option \code{val.pipeline.verbose} is set to (or \code{"normal"}).}
+
+\item{pkg_idx, pkg_total}{Integer(1) or \code{NULL}. Optional
+position-in-run counter surfaced on the \code{verbose = "minimal"}
+summary line as \code{"(<pkg_idx>/<pkg_total>)"}. Populated
+automatically when \code{val_pkg()} is called from inside
+\code{\link[=val_build]{val_build()}}'s per-package loop; leave as \code{NULL} when calling
+\code{val_pkg()} standalone.}
 }
 \value{
 A list containing package metadata, assessment results, and

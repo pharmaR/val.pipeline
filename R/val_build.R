@@ -277,7 +277,9 @@ val_build <- function(
           ref = if(pkg %in% remote_pkgs) 'remote' else ref,
           metric_pkg = metric_pkg,
           out_dir = val_dir,
-          val_date = val_date)
+          val_date = val_date,
+          pkg_idx = pkg_cnt,
+          pkg_total = pkgs_length)
       } else {
         val_msg(paste0("\nAttempted New Package: ", pkg, " v", ver,", but already assessed.\n\n"),
                 min_level = "normal")
@@ -285,7 +287,10 @@ val_build <- function(
 
         val_msg("\n-->", pkg_v,"Using assessment previously stored.\n",
                 min_level = "normal")
-        val_pkg_summary_line(pkg, ver, pkg_meta$decision, suffix = "(cached)")
+        val_pkg_summary_line(pkg, ver, pkg_meta$decision,
+                             suffix = "(cached)",
+                             pkg_idx = pkg_cnt,
+                             pkg_total = pkgs_length)
       }
       
       # if a pkg fails, make sure it's reverse dependencies don't run an assessment
@@ -361,7 +366,10 @@ val_build <- function(
       # save the pkg_meta
       saveRDS(pkg_meta, pkg_meta_file)
       val_msg("\n-->", pkg_v,"meta bundle saved.\n", min_level = "verbose")
-      val_pkg_summary_line(pkg, ver, pkg_meta$decision, suffix = "(dep-skip)")
+      val_pkg_summary_line(pkg, ver, pkg_meta$decision,
+                           suffix = "(dep-skip)",
+                           pkg_idx = pkg_cnt,
+                           pkg_total = pkgs_length)
     }
     
     # return!

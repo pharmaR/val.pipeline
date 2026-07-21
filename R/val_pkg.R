@@ -23,6 +23,12 @@
 #'   `"minimal"`, `"normal"` (default), or `"verbose"`. See
 #'   the `val.pipeline` verbosity docs for tier definitions. Defaults to whatever the
 #'   session option `val.pipeline.verbose` is set to (or `"normal"`).
+#' @param pkg_idx,pkg_total Integer(1) or `NULL`. Optional
+#'   position-in-run counter surfaced on the `verbose = "minimal"`
+#'   summary line as `"(<pkg_idx>/<pkg_total>)"`. Populated
+#'   automatically when `val_pkg()` is called from inside
+#'   [val_build()]'s per-package loop; leave as `NULL` when calling
+#'   `val_pkg()` standalone.
 #'
 #' @importFrom glue glue
 #' @importFrom utils download.file untar capture.output
@@ -43,7 +49,9 @@ val_pkg <- function(
     metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
     out_dir,
     val_date = Sys.Date(),
-    verbose = NULL
+    verbose = NULL,
+    pkg_idx = NULL,
+    pkg_total = NULL
 ) {
   # i <- 1 # for debugging
   # pkg <- pkgs[i] # for debugging
@@ -560,7 +568,9 @@ val_pkg <- function(
   saveRDS(meta_list, file.path(assessed, glue::glue("{pkg_v}_meta.rds")))
   val_msg("\n-->", pkg_v,"meta bundle saved.\n", min_level = "normal")
   val_pkg_summary_line(pkg, ver, decision$final_risk,
-                       elapsed_secs = as.numeric(ass_mins, units = "secs"))
+                       elapsed_secs = as.numeric(ass_mins, units = "secs"),
+                       pkg_idx = pkg_idx,
+                       pkg_total = pkg_total)
   
   return(meta_list)
 }
