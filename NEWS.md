@@ -1,5 +1,17 @@
 # val.pipeline (development version)
 
+- **Bug fix**: `val_pkg()` (and therefore `val_pipeline()` / `val_build()`) no
+longer crashes with `Error in dplyr::case_when(): object 'aa_metrics' not
+found` when processing a package whose initial assessment doesn't hit any
+auto-accept threshold. `dplyr::case_when()` eagerly evaluates every RHS
+expression regardless of which LHS matches, so referencing `aa_metrics`
+inside a case that was only meant to fire when `decision_aa` is `TRUE`
+still tries to evaluate `paste(aa_metrics, collapse = ", ")` on the
+non-auto-accept path — where `aa_metrics` was never defined. Regression
+introduced in #37 (`decision_reason_note` with driver metrics). Fixed by
+initialising `aa_metrics <- character(0)` unconditionally before the
+`if(decision_aa)` block.
+
 - All `val_*` entry points (`val_pipeline()`, `val_build()`, `val_pkg()`,
 `val_categorize()`, `val_decision()`, `val_pipeline_report()`) gain a
 new `verbose` argument that dials console output up or down without
