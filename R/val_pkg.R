@@ -448,7 +448,17 @@ val_pkg <- function(
   decision_aa <- decision |>
     dplyr::select(dplyr::ends_with("cataa")) |>
     as.vector() |> unlist() |> any()
-  
+
+  # Initialize `aa_metrics` unconditionally so the eager-evaluated
+  # `dplyr::case_when()` RHS below (see `decision_reason_note`) can
+  # always reference it even when no auto-accept threshold matched
+  # (i.e. when `decision_aa` is FALSE). Without this, packages that
+  # don't auto-accept trigger:
+  #   Error in dplyr::case_when(): object 'aa_metrics' not found
+  # because case_when() evaluates every RHS expression before
+  # selecting which one to use.
+  aa_metrics <- character(0)
+
   if(decision_aa) {
     approved_pkgs <- pull_config(val = "approved_pkgs", rule_type = "default")
     aa_metrics <- decision |>
