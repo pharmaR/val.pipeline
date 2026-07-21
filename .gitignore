@@ -4,3 +4,9 @@
 .Ruserdata
 .Renviron
 dev/riskassessments/*
+
+# testthat scratch directories: some upstream packages' test suites
+# copy themselves into <pkg>-tests/ dirs at the repo root when they
+# run under devtools::test(). Ignore any *-tests/ dir so a stray test
+# run doesn't accidentally commit hundreds of files.
+*-tests/
