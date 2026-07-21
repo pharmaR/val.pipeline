@@ -52,6 +52,7 @@ Imports:
     stringr,
     tibble,
     tidyr,
+    tomledit,
     tools
 Remotes: 
     pharmaR/riskmetric,

@@ -15,7 +15,8 @@ val_build(
   replace = FALSE,
   opt_repos = c(CRAN = "https://packagemanager.posit.co/cran/latest", BioC =
     "https://bioconductor.org/packages/3.22/bioc"),
-  verbose = NULL
+  verbose = NULL,
+  prep = NULL
 )
 }
 \arguments{
@@ -55,6 +56,14 @@ package installation. Default is CRAN.}
 \code{"minimal"}, \code{"normal"} (default), or \code{"verbose"}. See
 the \code{val.pipeline} verbosity docs for tier definitions. Defaults to whatever the
 session option \code{val.pipeline.verbose} is set to (or \code{"normal"}).}
+
+\item{prep}{Optional \code{val_prep} object returned by
+\code{\link[=val_prep_pipeline]{val_prep_pipeline()}}. When supplied, \code{val_build()} skips its own
+dependency-tree resolution and directory setup, reusing the
+already-sorted \code{pkgs}, \code{vers}, \code{avail_pkgs}, \code{val_dir} and
+\code{opt_repos} from the prep result. This is the fast path callers
+should take when they've already emitted a \code{pipeline.toml} and
+installed the snapshot via \code{rv}.}
 }
 \value{
 A list containing:
