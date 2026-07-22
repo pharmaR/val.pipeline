@@ -40,6 +40,13 @@
 #'   `pipeline.toml` and installed the snapshot via `rv`. When `NULL`
 #'   (default), `val_pipeline()` calls `val_prep_pipeline()` itself so
 #'   existing one-shot workflows continue to work unchanged.
+#' @param config_path Optional path to a user-supplied `config.yml`.
+#'   When provided, every internal `pull_config()` call made during this
+#'   run reads from that file instead of the `config.yml` bundled with
+#'   `val.pipeline`. The override is scoped to this call: the prior
+#'   `val.pipeline.config_path` option is restored on exit. When `NULL`
+#'   (default), the pre-packaged config is used (or whatever the caller
+#'   has already set via `options(val.pipeline.config_path = ...)`).
 #' @return A list containing the validation directory and a data frame of
 #'   package assessments.
 #'
@@ -61,7 +68,8 @@ val_pipeline <- function(
     c(CRAN = "https://packagemanager.posit.co/cran/latest",
       BioC = 'https://bioconductor.org/packages/3.22/bioc'),
   verbose = NULL,
-  prep = NULL
+  prep = NULL,
+  config_path = NULL
   ){
 
   # Assess args
@@ -73,6 +81,11 @@ val_pipeline <- function(
          call. = FALSE)
   }
   apply_verbose(verbose)
+
+  # Route pull_config() at any depth to the user-supplied config, if any.
+  old_cfg <- options()["val.pipeline.config_path"]
+  on.exit(options(old_cfg), add = TRUE)
+  apply_config_path(config_path)
 
   #
   # ---- Prep phase ----
@@ -89,7 +102,8 @@ val_pipeline <- function(
       val_date        = val_date,
       out             = out,
       opt_repos       = opt_repos,
-      verbose         = verbose
+      verbose         = verbose,
+      config_path     = config_path
     )
   }
 
@@ -115,7 +129,8 @@ val_pipeline <- function(
     replace         = replace,
     out             = out,
     opt_repos       = prep$opt_repos,
-    prep            = prep
+    prep            = prep,
+    config_path     = config_path
   )
   
   

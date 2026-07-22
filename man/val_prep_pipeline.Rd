@@ -15,7 +15,8 @@ val_prep_pipeline(
     "https://bioconductor.org/packages/3.22/bioc"),
   verbose = NULL,
   toml_path = NULL,
-  toml_project_name = "val.pipeline run"
+  toml_project_name = "val.pipeline run",
+  config_path = NULL
 )
 }
 \arguments{
@@ -52,6 +53,14 @@ where \code{val_dir} is the run's date-stamped output directory.}
 
 \item{toml_project_name}{Character(1). Value written to the toml's
 \verb{[project].name} field. Defaults to \code{"val.pipeline run"}.}
+
+\item{config_path}{Optional path to a user-supplied \code{config.yml}.
+When provided, every internal \code{pull_config()} call made during this
+run reads from that file instead of the \code{config.yml} bundled with
+\code{val.pipeline}. The override is scoped to this call: the prior
+\code{val.pipeline.config_path} option is restored on exit. When \code{NULL}
+(default), the pre-packaged config is used (or whatever the caller
+has already set via \code{options(val.pipeline.config_path = ...)}).}
 }
 \value{
 A list of class \code{"val_prep"} containing:

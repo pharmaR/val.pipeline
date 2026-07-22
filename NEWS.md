@@ -1,5 +1,16 @@
 # val.pipeline 0.1.0
 
+- **User-supplied `config.yml`**: `val_pipeline()`, `val_prep_pipeline()`,
+  and `val_build()` now accept a `config_path` argument. When supplied,
+  every `pull_config()` call made during the run reads from that file
+  instead of the `config.yml` bundled with the package, and
+  `val_build()` copies the same file into `val_dir` for record keeping.
+  Under the hood the entry points set the session option
+  `val.pipeline.config_path` (restored on exit) so any internal
+  `pull_config()` — no matter how deep in the call graph — picks up the
+  override. Passing `config_path = NULL` (the default) preserves the
+  previous behavior and uses the bundled config.
+
 - **CI fix (follow-up)**: address the four `R-CMD-check` warnings that
   were failing the workflow *after* `renv::restore()` succeeded on
   `ubuntu-latest` and `windows-latest`:

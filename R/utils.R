@@ -1,7 +1,66 @@
 
 
 
-#' Get Repo Origin
+#' Resolve the effective config.yml path
+#'
+#' Internal helper used by [pull_config()] and the entry-point pipeline
+#' functions to decide which `config.yml` should be read.
+#'
+#' Resolution order:
+#' 1. An explicit `config_path` argument (if non-`NULL`).
+#' 2. The session option `val.pipeline.config_path` (set by
+#'    [val_pipeline()], [val_prep_pipeline()], and [val_build()] when the
+#'    caller supplies a `config_path`).
+#' 3. The `config.yml` bundled with the installed `val.pipeline` package.
+#'
+#' @param config_path Optional path supplied by the caller.
+#'
+#' @return A single character string pointing at an existing config file.
+#'
+#' @keywords internal
+resolve_config_path <- function(config_path = NULL) {
+  if (!is.null(config_path)) {
+    if (!file.exists(config_path)) {
+      stop(sprintf("`config_path` does not exist: %s", config_path),
+           call. = FALSE)
+    }
+    return(config_path)
+  }
+  opt_path <- getOption("val.pipeline.config_path", default = NULL)
+  if (!is.null(opt_path) && nzchar(opt_path) && file.exists(opt_path)) {
+    return(opt_path)
+  }
+  system.file("config.yml", package = "val.pipeline")
+}
+
+
+#' Apply a user-supplied config path for the duration of a call
+#'
+#' Sets the `val.pipeline.config_path` session option to a validated,
+#' normalized path so [pull_config()] can pick up the user override
+#' anywhere inside the call graph. Returns the prior option value so the
+#' caller can restore it via `on.exit(options(old))`.
+#'
+#' @param config_path Path to a `config.yml`. If `NULL`, nothing is done
+#'   and `NULL` is returned.
+#'
+#' @return The previous value of the `val.pipeline.config_path` option in
+#'   the form returned by [base::options()] (suitable for feeding back
+#'   into `options()`), or `NULL` when `config_path` is `NULL`.
+#'
+#' @keywords internal
+apply_config_path <- function(config_path) {
+  if (is.null(config_path)) return(NULL)
+  if (!file.exists(config_path)) {
+    stop(sprintf("`config_path` does not exist: %s", config_path),
+         call. = FALSE)
+  }
+  resolved <- normalizePath(config_path, mustWork = TRUE)
+  options(val.pipeline.config_path = resolved)
+}
+
+
+
 #' 
 #' Helper function to determine which repo a package came from
 #' 
@@ -256,7 +315,12 @@ update_opt_repos <- function(
 #'   using a remote pkg_ref() assessment, whereas "decision" is used to filter
 #'   the final list of packages after a 'pkg_source' pkg_ref() assessment is
 #'   produced locally on the GxP system of interest.
-#' @param config_path A character string indicating the path to the config.yml
+#' @param config_path A character string indicating the path to a `config.yml`
+#'   file. When `NULL` (default), `pull_config()` looks at the session option
+#'   `val.pipeline.config_path` (set automatically by [val_pipeline()],
+#'   [val_prep_pipeline()], and [val_build()] when the caller supplies a
+#'   `config_path`). If that option is unset or points to a non-existent file,
+#'   it falls back to the `config.yml` bundled with `val.pipeline`.
 #'
 #' @importFrom config get
 #' @importFrom purrr map map_lgl set_names
@@ -272,10 +336,11 @@ update_opt_repos <- function(
 pull_config <- function(
     val = NULL,
     rule_type = c("default", "remote_reduce", "decide"),
-    config_path = system.file("config.yml", package = "val.pipeline")
+    config_path = NULL
 ) {
 
   rule_type <- match.arg(rule_type)
+  config_path <- resolve_config_path(config_path)
 
   configgy <- config::get(
     value = val, # NULL means grab everything

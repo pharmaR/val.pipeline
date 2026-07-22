@@ -16,7 +16,8 @@ val_build(
   opt_repos = c(CRAN = "https://packagemanager.posit.co/cran/latest", BioC =
     "https://bioconductor.org/packages/3.22/bioc"),
   verbose = NULL,
-  prep = NULL
+  prep = NULL,
+  config_path = NULL
 )
 }
 \arguments{
@@ -64,6 +65,13 @@ already-sorted \code{pkgs}, \code{vers}, \code{avail_pkgs}, \code{val_dir} and
 \code{opt_repos} from the prep result. This is the fast path callers
 should take when they've already emitted a \code{pipeline.toml} and
 installed the snapshot via \code{rv}.}
+
+\item{config_path}{Optional path to a user-supplied \code{config.yml}.
+When provided, every internal \code{pull_config()} call made during this
+run reads from that file instead of the \code{config.yml} bundled with
+\code{val.pipeline}, and the same file is copied into \code{val_dir} for
+record keeping. The override is scoped to this call: the prior
+\code{val.pipeline.config_path} option is restored on exit.}
 }
 \value{
 A list containing:
