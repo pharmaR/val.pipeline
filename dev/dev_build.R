@@ -4,7 +4,7 @@ devtools::load_all()
 
 
 val_date <- Sys.Date()
-val_date <- "2026-06-21"
+val_date <- "2026-07-20"
 val_date_txt <- gsub("-", "", val_date)
 val_dir <- file.path(
   Sys.getenv("RISK_OUTPATH", unset = getwd()),
@@ -81,7 +81,7 @@ qual <- val_build(
   # deps_recursive = TRUE,
   deps_recursive = FALSE,
   # val_date = Sys.Date(),
-  val_date = as.Date("2026-06-21"),
+  val_date = as.Date("2026-07-20"),
   replace = TRUE, 
   # use a env var for the out path
   out = Sys.getenv("RISK_OUTPATH", unset = getwd())
@@ -102,7 +102,7 @@ qual_df <- qual$pkgs_df
 # deps_recursive = TRUE
 # # deps_recursive = FALSE
 # # val_date = Sys.Date()
-# val_date = as.Date("2026-06-21")
+# val_date = as.Date("2026-07-20")
 # replace = FALSE
 # out = Sys.getenv("RISK_OUTPATH", unset = getwd())
 

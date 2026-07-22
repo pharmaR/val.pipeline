@@ -14,10 +14,11 @@ qual <- val_pipeline(
   metric_pkg = "riskmetric", 
   deps = c("depends"), #, "suggests"), # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
   deps_recursive = TRUE,
-  val_date = as.Date("2026-06-21"), #Sys.Date(),
+  val_date = as.Date("2026-07-20"), #Sys.Date(),
   # val_date = as.Date("2025-10-07"),
   replace = FALSE, 
   out = Sys.getenv("RISK_OUTPATH", unset = getwd())
+  verbose = 'minimal'
 )
 
 # 
@@ -29,19 +30,20 @@ metric_pkg = "riskmetric"
 deps = c("depends") #,"suggests") # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
 deps_recursive = TRUE
 # val_date = Sys.Date()
-val_date = as.Date("2026-06-21")
+val_date = as.Date("2026-07-20")
 replace = FALSE
 out = Sys.getenv("RISK_OUTPATH", unset = getwd())
 opt_repos =
   c(CRAN = "https://packagemanager.posit.co/cran/2026-06-21",
     BioC = 'https://bioconductor.org/packages/3.22/bioc')
+verbose = 'normal'
 
 
 #
 # Inspect the assessment dir
 #
 # 
-val_date = as.Date("2026-06-21")
+val_date = as.Date("2026-07-20")
 val_date_txt <- gsub("-", "", val_date)
 val_dir <- file.path(
   Sys.getenv("RISK_OUTPATH", unset = getwd()),
