@@ -64,7 +64,8 @@ val_prep_pipeline <- function(
       BioC = 'https://bioconductor.org/packages/3.22/bioc'),
   verbose = NULL,
   toml_path = NULL,
-  toml_project_name = "val.pipeline run"
+  toml_project_name = "val.pipeline run",
+  config_path = NULL
 ){
 
   # Assess args
@@ -72,6 +73,11 @@ val_prep_pipeline <- function(
   metric_pkg <- match.arg(metric_pkg)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
   apply_verbose(verbose)
+
+  # Route pull_config() at any depth to the user-supplied config, if any.
+  old_cfg <- options()["val.pipeline.config_path"]
+  on.exit(options(old_cfg), add = TRUE)
+  apply_config_path(config_path)
 
   #
   # ---- Set time variables ----

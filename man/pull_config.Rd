@@ -7,7 +7,7 @@
 pull_config(
   val = NULL,
   rule_type = c("default", "remote_reduce", "decide"),
-  config_path = system.file("config.yml", package = "val.pipeline")
+  config_path = NULL
 )
 }
 \arguments{
@@ -21,7 +21,12 @@ using a remote pkg_ref() assessment, whereas "decision" is used to filter
 the final list of packages after a 'pkg_source' pkg_ref() assessment is
 produced locally on the GxP system of interest.}
 
-\item{config_path}{A character string indicating the path to the config.yml}
+\item{config_path}{A character string indicating the path to a \code{config.yml}
+file. When \code{NULL} (default), \code{pull_config()} looks at the session option
+\code{val.pipeline.config_path} (set automatically by \code{\link[=val_pipeline]{val_pipeline()}},
+\code{\link[=val_prep_pipeline]{val_prep_pipeline()}}, and \code{\link[=val_build]{val_build()}} when the caller supplies a
+\code{config_path}). If that option is unset or points to a non-existent file,
+it falls back to the \code{config.yml} bundled with \code{val.pipeline}.}
 }
 \value{
 A named list of lists

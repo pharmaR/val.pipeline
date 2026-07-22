@@ -15,7 +15,8 @@ val_pipeline(
   opt_repos = c(CRAN = "https://packagemanager.posit.co/cran/latest", BioC =
     "https://bioconductor.org/packages/3.22/bioc"),
   verbose = NULL,
-  prep = NULL
+  prep = NULL,
+  config_path = NULL
 )
 }
 \arguments{
@@ -58,6 +59,14 @@ path callers should take when they've already emitted a
 \code{pipeline.toml} and installed the snapshot via \code{rv}. When \code{NULL}
 (default), \code{val_pipeline()} calls \code{val_prep_pipeline()} itself so
 existing one-shot workflows continue to work unchanged.}
+
+\item{config_path}{Optional path to a user-supplied \code{config.yml}.
+When provided, every internal \code{pull_config()} call made during this
+run reads from that file instead of the \code{config.yml} bundled with
+\code{val.pipeline}. The override is scoped to this call: the prior
+\code{val.pipeline.config_path} option is restored on exit. When \code{NULL}
+(default), the pre-packaged config is used (or whatever the caller
+has already set via \code{options(val.pipeline.config_path = ...)}).}
 }
 \value{
 A list containing the validation directory and a data frame of

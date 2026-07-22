@@ -66,6 +66,12 @@
 #'   `opt_repos` from the prep result. This is the fast path callers
 #'   should take when they've already emitted a `pipeline.toml` and
 #'   installed the snapshot via `rv`.
+#' @param config_path Optional path to a user-supplied `config.yml`.
+#'   When provided, every internal `pull_config()` call made during this
+#'   run reads from that file instead of the `config.yml` bundled with
+#'   `val.pipeline`, and the same file is copied into `val_dir` for
+#'   record keeping. The override is scoped to this call: the prior
+#'   `val.pipeline.config_path` option is restored on exit.
 #'
 #' @export
 #' 
@@ -82,7 +88,8 @@ val_build <- function(
     c(CRAN = "https://packagemanager.posit.co/cran/latest",
       BioC = 'https://bioconductor.org/packages/3.22/bioc'),
     verbose = NULL,
-    prep = NULL
+    prep = NULL,
+    config_path = NULL
     ){
   
   #
@@ -113,6 +120,11 @@ val_build <- function(
          call. = FALSE)
   }
   apply_verbose(verbose)
+
+  # Route pull_config() at any depth to the user-supplied config, if any.
+  old_cfg <- options()["val.pipeline.config_path"]
+  on.exit(options(old_cfg), add = TRUE)
+  apply_config_path(config_path)
   
   # store R Version
   r_ver = getRversion()
@@ -199,9 +211,10 @@ val_build <- function(
   if(!dir.exists(assessed)) dir.create(assessed) # needed
   
   #
-  # Save the config file to the val_dir for record keeping
+  # Save the config file to the val_dir for record keeping. Copies the
+  # user-supplied config when one was provided, otherwise the packaged one.
   file.copy(
-    system.file("config.yml", package = "val.pipeline"),
+    resolve_config_path(config_path),
     file.path(val_dir, "config.yml"),
     overwrite = TRUE
   )
