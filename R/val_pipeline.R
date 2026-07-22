@@ -143,13 +143,14 @@ val_pipeline <- function(
   # "validated" repo provisioned into the GxP environment. Failure here
   # should not fail the whole pipeline — the qualification evidence is
   # already on disk.
-  qm_path <- file.path(outtie$val_dir, "qual_metadata.rds")
   qa_path <- file.path(outtie$val_dir, "qual_assessments.rds")
+  qm_path <- file.path(outtie$val_dir, "qual_metadata.rds")
+  qual_meta = readRDS(qm_path)
 
   if (file.exists(qm_path)) {
     tryCatch(
       write_qualified_pkg_lists(
-        qual_metadata = readRDS(qm_path),
+        qual_metadata = qual_meta,
         out_dir = outtie$val_dir,
         qualified_decision = decisions[1]
       ),
@@ -184,7 +185,7 @@ val_pipeline <- function(
 
   # Return the val_build() results (val_dir points to all evidence, incl. the
   # newly rendered summary report).
-  return(outtie)
+  # return(qual_meta)
 }
 
 
