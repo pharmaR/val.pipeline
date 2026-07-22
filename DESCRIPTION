@@ -1,6 +1,6 @@
 Package: val.pipeline
 Title: Validation Pipeline Example
-Version: 0.0.1.9012
+Version: 0.0.1.9013
 Authors@R: 
   c(
     person(
@@ -46,9 +46,9 @@ Imports:
     purrr,
     quarto,
     reactable,
-    riskmetric (>= 0.2.5),
+    riskmetric (>= 0.2.7),
     riskreports (>= 0.0.0.9006),
-    riskscore (>= 0.1.0),
+    riskscore (>= 0.1.1),
     rlang,
     stringr,
     tibble,

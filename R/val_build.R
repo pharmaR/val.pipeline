@@ -368,12 +368,26 @@ val_build <- function(
   # # Start bundling rds files
   record_files <- list.files(assessed, pattern = "_assess_record.rds$")
   record_length <- record_files |> length() # assessment file count
+  # NB: pass the whole list to `dplyr::bind_rows()` in one call rather than
+  # `purrr::reduce(bind_rows)`. Reducing is O(n^2) (the growing accumulator is
+  # copied on every step) and dominates wall-clock on ~1000+ pkg runs; a single
+  # `bind_rows(list_of_frames)` is O(n). Empty-input guard preserves the prior
+  # behaviour where `purrr::reduce(list(), bind_rows)` errored: we now stop()
+  # with an actionable message instead of silently writing an empty RDS. #69.
+  if (record_length == 0L) {
+    stop("No `_assess_record.rds` files found under ", assessed,
+         " to collate into `qual_assessments.rds`.", call. = FALSE)
+  }
   assessment_bundle <- purrr::map(record_files, function(file){
     # file <- record_files[1] # for debugging
     readRDS(file.path(assessed, file))
   }) |>
-    purrr::reduce(dplyr::bind_rows)
-  saveRDS(assessment_bundle, file.path(val_dir, "qual_assessments.rds"))
+    dplyr::bind_rows()
+  qual_assessments_file <- file.path(val_dir, "qual_assessments.rds")
+  saveRDS(assessment_bundle, qual_assessments_file)
+  val_msg(paste0("\n--> Saved assessment records to ",
+                 qual_assessments_file, "\n"),
+          min_level = "minimal")
   
   
   #
@@ -395,6 +409,9 @@ val_build <- function(
   
   # Reduce package bundles down into a data.frame containing specific info
   # names(pkg_bundles)
+  # NB: single `dplyr::bind_rows(list_of_tibbles)` call instead of
+  # `purrr::reduce(bind_rows)` — same O(n) vs O(n^2) reason as the assessment
+  # collation above (#69).
   pkgs_df0 <- purrr::map( pkg_bundles, ~ {
       # .x <- pkg_bundles$askpass
       x <- purrr::list_flatten(.x)
@@ -408,14 +425,18 @@ val_build <- function(
       # x$repos <- list(x$repos)
       dplyr::as_tibble(x)
     }) |> 
-    purrr::reduce(dplyr::bind_rows)
+    dplyr::bind_rows()
   
   
   # Interim snapshot BEFORE dependency-based decision propagation runs.
   # Kept as a separate file (qual_metadata0.rds) so the pre-propagation state
   # remains inspectable for debugging decision-graph issues. The final
   # qual_metadata.rds is written after reject_iteration() converges (below).
-  saveRDS(pkgs_df0, file.path(val_dir, "qual_metadata0.rds"))
+  qual_metadata0_file <- file.path(val_dir, "qual_metadata0.rds")
+  saveRDS(pkgs_df0, qual_metadata0_file)
+  val_msg(paste0("\n--> Saved interim pkg metadata to ",
+                 qual_metadata0_file, "\n"),
+          min_level = "minimal")
   
   
   
