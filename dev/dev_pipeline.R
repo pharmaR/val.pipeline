@@ -1,6 +1,6 @@
 
 # update pertinent pkgs as needed
-# remotes::install_github("pharmar/riskscore", force = TRUE, ref = "latest") # v0.1.0
+# remotes::install_github("pharmar/riskscore", force = TRUE, ref = "latest") # v0.1.1
 # utils::install.packages("riskmetric") # v0.2.5
 # renv::snapshot()
 # restart R
