@@ -1,6 +1,17 @@
 default:
-  remote_only: [withr, VGAM, shinyBS, fitdistrplus, collapse, gamlss.dist, gss, segmented, RSiena, qtl, openxlsx2, BayesXsrc] # withr - crashes, VGAM 10h, shinyBS 5h, collapse 1.6h, fitdistrplus 1.7h, gamlss.dist 52m, gss 52m, segmented 45m, RSiena 1.6hr, qtl 22hr, openxlsx2 60m, BayesXsrc 45m,
-  pass_primary: [logrx, admiral, ggsurvfit, sdtm.oak, cardinal, cards, admiralonco, tidytlg, pharmaversesdtm, pharmaverseadam, rlistings, sdtmchecks, metatools, cardx, admiraldev, admiralophtha, datacutr, admiralci, envsetup] # Pkgs that shouldn't be immediately filtered from (1) val_categorize() or (2) from primary metrics in val_decision(). Usually, these packages have low downloads, but we want these packages to recieve their full day in court & retrieve code coverage metrics.
+
+  # Pkgs that are too time intensive to run riskmetric assessment with pkg_ref == "source"
+  # withr - crashes, VGAM 10h, shinyBS 5h, collapse 1.6h, fitdistrplus 1.7h, gamlss.dist 52m, gss 52m, segmented 45m, RSiena 1.6hr, qtl 22hr, openxlsx2 60m, BayesXsrc 45m,
+  remote_only: [withr, VGAM, shinyBS, fitdistrplus, collapse, gamlss.dist, gss, segmented, RSiena, qtl, openxlsx2, BayesXsrc] 
+  
+  # Pkgs that shouldn't be immediately filtered from (1) val_categorize() or (2) from primary metrics in val_decision(). Usually, these packages have low downloads, but we want these packages to recieve their full day in court & retrieve code coverage metrics.
+  # Pharmaverse + provided lists from org
+  pass_primary: [
+  logrx, admiral, ggsurvfit, sdtm.oak, cardinal, cards, admiral.test, admiralonco, admiralvaccine, tidytlg, pharmaversesdtm, pharmaverseadam, rlistings, sdtmchecks, metatools, cardx, admiraldev, admiralophtha, datacutr, admiralci, envsetup,
+  abind, addinexamples, apt, arsenal, AsioHeaders, askpass, assertr, assertthat, autoslider.core, AzureAuth, AzureGraph, backports, base, base64enc, bayestestR, bbmle, bbr, bbr.bayes, bcrm, bdsmatrix, berryFunctions, BH, bigD, BiocManager, BiocParallel, BiocVersion, bit, bit64, bitops, blob, blogdown, bookdown, boot, brew, brio, broom, bslib, cachem, Cairo, callr, car, carData, cards, cardx, caret, caTools, cellranger, checkmate, chevron, chromote, chron, class, classInt, cli, clinfun, clipr, clisymbols, cluster, cmprsk, codetools, collections, colorspace, commonmark, compareDF, compiler, condSURV, configr, confintr, conflicted, constructive, corrplot, covtracer, cowplot, cpp11, crayon, credentials, crmPack, crul, CTP, cubature, curl, cyclocomp, daff, data.table, data.tree, data.validator, datacutr, datapasta, datasets, datawizard, DBI, dbplyr, deldir, Deriv, desc, descem, deSolve, devtools, diffdf, diffobj, diffr, digest, distributional, doBy, doconv, docxtractr, doParallel, doRNG, downlit, dplyr, dtplyr, dunlin, e1071, egg, ellipsis, ellmer, emmeans, envsetup, evaluate, exactRankTests, expss, extrafont, extrafontdb, facetsr, fansi, farver, fastDummies, fastGHQuad, fastmap, flexsurv, flexsurvPlus, flextable, fontawesome, fontBitstreamVera, fontLiberation, fontquiver, forcats, foreach, foreign, formatR, formatters, Formula, fs, furrr, future, future.apply, future.batchtools, gam, gargle, gdtools, geepack, gemtcPlus, generics, gert, gfonts, GGally, ggdist, ggforce, ggfortify, ggh4x, gghalves, gginnards, ggplot2, ggplot2.utils, ggpmisc, ggpp, ggpubr, ggrepel, ggsci, ggsignif, ggstats, ggsurvfit, ggtext, ggthemes, gh, ghqc, gitcreds, gitworkr, glmnet, glmtoolbox, globals, glue, googledrive, googlesheets4, goshawk, GPArotation, graphics, grDevices, greekLetters, grid, gridExtra, gridGraphics, gridtext, gt, gtable, gtools, gtsummary, hardhat, hash, hashr, haven, here, hermes, highr, Hmisc, hms, hrbrthemes, htmlTable, htmltools, htmlwidgets, httpcode, httpuv, httr, httr2, ids, ini, insight, interp, isoband, iterators, janitor, jose, jpeg, jquerylib, jsonlite, jsTreeR, juicyjuice, kableExtra, KernSmooth, keyring, km.ci, KMsurv, knitr, labeling, labelled, languageserver, lastdose, later, latex2exp, lattice, latticeExtra, lazyeval, leaps, lemon, lifecycle, lintr, listenv, lme4, lmodel2, lobstr, locatexec, log4r, logitnorm, logrx, lookup, lubridate, maditr, magick, magrittr, MAIC, markdown, MASS, Matrix, MatrixModels, matrixStats, maxstat, memoise, metacore, metatools, methods, metrumrg, mgcv, mgsub, mice, microbenchmark, Microsoft365R, mime, miniUI, minqa, mmrm, mnormt, modelr, moments, mrgda, mrggsave, mrgmisc, mrgsolve, mstate, mtdesign, muhaz, multcomp, multcompView, munsell, mvtnorm, ncappc, nestcolor, nesttemplate, nhanesA, nlme, nlmixr, nloptr, NMcheckData, NMdata, NMproject, nmrec, NMsim, nnet, noindex), nonmem2R, np, numDeriv, officer, openssl, openxlsx, osprey, overlapping, pacman, pak, pander, parallel, parallelly, patchwork, pbkrtest, pdftools, PerformanceAnalytics, pharmaRTF, pharmaverseadam, pharmaversesdtm, pharmr, pillar, pkgbuild, pkgconfig, pkgdown, pkglite, pkgload, pkgr, PKNCA, plotrix, plyr, pmforest, pmparams, pmplots, pmtables, pmxTools, png, pointblank, polyclip, polynom, PopED, praise, prettyunits, pROC, processx, profvis, progress, progressr, promises, proxy, pryr, ps, psborrow, psych, purrr, qpdf, quadprog, quantreg, R.cache, R.methodsS3, R.oo, r.pkg.template, R.utils, r2rtf, R6, ragg, random.cdisc.data, randomForrest, rappdirs, rapportools, rbmi, rcmdcheck, RColorBrewer, Rcpp, RcppArmadillo, RcppEigen, RcppTOML, RCurl, RDO, reactable, reactR, readr, readsas, readxl, rematch, rematch2, remotes, renv, reporter, repr, reprex, reshape, reshape2, respectables, reticulate, rex, rio, riskassessment, rJava, rlang, rlistings, rmarkdown, rmsfuns, rngtools, RNMImport, roxy.shinylive, roxygen2, rpart, rprojroot, rpsftmPlus, RsNLME, rspeaksnonmem, rstatix, rstpm2, rstudioapi, rtables, rtables.officer, Rttf2pt1, rversions, rvest, sandwich, sas7bdat, sass, sasxport, scales, scda, scda.2021, scda.2022, sdtmchecks, selectr, sem, semantic.assets, sensitivity, servr, sessioninfo, sftp, shiny, shiny.semantic, shinyAce, shinyjs, simaerep, simIDM, simpar, sjlabelled, skimr, sloop, snakecase, sourcetools, SparseM, spatial, splines, splines2, splus2R, staged.dependencies, statmod, stats, stats4, strex, stringi, stringr, styler, summarytools, survival, survminer, survMisc, svglite, syntrial, sys, systemfonts, table1, tcltk, teal, teal.code, teal.data, teal.goshawk, teal.logger, teal.modules.clinical, teal.modules.general, teal.modules.hermes, teal.osprey, teal.reporter, teal.slice, teal.transform, teal.widgets, tern, tern.gee, tern.mmrm, tern.rbmi, testthat, texPreview, textshaping, tfrmt, TH.data, this.path, tibble, tidyCDISC, tidycmprsk, tidylog, tidymodels, tidyr, tidyselect, tidytlg, tidyverse, tidyvpc, timechange, timereg, tinytex, tools, torch, Tplyr, translations, treesitter, treesitter.r, tweenr, tzdb, units, urlchecker, usethis, utf8, utils, uuid, V8, validate, valtools, vctrs, VIM, viridis, viridisLite, visR, vpc, vroom, vtable, waiter, waldo, webshot, webshot2, websocket, whisker, whoami, withr, writexl, xfun, xgboost, xgxr, XLConnect, XML, xml2, xmlparsedata, xopen, xportr, xpose, xpose4, xtable, xts, yaml, yspec, zip, zoo
+  ]
+  
+  # packages that have been approved manually outside of {val.pipeline} workflow
   approved_pkgs: [
     tidyverse, ggplot2, dplyr, tidyr, readr, purrr, tibble, stringr, forcats, lubridate,
     DBI, haven, httr, readxl, googlesheets4, googledrive, rvest, jsonlite, xml2,
@@ -16,7 +27,7 @@ default:
     shiny, rmarkdown,
     
     gt
-  ] # packages that have been approved manually outside of {val.pipeline} workflow
+  ] 
   decisions_lst: [Low, Medium, High]
   opt_repos: 
     CRAN: https://packagemanager.posit.co/cran/2026-06-21
@@ -26,7 +37,6 @@ remote_reduce:
   inherits: default
   downloads_1yr:
     cond:
-      # High: ~ 
       High: ~ is.na(.x) | .x < 80000
       Medium: ~ dplyr::between(.x, 80000, 240000)
       Low: ~ .x > 240000
@@ -83,15 +93,6 @@ remote_reduce:
 
 decide:
   inherits: remote_reduce
-  # downloads_1yr: # overwrites remote_reduce contraint!
-  #   cond:
-  #     High: ~ is.na(.x) | .x < 120000
-  #     Medium: ~ dplyr::between(.x, 120000, 240000)
-  #     Low: ~ .x > 240000
-  #   type: secondary # only change! Leaving covr_coverage as the only primary
-  #   accept_cats: Low
-  #   promote_min: ~ .x > 80000
-  #   auto_accept: ~ .x > 1000000
   covr_coverage:
     cond:
       High: ~ is.na(.x) | .x < 35
