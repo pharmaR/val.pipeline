@@ -1,4 +1,4 @@
-# val.pipeline (development version)
+# val.pipeline 0.1.0
 
 - **CI fix (follow-up)**: address the four `R-CMD-check` warnings that
   were failing the workflow *after* `renv::restore()` succeeded on
