@@ -1,3 +1,5 @@
+# val.pipeline 0.1.1
+
 # val.pipeline 0.1.0
 
 - **User-supplied `config.yml`**: `val_pipeline()`, `val_prep_pipeline()`,
