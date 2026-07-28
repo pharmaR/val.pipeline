@@ -1099,17 +1099,31 @@ rip_cats_by_pkg <- function(
   # Grab pkg names that are allowed to pass the primar filtering event.
   # These are typically lower download pkgs that derserve their day in court
   bypass_primary  <- pull_config(val = "pass_primary", rule_type = "default")
-  
+
+  # Lowest boundary of the `downloads_1yr` primary rule in inst/config.yml:
+  # under `remote_reduce.downloads_1yr.cond`, High is defined as
+  # `is.na(.x) | .x < 80000`. The `pass_primary` bypass exists for
+  # low-download pkgs that deserve a fair shake, so it should only be
+  # applied while a pkg is still below this bound. Once a pkg on the
+  # bypass list has grown past 80k downloads, it can pass the primary
+  # metric on its own and doesn't need the bypass anymore.
+  min_dwnld_bound <- 80000L
+
   subset_metrics <- dec_df |>
     dplyr::filter(tolower(metric_type) == tolower(label)) %>%
-    
+
     # if this is not a CRAN pkg OR if it's a pkg that has been granted "pass-primary" status
-    # (usually pkgs with lower downloads, but need a fair shake)...
+    # (usually pkgs with lower downloads, but need a fair shake) AND its
+    # downloads_1yr is still below the lowest primary bound
+    # (min_dwnld_bound; see above)...
     # then do not use downloads_1yr as the cornerstone primary metric
-    {if("downloads_1yr" %in% all_mets && 
-        (toupper(repo_name) != "CRAN" || pkgs_df$package %in% bypass_primary)
+    {if("downloads_1yr" %in% all_mets &&
+        (toupper(repo_name) != "CRAN" ||
+         (pkgs_df$package %in% bypass_primary &
+          (is.na(pkgs_df$downloads_1yr) |
+           pkgs_df$downloads_1yr < min_dwnld_bound)))
          ) {
-      dplyr::filter(., !(tolower(metric) %in% c("downloads_1yr"))) 
+      dplyr::filter(., !(tolower(metric) %in% c("downloads_1yr")))
     } else .} |>
     
     # For debugging:

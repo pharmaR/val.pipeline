@@ -12,6 +12,15 @@
   list live in `dev/pass_primary_audit.md`. Also updated the block's
   header comment to spell out the `< 80,000/yr` intent.
 
+- **Guard `rip_cats_by_pkg()` bypass on live download count**: the
+  bypass branch that drops `downloads_1yr` from the primary metric set
+  now additionally requires the package's own `downloads_1yr` to be
+  `NA` or `< 80,000` (the lowest boundary from the config's
+  `downloads_1yr` rule). This keeps the bypass targeted at packages
+  that actually need it — a package that used to be in `pass_primary`
+  but has since crossed 80k downloads now takes the normal primary
+  path and passes on its own merits.
+
 - **Optional local repo in `pipeline.toml`**: `write_pipeline_toml()` and
   `val_prep_pipeline()` now accept a `local_repo` / `toml_local_repo`
   argument. When supplied, the given URL is prepended at position 1 of
