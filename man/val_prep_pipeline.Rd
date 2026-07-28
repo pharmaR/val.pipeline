@@ -16,6 +16,7 @@ val_prep_pipeline(
   verbose = NULL,
   toml_path = NULL,
   toml_project_name = "val.pipeline run",
+  toml_local_repo = NULL,
   config_path = NULL
 )
 }
@@ -53,6 +54,16 @@ where \code{val_dir} is the run's date-stamped output directory.}
 
 \item{toml_project_name}{Character(1). Value written to the toml's
 \verb{[project].name} field. Defaults to \code{"val.pipeline run"}.}
+
+\item{toml_local_repo}{Optional extra repository to prepend at
+position 1 of the emitted \code{pipeline.toml}'s \verb{[project].repositories}
+array, so \code{rv} reaches it first when processing the toml. Intended
+for a PPM URL that is only needed by \code{rv} during the install phase
+and should \emph{not} leak into \code{opt_repos} (which drives the assessment
+itself). Either an unnamed \code{character(1)} URL (aliased as \code{"local"})
+or a named \code{character(1)} where the name is used as the alias
+(e.g. \code{c(local = "https://...")}). \code{NULL} (default) leaves the
+emitted repositories identical to \code{opt_repos}.}
 
 \item{config_path}{Optional path to a user-supplied \code{config.yml}.
 When provided, every internal \code{pull_config()} call made during this

@@ -7,6 +7,7 @@
 write_pipeline_toml(
   pkgs,
   opt_repos,
+  local_repo = NULL,
   r_version = paste(R.Version()$major, R.Version()$minor, sep = "."),
   name = "val.pipeline run",
   path
@@ -18,6 +19,21 @@ write_pipeline_toml(
 
 \item{opt_repos}{Named character vector of repositories. Passed
 through to \verb{[project].repositories}. Order is preserved.}
+
+\item{local_repo}{Optional additional repository to prepend at
+position 1 of \verb{[project].repositories} (so \code{rv} reaches it first
+when resolving packages). Intended for a PPM URL that should be
+consumed by \code{rv} while processing the toml \emph{without} polluting
+the caller's \code{opt_repos} (which is used for the assessment
+itself). Either:
+\itemize{
+\item an unnamed \code{character(1)} URL — the alias defaults to
+\code{"local"}; or
+\item a named \code{character(1)} where the name is used as the alias
+(e.g. \code{c(local = "https://...")} or
+\code{c(internal_ppm = "https://...")}).
+}
+\code{NULL} (default) leaves \code{opt_repos} untouched.}
 
 \item{r_version}{Character(1) written under \verb{[project].r_version}.
 Defaults to the current R major.minor

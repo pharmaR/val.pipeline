@@ -22,6 +22,15 @@
 #'   where `val_dir` is the run's date-stamped output directory.
 #' @param toml_project_name Character(1). Value written to the toml's
 #'   `[project].name` field. Defaults to `"val.pipeline run"`.
+#' @param toml_local_repo Optional extra repository to prepend at
+#'   position 1 of the emitted `pipeline.toml`'s `[project].repositories`
+#'   array, so `rv` reaches it first when processing the toml. Intended
+#'   for a PPM URL that is only needed by `rv` during the install phase
+#'   and should *not* leak into `opt_repos` (which drives the assessment
+#'   itself). Either an unnamed `character(1)` URL (aliased as `"local"`)
+#'   or a named `character(1)` where the name is used as the alias
+#'   (e.g. `c(local = "https://...")`). `NULL` (default) leaves the
+#'   emitted repositories identical to `opt_repos`.
 #'
 #' @return A list of class `"val_prep"` containing:
 #' \describe{
@@ -65,6 +74,7 @@ val_prep_pipeline <- function(
   verbose = NULL,
   toml_path = NULL,
   toml_project_name = "val.pipeline run",
+  toml_local_repo = NULL,
   config_path = NULL
 ){
 
@@ -202,11 +212,12 @@ val_prep_pipeline <- function(
   #
   if (is.null(toml_path)) toml_path <- file.path(val_dir, "pipeline.toml")
   write_pipeline_toml(
-    pkgs      = pkgs,
-    opt_repos = opt_repos,
-    r_version = paste(R.Version()$major, R.Version()$minor, sep = "."),
-    name      = toml_project_name,
-    path      = toml_path
+    pkgs       = pkgs,
+    opt_repos  = opt_repos,
+    local_repo = toml_local_repo,
+    r_version  = paste(R.Version()$major, R.Version()$minor, sep = "."),
+    name       = toml_project_name,
+    path       = toml_path
   )
   val_msg(paste0("\n--> Wrote pipeline toml with ",
                  prettyNum(length(pkgs), big.mark = ","),
