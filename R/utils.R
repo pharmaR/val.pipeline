@@ -1100,14 +1100,25 @@ rip_cats_by_pkg <- function(
   # These are typically lower download pkgs that derserve their day in court
   bypass_primary  <- pull_config(val = "pass_primary", rule_type = "default")
 
-  # Lowest boundary of the `downloads_1yr` primary rule in inst/config.yml:
-  # under `remote_reduce.downloads_1yr.cond`, High is defined as
-  # `is.na(.x) | .x < 80000`. The `pass_primary` bypass exists for
-  # low-download pkgs that deserve a fair shake, so it should only be
-  # applied while a pkg is still below this bound. Once a pkg on the
-  # bypass list has grown past 80k downloads, it can pass the primary
-  # metric on its own and doesn't need the bypass anymore.
-  min_dwnld_bound <- 80000L
+  # Lowest boundary of the `downloads_1yr` primary rule, derived directly
+  # from dec_df so we stay in sync with whatever the config says (rather
+  # than hard-coding it here and drifting out of date). Combining
+  # to_the_limit(low = TRUE) and to_the_limit(low = FALSE) across every
+  # `downloads_1yr` row picks up boundaries expressed as `< X`, `> X`,
+  # `<= X`, `>= X`, and `dplyr::between(., a, b)` alike. Compound
+  # conditions like `is.na(.x) | .x < X` return NA from to_the_limit()
+  # and are silently ignored — as long as one of the other rows for the
+  # same metric names the boundary (e.g. Medium's `between(80000, ...)`
+  # or Low's `> 240000`), we'll pick up the 80k floor. If nothing is
+  # parseable, we fall back to Inf so the bypass behaves as it did
+  # before this guard was added (applies to any `pass_primary` member).
+  dwnld_conds  <- dec_df$condition[tolower(dec_df$metric) == "downloads_1yr"]
+  dwnld_bounds <- c(
+    to_the_limit(dwnld_conds, low = TRUE),
+    to_the_limit(dwnld_conds, low = FALSE)
+  )
+  dwnld_bounds <- dwnld_bounds[is.finite(dwnld_bounds) & dwnld_bounds > 0]
+  min_dwnld_bound <- if (length(dwnld_bounds)) min(dwnld_bounds) else Inf
 
   subset_metrics <- dec_df |>
     dplyr::filter(tolower(metric_type) == tolower(label)) %>%
