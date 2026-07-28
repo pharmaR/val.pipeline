@@ -55,17 +55,22 @@ write_pipeline_toml <- function(
   if (!nzchar(path)) stop("`path` must be a non-empty string", call. = FALSE)
 
   # Optionally prepend a caller-supplied repo (typically a PPM URL that
-  # `rv` needs to see first, but that shouldn't leak into `opt_repos`).
+  # `rv` needs to see first, but that shouldn't leak into the caller's
+  # `opt_repos`). We build a fresh `repos_out` here rather than
+  # reassigning `opt_repos` to make it obvious at review time that the
+  # caller's object is not mutated — R's copy-on-modify already
+  # guarantees this, but the naming makes intent explicit and the
+  # regression test in test-write_pipeline_toml.R locks it in.
+  repos_out <- opt_repos
   if (!is.null(local_repo)) {
     if (!is.character(local_repo) || length(local_repo) != 1L ||
         !nzchar(local_repo))
       stop("`local_repo` must be a non-empty character(1)", call. = FALSE)
     local_alias <- names(local_repo)
     if (is.null(local_alias) || !nzchar(local_alias)) local_alias <- "local"
-    local_url <- unname(local_repo)
-    local_entry <- local_url
+    local_entry <- unname(local_repo)
     names(local_entry) <- local_alias
-    opt_repos <- c(local_entry, opt_repos)
+    repos_out <- c(local_entry, opt_repos)
   }
 
   # Build repositories as an array of inline tables, one per repo, so
@@ -74,12 +79,12 @@ write_pipeline_toml <- function(
   #     { alias = "CRAN", url = "https://..." },
   #     { alias = "BioC", url = "https://..." },
   #   ]
-  # rather than a single-line inline-object dict. Order of `opt_repos`
+  # rather than a single-line inline-object dict. Order of `repos_out`
   # is preserved.
   repos_lst <- Map(
     function(alias, url) list(alias = alias, url = unname(url)),
-    names(opt_repos),
-    opt_repos
+    names(repos_out),
+    repos_out
   ) |> unname()
 
   project <- tomledit::toml(

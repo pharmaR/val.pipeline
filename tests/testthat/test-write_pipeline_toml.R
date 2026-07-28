@@ -162,3 +162,28 @@ test_that("write_pipeline_toml() validates local_repo", {
     "non-empty character\\(1\\)"
   )
 })
+
+
+test_that("write_pipeline_toml() does not mutate the caller's opt_repos", {
+  tmp <- withr::local_tempfile(fileext = ".toml")
+
+  # Snapshot the caller's opt_repos before + after. The `local_repo`
+  # prepend must happen only inside the emitted toml; the caller's
+  # object must stay identical (same names, same values, same order).
+  opt_repos <- c(
+    CRAN = "https://packagemanager.posit.co/cran/2026-06-21",
+    BioC = "https://bioconductor.org/packages/3.22/bioc"
+  )
+  before <- opt_repos
+
+  write_pipeline_toml(
+    pkgs       = "dplyr",
+    opt_repos  = opt_repos,
+    local_repo = "https://ppm.example.com/internal",
+    path       = tmp
+  )
+
+  expect_identical(opt_repos, before)
+  # And the local_repo alias must not have leaked into the caller's names.
+  expect_false("local" %in% names(opt_repos))
+})
