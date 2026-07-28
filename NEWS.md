@@ -1,3 +1,5 @@
+# val.pipeline 0.1.2
+
 # val.pipeline 0.1.1
 
 - **Optional local repo in `pipeline.toml`**: `write_pipeline_toml()` and
