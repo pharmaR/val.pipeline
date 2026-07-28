@@ -2,6 +2,16 @@
 
 # val.pipeline 0.1.1
 
+- **Pruned `pass_primary` in `inst/config.yml`**: the bypass list is only
+  meant for packages that would otherwise fail the `downloads_1yr` primary
+  metric (< 80,000 annual downloads). Ran a cranlogs audit against every
+  entry and removed the 391 packages with `>= 80,000` annual downloads,
+  taking the list from 575 to 184 entries. Packages with 0 reported
+  downloads (base R, Bioconductor-only, GitHub-only, org-internal) were
+  kept — the bypass is exactly what they need. Audit trail and removal
+  list live in `dev/pass_primary_audit.md`. Also updated the block's
+  header comment to spell out the `< 80,000/yr` intent.
+
 - **Optional local repo in `pipeline.toml`**: `write_pipeline_toml()` and
   `val_prep_pipeline()` now accept a `local_repo` / `toml_local_repo`
   argument. When supplied, the given URL is prepended at position 1 of
