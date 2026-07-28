@@ -9,7 +9,8 @@ default:
   pass_primary: [
     logrx, admiral, sdtm.oak, cardinal, admiral.test, admiralonco, admiralvaccine, tidytlg,
     pharmaversesdtm, pharmaverseadam, rlistings, sdtmchecks, metatools, admiraldev, admiralophtha,
-    datacutr, admiralci, envsetup, addinexamples, apt, assertr, autoslider.core, base, bbr,
+    datacutr, admiralci, envsetup, cards, cardx, mmrm,
+    addinexamples, apt, assertr, autoslider.core, base, bbr,
     bbr.bayes, bcrm, berryFunctions, BiocParallel, BiocVersion, blogdown, chevron, clinfun,
     compareDF, compiler, condSURV, constructive, covtracer, crmPack, CTP, daff, data.validator,
     datapasta, datasets, descem, diffdf, diffr, docxtractr, dunlin, facetsr, flexsurvPlus,
@@ -19,7 +20,7 @@ default:
     mrgsolve, mtdesign, ncappc, nestcolor, nesttemplate, nhanesA, nlmixr, NMcheckData, NMdata,
     NMproject, nmrec, NMsim, noindex, nonmem2R, osprey, overlapping, parallel, pharmaRTF, pharmr,
     pkglite, pkgr, PKNCA, pmforest, pmparams, pmplots, pmtables, pmxTools, PopED, psborrow,
-    r.pkg.template, random.cdisc.data, randomForrest, rbmi, RDO, readsas, reporter, respectables,
+    r.pkg.template, random.cdisc.data, randomForest, rbmi, RDO, readsas, reporter, respectables,
     riskassessment, rmsfuns, RNMImport, roxy.shinylive, rpsftmPlus, RsNLME, rspeaksnonmem, rtables,
     rtables.officer, sas7bdat, sasxport, scda, scda.2021, scda.2022, semantic.assets, sensitivity,
     sftp, shiny.semantic, simaerep, simIDM, simpar, sloop, splines, staged.dependencies, stats,
