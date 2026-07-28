@@ -1,4 +1,17 @@
+# val.pipeline 0.1.2
+
 # val.pipeline 0.1.1
+
+- **Optional local repo in `pipeline.toml`**: `write_pipeline_toml()` and
+  `val_prep_pipeline()` now accept a `local_repo` / `toml_local_repo`
+  argument. When supplied, the given URL is prepended at position 1 of
+  the emitted toml's `[project].repositories` array (so `rv` reaches it
+  first while processing the toml) without leaking into `opt_repos`,
+  which continues to drive the assessment itself. Accepts either an
+  unnamed `character(1)` (aliased as `"local"`) or a named
+  `character(1)` where the name becomes the alias (e.g.
+  `c(local = "https://...")`). Defaults to `NULL` — no change to
+  existing behavior.
 
 # val.pipeline 0.1.0
 

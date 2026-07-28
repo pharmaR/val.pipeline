@@ -96,3 +96,94 @@ test_that("write_pipeline_toml() r_version defaults to current R major.minor", {
     txt
   )))
 })
+
+
+test_that("write_pipeline_toml() prepends an unnamed local_repo as 'local'", {
+  tmp <- withr::local_tempfile(fileext = ".toml")
+  write_pipeline_toml(
+    pkgs       = "dplyr",
+    opt_repos  = c(
+      CRAN = "https://packagemanager.posit.co/cran/2026-06-21",
+      BioC = "https://bioconductor.org/packages/3.22/bioc"
+    ),
+    local_repo = "https://ppm.example.com/internal",
+    path       = tmp
+  )
+  txt <- readLines(tmp)
+
+  local_line <- grep("alias = \"local\"", txt, value = TRUE)
+  cran_line  <- grep("alias = \"CRAN\"",  txt, value = TRUE)
+  bioc_line  <- grep("alias = \"BioC\"",  txt, value = TRUE)
+  expect_length(local_line, 1L)
+  expect_match(local_line, "url = \"https://ppm\\.example\\.com/internal\"")
+  # local must be first, then CRAN, then BioC
+  expect_lt(which(txt == local_line), which(txt == cran_line))
+  expect_lt(which(txt == cran_line),  which(txt == bioc_line))
+})
+
+
+test_that("write_pipeline_toml() uses the name of a named local_repo as its alias", {
+  tmp <- withr::local_tempfile(fileext = ".toml")
+  write_pipeline_toml(
+    pkgs       = "dplyr",
+    opt_repos  = c(CRAN = "https://packagemanager.posit.co/cran/2026-06-21"),
+    local_repo = c(internal_ppm = "https://ppm.example.com/internal"),
+    path       = tmp
+  )
+  txt <- readLines(tmp)
+  local_line <- grep("alias = \"internal_ppm\"", txt, value = TRUE)
+  cran_line  <- grep("alias = \"CRAN\"", txt, value = TRUE)
+  expect_length(local_line, 1L)
+  expect_match(local_line, "url = \"https://ppm\\.example\\.com/internal\"")
+  expect_lt(which(txt == local_line), which(txt == cran_line))
+  # 'local' should not appear when an alias was supplied.
+  expect_length(grep("alias = \"local\"", txt), 0L)
+})
+
+
+test_that("write_pipeline_toml() validates local_repo", {
+  tmp <- withr::local_tempfile(fileext = ".toml")
+  expect_error(
+    write_pipeline_toml(
+      pkgs       = "dplyr",
+      opt_repos  = c(CRAN = "https://example.com"),
+      local_repo = c("a", "b"),
+      path       = tmp
+    ),
+    "non-empty character\\(1\\)"
+  )
+  expect_error(
+    write_pipeline_toml(
+      pkgs       = "dplyr",
+      opt_repos  = c(CRAN = "https://example.com"),
+      local_repo = "",
+      path       = tmp
+    ),
+    "non-empty character\\(1\\)"
+  )
+})
+
+
+test_that("write_pipeline_toml() does not mutate the caller's opt_repos", {
+  tmp <- withr::local_tempfile(fileext = ".toml")
+
+  # Snapshot the caller's opt_repos before + after. The `local_repo`
+  # prepend must happen only inside the emitted toml; the caller's
+  # object must stay identical (same names, same values, same order).
+  opt_repos <- c(
+    CRAN = "https://packagemanager.posit.co/cran/2026-06-21",
+    BioC = "https://bioconductor.org/packages/3.22/bioc"
+  )
+  before <- opt_repos
+
+  write_pipeline_toml(
+    pkgs       = "dplyr",
+    opt_repos  = opt_repos,
+    local_repo = "https://ppm.example.com/internal",
+    path       = tmp
+  )
+
+  expect_identical(opt_repos, before)
+  # And the local_repo alias must not have leaked into the caller's names.
+  expect_false("local" %in% names(opt_repos))
+})

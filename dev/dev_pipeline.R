@@ -8,6 +8,37 @@
 # Load package
 devtools::load_all()
 
+
+ref = "source"
+metric_pkg = "riskmetric"
+deps = c("depends") #,"suggests") # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
+deps_recursive = TRUE
+# val_date = Sys.Date()
+val_date = as.Date("2026-07-20")
+replace = FALSE
+out = Sys.getenv("RISK_OUTPATH", unset = getwd())
+opt_repos =
+  c(CRAN = "https://packagemanager.posit.co/cran/2026-06-21",
+    BioC = 'https://bioconductor.org/packages/3.22/bioc')
+verbose = 'normal'
+# config_path = NULL
+
+
+
+# Prepare the environment to run the qualification pipeline
+prep <- val_prep_pipeline(
+  ref             = ref,
+  metric_pkg      = metric_pkg,
+  deps            = deps,
+  deps_recursive  = deps_recursive,
+  val_date        = val_date,
+  out             = out,
+  opt_repos       = opt_repos,
+  toml_local_repo = 'https://fake.test.com/local-r4.5-2026-07-21/', # new
+  verbose         = 'normal'
+)
+
+
 # Create qualified pkg data.frame
 qual <- val_pipeline(
   ref = "source",
@@ -25,18 +56,6 @@ qual <- val_pipeline(
 # Quick run
 # # 
 # 
-ref = "source"
-metric_pkg = "riskmetric"
-deps = c("depends") #,"suggests") # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
-deps_recursive = TRUE
-# val_date = Sys.Date()
-val_date = as.Date("2026-07-20")
-replace = FALSE
-out = Sys.getenv("RISK_OUTPATH", unset = getwd())
-opt_repos =
-  c(CRAN = "https://packagemanager.posit.co/cran/2026-06-21",
-    BioC = 'https://bioconductor.org/packages/3.22/bioc')
-verbose = 'normal'
 
 
 #
