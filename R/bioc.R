@@ -152,25 +152,29 @@ configure_bioc_repositories <- function(repos = NULL, quiet = FALSE) {
   invisible(effective)
 }
 
-#' Install the BiocManager repositories shim when requested by an env var
+#' Install the BiocManager repositories shim when opted-in
 #'
 #' Wrapper around [configure_bioc_repositories()] that is a no-op unless
-#' the environment variable `VAL_PIPELINE_INTERNAL_BIOC` is set to a
-#' truthy value (`"1"`, `"TRUE"`, `"true"`, `"yes"`). This is what the
-#' `val.pipeline` entry points call at startup so that public-network
-#' users are unaffected while air-gapped users can opt in with a single
-#' env var.
+#' the current run is flagged as air-gapped by either:
+#'
+#' * the environment variable `VAL_PIPELINE_INTERNAL_BIOC` being set to a
+#'   truthy value (`"1"`, `"TRUE"`, `"true"`, `"yes"`, `"on"`), or
+#' * `default: air_gapped: true` in the resolved `config.yml`.
+#'
+#' The env var wins when both are set, so operators can override the
+#' config from a shell. This is what the `val.pipeline` entry points
+#' call at startup so that public-network users are unaffected while
+#' air-gapped users can opt in with a single knob.
 #'
 #' @param quiet Passed through to [configure_bioc_repositories()].
 #'
 #' @return Invisibly, the character vector of repository URLs that the
-#'   shim will return (or `character(0)` when the env var is unset or
-#'   BiocManager is not installed).
+#'   shim will return (or `character(0)` when the shim was not
+#'   requested or BiocManager is not installed).
 #'
 #' @export
 configure_bioc_repositories_if_requested <- function(quiet = FALSE) {
-  flag <- Sys.getenv("VAL_PIPELINE_INTERNAL_BIOC", unset = "")
-  if (!nzchar(flag) || !tolower(flag) %in% c("1", "true", "yes", "y", "on")) {
+  if (!.val_pipeline_air_gapped_requested()) {
     return(invisible(character(0)))
   }
   configure_bioc_repositories(quiet = quiet)
@@ -265,11 +269,12 @@ configure_riskmetric_offline <- function(quiet = FALSE) {
   invisible(TRUE)
 }
 
-#' Install the riskmetric offline reverse-deps shim when requested
+#' Install the riskmetric offline reverse-deps shim when opted-in
 #'
-#' Wrapper around [configure_riskmetric_offline()] that is a no-op
-#' unless the environment variable `VAL_PIPELINE_INTERNAL_BIOC` is set
-#' to a truthy value (`"1"`, `"TRUE"`, `"true"`, `"yes"`, `"on"`).
+#' Wrapper around [configure_riskmetric_offline()] that is a no-op unless
+#' the current run is flagged as air-gapped by either the environment
+#' variable `VAL_PIPELINE_INTERNAL_BIOC` (truthy) or
+#' `default: air_gapped: true` in the resolved `config.yml`.
 #'
 #' @param quiet Passed through to [configure_riskmetric_offline()].
 #'
@@ -278,8 +283,7 @@ configure_riskmetric_offline <- function(quiet = FALSE) {
 #'
 #' @export
 configure_riskmetric_offline_if_requested <- function(quiet = FALSE) {
-  flag <- Sys.getenv("VAL_PIPELINE_INTERNAL_BIOC", unset = "")
-  if (!nzchar(flag) || !tolower(flag) %in% c("1", "true", "yes", "y", "on")) {
+  if (!.val_pipeline_air_gapped_requested()) {
     return(invisible(FALSE))
   }
   configure_riskmetric_offline(quiet = quiet)

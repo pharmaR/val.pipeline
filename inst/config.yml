@@ -1,5 +1,19 @@
 default:
 
+  # Version of this config file's schema. Kept in sync with
+  # val.pipeline::CONFIG_VERSION_CURRENT; bumped when the schema changes
+  # in a backwards-incompatible way. Older configs are rejected by
+  # `validate_config()`; newer configs warn and ask the user to upgrade
+  # val.pipeline.
+  config_version: "1.0.0"
+
+  # Opt into the air-gapped Bioconductor / riskmetric shims installed by
+  # configure_bioc_repositories_if_requested() and
+  # configure_riskmetric_offline_if_requested(). Equivalent to setting
+  # `Sys.setenv(VAL_PIPELINE_INTERNAL_BIOC = "1")`; the env var wins when
+  # both are set. Defaults to FALSE for public-network users.
+  air_gapped: false
+
   # Pkgs that are too time intensive to run riskmetric assessment with pkg_ref == "source"
   # withr - crashes, VGAM 10h, shinyBS 5h, collapse 1.6h, fitdistrplus 1.7h, gamlss.dist 52m, gss 52m, segmented 45m, RSiena 1.6hr, qtl 22hr, openxlsx2 60m, BayesXsrc 45m,
   remote_only: [withr, VGAM, shinyBS, fitdistrplus, collapse, gamlss.dist, gss, segmented, RSiena, qtl, openxlsx2, BayesXsrc] 
