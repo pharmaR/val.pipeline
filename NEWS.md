@@ -7,24 +7,38 @@
   the directory it belongs to.
 
 - **Surface R CMD check error and warning text in the "Code checks"
-  section**: previously the "Code checks" chunk was skipped entirely
-  when `d_riskmetric$r_cmd_check` was a `pkg_metric_error`, hiding
-  the actual reason the check failed. The section now extracts any
-  error / warning text from the metric (whether it arrives as an
+  section**: previously the "Code checks" chunk only showed the
+  count breakdown (`Notes - 0 Errors - 1 Warnings - 0`) and had no
+  affordance for the actual message text. The section now extracts
+  any error / warning text from the metric (whether it arrives as an
   `rcmdcheck_error` with `$result$errors` / `$result$warnings`, a
   `system_command_status_error` with `$stderr`, or a bare
   condition's `$message`) and renders it under labeled subsections.
-  Notes are intentionally omitted.
+  When the metric is a plain named-integer count with `errors > 0`
+  or `warnings > 0` but no text was captured (the typical shape from
+  `riskmetric::pkg_metric_r_cmd_check`), an explicit fallback line
+  is shown so the reader isn't left wondering why the section is
+  empty. Notes are intentionally omitted.
 
-- **Follow-up fix for `data.frame(... check.names = FALSE): row names
-  contain missing values`**: the earlier fix only hardened the summary
-  card `data.frame()`. The same error was still firing from
-  `summary_data <- summary_table(r_riskmetric[, !is.na(as.vector(...))])`
-  when a metric column was an error object, a list, or a multi-element
-  vector — `!is.na(as.vector(...))` recycled and produced NA-named
-  column selections. Column selection now uses a per-column
-  `vapply(..., !all(is.na(x)))` predicate and `row.names(summary_data)`
-  is explicitly nulled out.
+- **Fix `data.frame(... check.names = FALSE): row names contain
+  missing values` for packages whose exports include names with
+  leading underscores** (e.g. `cli`'s `__cli_update_due`). Some
+  assessments store `export_help` names with literal surrounding
+  quote characters (`"__cli_update_due"`, 18 bytes) while
+  `exported_namespace` stores the same identifier without quotes
+  (`__cli_update_due`, 16 bytes), so
+  `export_help[sort(exported_namespace)]` inside
+  `riskreports:::prepare_namespace_table()` returned NA-named
+  entries and `as.data.frame()` complained about missing row
+  names. The report now strips stray surrounding quotes from both
+  metrics before calling `prepare_namespace_table()`, and wraps
+  the call in `tryCatch()` so any residual failure degrades to a
+  short message instead of aborting the whole render.
+
+- **Follow-up fix for the same error at the `summary_table()` input**:
+  replaced `r_riskmetric[, !is.na(as.vector(r_riskmetric))]` with a
+  per-column `vapply(..., !all(is.na(x)))` predicate and set
+  `row.names(summary_data) <- NULL`.
 
 # val.pipeline 0.1.3
 
