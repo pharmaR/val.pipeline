@@ -104,12 +104,36 @@ riskreports:::create_metrics_cards(r_riskmetric)
 ::: {.content-hidden when-format="html"}
 
 ```{r simple_cards}
+safe_scalar <- function(x) {
+  if (is.null(x) || length(x) == 0) return("unknown")
+  x <- unname(x)
+  as.character(x[[1]])
+}
+rdep_raw <- d_riskmetric$reverse_dependencies
+rdep_display <- if (inherits(rdep_raw, "pkg_metric_error") ||
+                    is.null(rdep_raw) || length(rdep_raw) == 0) {
+  "unknown"
+} else if (is.character(rdep_raw)) {
+  prettyNum(length(rdep_raw), big.mark = ",")
+} else if (is.numeric(rdep_raw)) {
+  prettyNum(rdep_raw[[1]], big.mark = ",")
+} else {
+  "unknown"
+}
+dl_raw <- r_riskmetric$downloads_1yr
+dl_display <- if (is.numeric(dl_raw) && length(dl_raw) >= 1) {
+  prettyNum(dl_raw[[1]], big.mark = ",")
+} else {
+  safe_scalar(dl_raw)
+}
 simple_cards <- data.frame(
-  "Downloads 1 year" = prettyNum(r_riskmetric$downloads_1yr, big.mark = ","),
-  "Reverse dependencies" = prettyNum(r_riskmetric$reverse_dependencies, big.mark = ","),
-  "License" = as.character(r_riskmetric$license),
-  "Origin" = r_riskmetric$origin,
-  check.names = FALSE
+  "Downloads 1 year" = dl_display,
+  "Reverse dependencies" = rdep_display,
+  "License" = safe_scalar(r_riskmetric$license),
+  "Origin" = safe_scalar(r_riskmetric$origin),
+  check.names = FALSE,
+  row.names = NULL,
+  stringsAsFactors = FALSE
 )
 r_riskmetric$origin <- NULL
 knitr::kable(simple_cards)
@@ -142,7 +166,13 @@ dependencies_table <- htmltools::div(
 :::
 
 ```{r prepare_tables_reverse_dependencies}
-reverse_dependencies <- paste(d_riskmetric$reverse_dependencies, collapse = ", ")
+rdep_raw <- d_riskmetric$reverse_dependencies
+reverse_dependencies <- if (inherits(rdep_raw, "pkg_metric_error") ||
+                            is.null(rdep_raw) || length(rdep_raw) == 0) {
+  "Reverse dependencies could not be retrieved."
+} else {
+  paste(as.character(rdep_raw), collapse = ", ")
+}
 ```
 
 ```{r prepare_tables_examples}
@@ -263,10 +293,29 @@ cat("Remote checks: ", d_riskmetric[["remote_checks"]])
 ```
 
 
-```{r covr_coverage, eval=!riskreports::is_risk_error(d_riskmetric[["covr_coverage"]]), results='asis'}
+```{r covr_coverage_eval_flag, include=FALSE}
+.covr_val <- d_riskmetric[["covr_coverage"]]
+.covr_scalar <- if (is.list(.covr_val)) {
+  if (!is.null(.covr_val$totalcoverage)) .covr_val$totalcoverage else .covr_val[[1]]
+} else {
+  .covr_val
+}
+.covr_ok <- !riskreports::is_risk_error(.covr_val) &&
+  !is.null(.covr_scalar) && length(.covr_scalar) == 1 &&
+  !is.na(.covr_scalar) && (is.numeric(.covr_scalar) || is.character(.covr_scalar))
+.covr_display <- if (.covr_ok && is.numeric(.covr_scalar)) {
+  sprintf("%.2f%%", .covr_scalar)
+} else if (.covr_ok) {
+  as.character(.covr_scalar)
+} else {
+  ""
+}
+```
+
+```{r covr_coverage, eval=.covr_ok, results='asis'}
 cat("## Code coverage", "\n")
 
-cat("Code coverage for this package: ", d_riskmetric[["covr_coverage"]])
+cat("Code coverage for this package: ", .covr_display)
 ```
 
 

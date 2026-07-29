@@ -1,5 +1,22 @@
 # val.pipeline 0.1.2
 
+- **Individual package report PDF fixes**: hardened
+  `inst/report/package/pkg_template.qmd` against three failure modes
+  seen in real reports: (1) the "Reverse dependencies" cell in the
+  summary card table sometimes rendered an error/warning string (e.g.
+  "Bioconductor version cannot be validated...") instead of a count —
+  it is now coerced to a length via `length()` when the metric is a
+  character vector of package names, and shown as "unknown" for
+  `pkg_metric_error` / `NULL` values; (2) `data.frame(... check.names
+  = FALSE): row names contain missing values` right below that table
+  — every card column is now forced to a single unnamed character
+  scalar with explicit `row.names = NULL`; (3) `cat(... covr_coverage
+  ...): argument 2 (type 'list') cannot be handled by 'cat'` in the
+  "Code coverage" section — the chunk now extracts a scalar from the
+  `list(totalcoverage=, filecoverage=)` structure, formats numeric
+  values as a percentage, and skips the section entirely when no
+  usable coverage value is available.
+
 # val.pipeline 0.1.1
 
 - **Optional local repo in `pipeline.toml`**: `write_pipeline_toml()` and
