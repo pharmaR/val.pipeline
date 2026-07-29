@@ -374,26 +374,47 @@ if (!riskreports::is_risk_error(.rmt) && length(.rmt) >= 1) {
   .append_row("Remote checks", as.character(.rmt[[1]]))
 }
 
+# Code coverage — pull the same scalar the standalone Code coverage
+# section used to compute (percent for numeric metrics, raw text
+# otherwise) and expose it as a metric-table row.
+.cov <- d_riskmetric[["covr_coverage"]]
+.cov_scalar <- if (is.list(.cov)) {
+  if (!is.null(.cov$totalcoverage)) .cov$totalcoverage else .cov[[1]]
+} else {
+  .cov
+}
+if (!riskreports::is_risk_error(.cov) &&
+    !is.null(.cov_scalar) && length(.cov_scalar) == 1 &&
+    !is.na(.cov_scalar) &&
+    (is.numeric(.cov_scalar) || is.character(.cov_scalar))) {
+  .cov_display <- if (is.numeric(.cov_scalar)) {
+    sprintf("%.2f%%", .cov_scalar)
+  } else {
+    as.character(.cov_scalar)
+  }
+  .append_row("Code coverage", .cov_display)
+}
+
 # Reorder rows into a friendlier grouping:
 #   1. Downloads 1yr + Reverse dependencies (top)
 #   2. Dependencies
-#   3. Has news + News current (paired)
-#   4. Exported namespace + Export help (paired)
-#   5. Has examples + Has vignettes (paired)
-#   6. URL-returning fields: Has website, Has source control, Has bug
+#   3. R CMD check + Code coverage + Remote checks (paired trio)
+#   4. Has news + News current (paired)
+#   5. Exported namespace + Export help (paired)
+#   6. Has examples + Has vignettes (paired)
+#   7. URL-returning fields: Has website, Has source control, Has bug
 #      reports url, followed immediately by Bugs status.
-#   7. R CMD check + Remote checks (paired)
 #   8. Everything else (e.g. Size codebase) keeps its original relative
 #      order after the groups above.
 #   9. License + Has maintainer (bottom)
 .preferred_order <- c(
   "Downloads 1yr", "Reverse dependencies",
   "Dependencies",
+  "R CMD check", "Code coverage", "Remote checks",
   "Has news", "News current",
   "Exported namespace", "Export help",
   "Has examples", "Has vignettes",
-  "Has website", "Has source control", "Has bug reports url", "Bugs status",
-  "R CMD check", "Remote checks"
+  "Has website", "Has source control", "Has bug reports url", "Bugs status"
 )
 .bottom_pinned <- c("License", "Has maintainer")
 .metric_order  <- summary_data$Metric
@@ -498,12 +519,21 @@ if (inherits(.deps_raw, "data.frame") && "package" %in% names(.deps_raw)) {
   .deps_names <- as.character(.deps_raw)
   .deps_names <- .deps_names[nzchar(.deps_names) & !is.na(.deps_names)]
   .deps_names <- sort(unique(.deps_names))
-  .deps_df <- data.frame(
-    package = .deps_names,
-    type = NA_character_,
-    stringsAsFactors = FALSE,
-    row.names = NULL
-  )
+  .deps_df <- if (length(.deps_names) > 0) {
+    data.frame(
+      package = .deps_names,
+      type = NA_character_,
+      stringsAsFactors = FALSE,
+      row.names = NULL
+    )
+  } else {
+    data.frame(
+      package = character(0),
+      type = character(0),
+      stringsAsFactors = FALSE,
+      row.names = NULL
+    )
+  }
 }
 .has_deps <- length(.deps_names) > 0
 
@@ -540,29 +570,9 @@ cat(paste(.rdep_names, collapse = ", "), ".\n\n", sep = "")
 ```
 
 
-```{r covr_coverage_eval_flag, include=FALSE}
-.covr_val <- d_riskmetric[["covr_coverage"]]
-.covr_scalar <- if (is.list(.covr_val)) {
-  if (!is.null(.covr_val$totalcoverage)) .covr_val$totalcoverage else .covr_val[[1]]
-} else {
-  .covr_val
-}
-.covr_ok <- !riskreports::is_risk_error(.covr_val) &&
-  !is.null(.covr_scalar) && length(.covr_scalar) == 1 &&
-  !is.na(.covr_scalar) && (is.numeric(.covr_scalar) || is.character(.covr_scalar))
-.covr_display <- if (.covr_ok && is.numeric(.covr_scalar)) {
-  sprintf("%.2f%%", .covr_scalar)
-} else if (.covr_ok) {
-  as.character(.covr_scalar)
-} else {
-  ""
-}
-```
-
-```{r covr_coverage, eval=.covr_ok, results='asis'}
-cat("## Code coverage", "\n")
-
-cat("Code coverage for this package: ", .covr_display)
+```{r covr_coverage, eval=FALSE, results='asis'}
+# The Code coverage metric is now shown as a row in the summary metric
+# table above, so this standalone section is no longer rendered.
 ```
 
 
