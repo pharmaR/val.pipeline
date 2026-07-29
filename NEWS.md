@@ -8,6 +8,11 @@
   with `Bugs status` placed adjacent to `Has bug reports url`;
   `Has maintainer` pinned at the bottom.
 
+- **Dependencies section rendered as a table** with `Package` and
+  `Type` columns (Depends / Imports / LinkingTo / Suggests / Enhances),
+  replacing the previous comma-separated paragraph. Rows are ordered
+  by dependency type and then alphabetically.
+
 - **Indent the R CMD check bullets and error/warning blocks** so they
   sit inside the same Markdown blockquote as the R CMD check /
   Remote checks summary lines.

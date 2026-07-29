@@ -557,14 +557,39 @@ cat("> **Remote checks**: ", d_riskmetric[["remote_checks"]], "\n")
 
 ```{r dependencies_section_prep, include=FALSE}
 .deps_raw <- d_riskmetric$dependencies
+.deps_df <- NULL
 .deps_names <- character(0)
 if (inherits(.deps_raw, "data.frame") && "package" %in% names(.deps_raw)) {
-  .deps_names <- as.character(.deps_raw$package)
+  .deps_df <- as.data.frame(.deps_raw, stringsAsFactors = FALSE)
+  .deps_df <- .deps_df[, intersect(c("package", "type"), names(.deps_df)), drop = FALSE]
+  .deps_df$package <- as.character(.deps_df$package)
+  if ("type" %in% names(.deps_df)) {
+    .deps_df$type <- as.character(.deps_df$type)
+  } else {
+    .deps_df$type <- NA_character_
+  }
+  .deps_df <- .deps_df[nzchar(.deps_df$package) & !is.na(.deps_df$package), , drop = FALSE]
+  # Prefer a friendly ordering: Depends, Imports, LinkingTo, Suggests, Enhances,
+  # then any other type, then alphabetical within each type.
+  .type_rank <- c("Depends" = 1L, "Imports" = 2L, "LinkingTo" = 3L,
+                  "Suggests" = 4L, "Enhances" = 5L)
+  .deps_df$.rank <- unname(ifelse(.deps_df$type %in% names(.type_rank),
+                                  .type_rank[.deps_df$type], 99L))
+  .deps_df <- .deps_df[order(.deps_df$.rank, .deps_df$type, .deps_df$package), , drop = FALSE]
+  .deps_df$.rank <- NULL
+  rownames(.deps_df) <- NULL
+  .deps_names <- .deps_df$package
 } else if (is.character(.deps_raw)) {
   .deps_names <- as.character(.deps_raw)
+  .deps_names <- .deps_names[nzchar(.deps_names) & !is.na(.deps_names)]
+  .deps_names <- sort(unique(.deps_names))
+  .deps_df <- data.frame(
+    package = .deps_names,
+    type = NA_character_,
+    stringsAsFactors = FALSE,
+    row.names = NULL
+  )
 }
-.deps_names <- .deps_names[nzchar(.deps_names) & !is.na(.deps_names)]
-.deps_names <- sort(unique(.deps_names))
 .has_deps <- length(.deps_names) > 0
 
 .rdep_raw <- d_riskmetric$reverse_dependencies
@@ -582,7 +607,13 @@ cat("## Dependencies", "\n\n")
 cat(sprintf("This package has %s first-order dependenc%s:\n\n",
             prettyNum(length(.deps_names), big.mark = ","),
             if (length(.deps_names) == 1L) "y" else "ies"))
-cat(paste(.deps_names, collapse = ", "), ".\n\n", sep = "")
+.deps_show <- .deps_df
+names(.deps_show) <- c("Package", "Type")[seq_len(ncol(.deps_show))]
+if ("Type" %in% names(.deps_show)) {
+  .deps_show$Type[is.na(.deps_show$Type) | !nzchar(.deps_show$Type)] <- "—"
+}
+print(knitr::kable(.deps_show, row.names = FALSE))
+cat("\n\n")
 ```
 
 ```{r reverse_dependencies_section, eval=.has_rdeps, results='asis'}
