@@ -1,7 +1,7 @@
 ---
 title: "`r basename(params$package_name)` v`r params$package_version`"
 date-format: "[Validation Date:] YYYY-MM-DD"
-date: "`r params$val_date`"
+date: "`r if (is.null(params$val_date) || !nzchar(as.character(params$val_date))) format(Sys.Date(), '%Y-%m-%d') else params$val_date`"
 published-title: ""
 params:
   package_name: dplyr
@@ -275,6 +275,70 @@ row.names(summary_data) <- NULL
                if (is.character(d_riskmetric$reverse_dependencies))
                  length(d_riskmetric$reverse_dependencies) else
                  d_riskmetric$reverse_dependencies)
+.restore_count("Has vignettes",
+               if (is.numeric(d_riskmetric$has_vignettes))
+                 d_riskmetric$has_vignettes else NULL)
+
+# --- Extra polish on individual summary rows -----------------------------
+.set_value <- function(metric_row_name, val) {
+  if (is.null(val) || !length(val) || !nzchar(as.character(val))) {
+    return(invisible())
+  }
+  idx <- which(summary_data$Metric == metric_row_name)
+  if (length(idx) == 1L) summary_data$Value[idx] <<- as.character(val)
+}
+
+# Export help: show "N / M (P%)" derived from the raw per-export logical.
+.eh <- d_riskmetric$export_help
+if (is.logical(.eh) && length(.eh) > 0) {
+  .n <- sum(.eh, na.rm = TRUE)
+  .m <- length(.eh)
+  .set_value("Export help",
+             sprintf("%s / %s (%.1f%%)",
+                     prettyNum(.n, big.mark = ","),
+                     prettyNum(.m, big.mark = ","),
+                     100 * .n / .m))
+}
+
+# Bugs status: round the percent-closed figure to one decimal place.
+.bs <- d_riskmetric$bugs_status
+if (is.logical(.bs) && length(.bs) > 0) {
+  .set_value("Bugs status",
+             sprintf("%.1f%% closed", 100 * sum(.bs, na.rm = TRUE) / length(.bs)))
+}
+
+# Size codebase: pretty-print with a thousands separator.
+.sc <- d_riskmetric$size_codebase
+if (is.numeric(.sc) && length(.sc) >= 1) {
+  .set_value("Size codebase",
+             prettyNum(as.integer(.sc[[1]]), big.mark = ","))
+}
+
+# Websites: show the associated URL(s) rather than a boolean "Yes".
+.ws <- d_riskmetric$has_website
+if (is.character(.ws) && length(.ws) > 0) {
+  .ws <- .ws[nzchar(.ws) & !is.na(.ws)]
+  if (length(.ws) > 0) {
+    .set_value("Has website", paste(.ws, collapse = ", "))
+  }
+}
+
+# Bug reports URL: the `has_bug_reports_url` metric only records presence
+# (0/1), not the URL itself. Try to extract the URL from the package's
+# sourced DESCRIPTION file when the run's val_dir is available.
+if (!is.null(val_dir) && nzchar(as.character(val_dir))) {
+  .desc_path <- file.path(as.character(val_dir), "sourced",
+                          as.character(pkg_name), "DESCRIPTION")
+  if (file.exists(.desc_path)) {
+    .desc <- tryCatch(read.dcf(.desc_path), error = function(e) NULL)
+    if (!is.null(.desc)) {
+      .br <- if ("BugReports" %in% colnames(.desc)) .desc[1, "BugReports"] else NA
+      if (!is.na(.br) && nzchar(.br)) {
+        .set_value("Has bug reports url", as.character(.br))
+      }
+    }
+  }
+}
 
 values_collapsed_rows <- c(
   "Has news",
@@ -427,7 +491,7 @@ cat("Code checks for this package:", "\n")
 
 ```{r r_cmd_check, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]), results='asis'}
 r_cmd <- d_riskmetric[["r_cmd_check"]]
-cat("**R CMD check**: ", paste(stringr::str_to_title(names(r_cmd)), r_cmd, sep = " - "))
+cat("> **R CMD check**: ", paste(stringr::str_to_title(names(r_cmd)), r_cmd, sep = " - "), "\n")
 ```
 
 ```{r r_cmd_check_errors, eval=length(.rcmd_errors) > 0, results='asis'}
@@ -461,7 +525,7 @@ cat(sprintf(
 
 
 ```{r remote_checks, eval=!riskreports::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
-cat("**Remote checks**: ", d_riskmetric[["remote_checks"]])
+cat("> **Remote checks**: ", d_riskmetric[["remote_checks"]], "\n")
 ```
 
 

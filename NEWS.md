@@ -1,5 +1,26 @@
 # val.pipeline 0.1.4
 
+- **Indent the R CMD check and Remote checks lines** using a Markdown
+  blockquote so they read as nested content under the `## Code checks`
+  heading rather than as inline paragraphs.
+
+- **Report renders when `params$val_date` is `NULL`**: the YAML
+  `date` field now falls back to `Sys.Date()` when `val_date` is
+  missing or empty, so Quarto no longer errors on the empty
+  `date-format` before any R chunk runs.
+
+- **Richer summary-card values**:
+  - `Has vignettes` shows the raw vignette count instead of `Yes`.
+  - `Export help` shows `N / M (P%)` — number of exports with help
+    over total exports — computed from the raw per-export logical.
+  - `Bugs status` is rounded to one decimal (`60.0% closed` rather
+    than `60.00% closed`).
+  - `Size codebase` is pretty-printed with a thousands separator.
+  - `Has website` shows the associated URL(s) rather than `Yes`.
+  - `Has bug reports url` shows the actual URL when it can be read
+    from `<val_dir>/sourced/<pkg>/DESCRIPTION` (falls back to the
+    prior boolean when the DESCRIPTION isn't available).
+
 - **Drop the redundant `## License` section** from
   `inst/report/package/pkg_template.qmd`. The package's license is
   already shown in the summary card table above the section, so
