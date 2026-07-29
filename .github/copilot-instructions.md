@@ -187,8 +187,13 @@ Every PR must include:
    effect).
 2. **NEWS.md**: add one bullet under `# val.pipeline (development version)`
    at the **bottom** of the existing list. Format: short imperative summary
-   of the user-visible change, ending with `(#<n>)` referencing the issue.
-   Match the voice of surrounding bullets. Skip only for changes with zero
+   of the user-visible change, ending with `(#<n>)` referencing the PR or
+   issue. **Always use the bare `#<n>` autolink form** — never a full
+   Markdown link (`[#78](https://…)`) or a plain URL. `pkgdown` and
+   GitHub's own renderer autolink `#N` against `URL:` in `DESCRIPTION`, so
+   the bare form renders as a link everywhere while keeping the source
+   readable. When both a PR and an issue exist, cite the PR. Match the
+   voice of surrounding bullets. Skip only for changes with zero
    user-visible / reviewer-visible effect (comment tweak, internal test
    rename that ships no behavior). If unsure, add the entry.
 
