@@ -376,24 +376,25 @@ if (!riskreports::is_risk_error(.rmt) && length(.rmt) >= 1) {
 
 # Code coverage — pull the same scalar the standalone Code coverage
 # section used to compute (percent for numeric metrics, raw text
-# otherwise) and expose it as a metric-table row.
+# otherwise) and expose it as a metric-table row. When the metric
+# is unavailable, still render the row with "Not calculated" so the
+# reader knows coverage was considered.
 .cov <- d_riskmetric[["covr_coverage"]]
 .cov_scalar <- if (is.list(.cov)) {
   if (!is.null(.cov$totalcoverage)) .cov$totalcoverage else .cov[[1]]
 } else {
   .cov
 }
-if (!riskreports::is_risk_error(.cov) &&
-    !is.null(.cov_scalar) && length(.cov_scalar) == 1 &&
-    !is.na(.cov_scalar) &&
-    (is.numeric(.cov_scalar) || is.character(.cov_scalar))) {
-  .cov_display <- if (is.numeric(.cov_scalar)) {
-    sprintf("%.2f%%", .cov_scalar)
-  } else {
-    as.character(.cov_scalar)
-  }
-  .append_row("Code coverage", .cov_display)
+.cov_display <- if (!riskreports::is_risk_error(.cov) &&
+                    !is.null(.cov_scalar) && length(.cov_scalar) == 1 &&
+                    !is.na(.cov_scalar) &&
+                    (is.numeric(.cov_scalar) || is.character(.cov_scalar))) {
+  if (is.numeric(.cov_scalar)) sprintf("%.2f%%", .cov_scalar)
+  else as.character(.cov_scalar)
+} else {
+  "Not calculated"
 }
+.append_row("Code coverage", .cov_display)
 
 # Reorder rows into a friendlier grouping:
 #   1. Downloads 1yr + Reverse dependencies (top)
