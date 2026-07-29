@@ -1,4 +1,4 @@
-# val.pipeline 0.1.7
+# val.pipeline 0.1.8
 
 - Add `validate_config()` — checks the resolved `config.yml` for a
   supported `config_version:`, known top-level sections, known keys
