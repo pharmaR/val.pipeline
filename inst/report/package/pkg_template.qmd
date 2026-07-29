@@ -88,24 +88,7 @@ cat("- **Validation directory (`val_dir`):** ",
 ```
 
 ```{r context_code_checks, results='asis'}
-.rcmd <- d_riskmetric[["r_cmd_check"]]
-if (!riskreports::is_risk_error(.rcmd) && !is.null(.rcmd) && length(.rcmd) > 0) {
-  # r_cmd_check is typically a named vector/list with counts for
-  # errors / warnings / notes (e.g. c(errors = 0, warnings = 1, notes = 2)).
-  nm <- names(.rcmd)
-  vals <- suppressWarnings(as.numeric(unlist(.rcmd, use.names = FALSE)))
-  keep <- !is.na(vals) & vals > 0 &
-    grepl("error|warning|note", tolower(nm))
-  if (any(keep)) {
-    cat("\n**R CMD check findings for this package:**\n\n")
-    for (i in which(keep)) {
-      cat("- ", stringr::str_to_title(nm[i]), ": ", vals[i], "\n", sep = "")
-    }
-    cat("\n")
-  } else if (any(grepl("error|warning|note", tolower(nm)))) {
-    cat("\nR CMD check reported no errors, warnings, or notes for this package.\n\n")
-  }
-}
+```
 ```
 
 
@@ -317,7 +300,53 @@ cat("The package uses ", d_riskmetric$license, ".", sep = "")
 ```
 
 
-```{r, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]) || !riskreports::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
+```{r code_checks_prep, include=FALSE}
+# Extract error / warning message text from d_riskmetric$r_cmd_check for
+# display in the Code checks section. Notes are intentionally omitted.
+# r_cmd_check can arrive in a few shapes:
+#   - a named vector of counts (successful run: c(errors, warnings, notes))
+#   - a `pkg_metric_error` + `rcmdcheck_error` with $result$errors / $result$warnings
+#   - a `pkg_metric_error` + `system_command_status_error` with $stderr
+#   - a `pkg_metric_error` + simpleError with just $message
+.rcmd <- d_riskmetric[["r_cmd_check"]]
+.rcmd_errors   <- character(0)
+.rcmd_warnings <- character(0)
+
+if (!is.null(.rcmd)) {
+  # rcmdcheck-style result
+  res <- tryCatch(.rcmd$result, error = function(e) NULL)
+  if (!is.null(res)) {
+    if (!is.null(res$errors))   .rcmd_errors   <- as.character(res$errors)
+    if (!is.null(res$warnings)) .rcmd_warnings <- as.character(res$warnings)
+  }
+  # Named-vector count with a companion text field
+  if (is.list(.rcmd) && length(.rcmd_errors) == 0 && !is.null(.rcmd$errors)) {
+    e <- .rcmd$errors
+    if (is.character(e)) .rcmd_errors <- e
+  }
+  if (is.list(.rcmd) && length(.rcmd_warnings) == 0 && !is.null(.rcmd$warnings)) {
+    w <- .rcmd$warnings
+    if (is.character(w)) .rcmd_warnings <- w
+  }
+  # Bare condition object — surface its message as an error
+  if (length(.rcmd_errors) == 0 && length(.rcmd_warnings) == 0 &&
+      inherits(.rcmd, "pkg_metric_error")) {
+    msg <- tryCatch(conditionMessage(.rcmd), error = function(e) NULL)
+    if (is.null(msg) && is.list(.rcmd) && !is.null(.rcmd$message)) msg <- .rcmd$message
+    if (is.null(msg) && is.list(.rcmd) && !is.null(.rcmd$stderr))  msg <- .rcmd$stderr
+    if (!is.null(msg) && nzchar(msg)) .rcmd_errors <- as.character(msg)
+  }
+}
+
+.rcmd_errors   <- .rcmd_errors[nzchar(.rcmd_errors)]
+.rcmd_warnings <- .rcmd_warnings[nzchar(.rcmd_warnings)]
+
+.has_code_checks <- !riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]) ||
+  !riskreports::is_risk_error(d_riskmetric[["remote_checks"]]) ||
+  length(.rcmd_errors) > 0 || length(.rcmd_warnings) > 0
+```
+
+```{r code_checks_header, eval=.has_code_checks, results='asis'}
 cat("## Code checks", "\n")
 
 cat("Code checks for this package:", "\n")
@@ -326,6 +355,20 @@ cat("Code checks for this package:", "\n")
 ```{r r_cmd_check, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]), results='asis'}
 r_cmd <- d_riskmetric[["r_cmd_check"]]
 cat("R CMD check: ", paste(stringr::str_to_title(names(r_cmd)), r_cmd, sep = " - "))
+```
+
+```{r r_cmd_check_errors, eval=length(.rcmd_errors) > 0, results='asis'}
+cat("\n\n**R CMD check errors:**\n\n")
+for (msg in .rcmd_errors) {
+  cat("```\n", msg, "\n```\n\n", sep = "")
+}
+```
+
+```{r r_cmd_check_warnings, eval=length(.rcmd_warnings) > 0, results='asis'}
+cat("\n\n**R CMD check warnings:**\n\n")
+for (msg in .rcmd_warnings) {
+  cat("```\n", msg, "\n```\n\n", sep = "")
+}
 ```
 
 

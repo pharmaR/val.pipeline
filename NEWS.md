@@ -2,10 +2,19 @@
 
 - **Populate the Context section of the individual package report**:
   the placeholder text in `inst/report/package/pkg_template.qmd` is
-  replaced with the run's `val_date` and `val_dir`, plus a summary of
-  any errors, warnings, or notes from `d_riskmetric$r_cmd_check`. A
-  new `val_dir` parameter is threaded through `val_pkg.R` so the
-  report can display the directory it belongs to.
+  replaced with the run's `val_date` and `val_dir`. A new `val_dir`
+  parameter is threaded through `val_pkg.R` so the report can display
+  the directory it belongs to.
+
+- **Surface R CMD check error and warning text in the "Code checks"
+  section**: previously the "Code checks" chunk was skipped entirely
+  when `d_riskmetric$r_cmd_check` was a `pkg_metric_error`, hiding
+  the actual reason the check failed. The section now extracts any
+  error / warning text from the metric (whether it arrives as an
+  `rcmdcheck_error` with `$result$errors` / `$result$warnings`, a
+  `system_command_status_error` with `$stderr`, or a bare
+  condition's `$message`) and renders it under labeled subsections.
+  Notes are intentionally omitted.
 
 - **Follow-up fix for `data.frame(... check.names = FALSE): row names
   contain missing values`**: the earlier fix only hardened the summary
