@@ -403,7 +403,7 @@ cat("Code checks for this package:", "\n")
 
 ```{r r_cmd_check, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]), results='asis'}
 r_cmd <- d_riskmetric[["r_cmd_check"]]
-cat("R CMD check: ", paste(stringr::str_to_title(names(r_cmd)), r_cmd, sep = " - "))
+cat("**R CMD check**: ", paste(stringr::str_to_title(names(r_cmd)), r_cmd, sep = " - "))
 ```
 
 ```{r r_cmd_check_errors, eval=length(.rcmd_errors) > 0, results='asis'}
@@ -415,7 +415,7 @@ for (msg in .rcmd_errors) {
 
 ```{r r_cmd_check_errors_no_text, eval=.rcmd_errors_missing_text, results='asis'}
 cat(sprintf(
-  "\n\n**R CMD check errors:** %d error%s reported, but the error text was not captured in the assessment output.\n\n",
+  "\n\n* %d error%s reported, but the error text was not captured in the assessment output.\n\n",
   .rcmd_err_count, if (.rcmd_err_count == 1L) "" else "s"
 ))
 ```
@@ -429,7 +429,7 @@ for (msg in .rcmd_warnings) {
 
 ```{r r_cmd_check_warnings_no_text, eval=.rcmd_warnings_missing_text, results='asis'}
 cat(sprintf(
-  "\n\n**R CMD check warnings:** %d warning%s reported, but the warning text was not captured in the assessment output.\n\n",
+  "\n\n* %d warning%s reported, but the warning text was not captured in the assessment output.\n\n",
   .rcmd_warn_count, if (.rcmd_warn_count == 1L) "" else "s"
 ))
 ```
@@ -437,7 +437,7 @@ cat(sprintf(
 
 
 ```{r remote_checks, eval=!riskreports::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
-cat("Remote checks: ", d_riskmetric[["remote_checks"]])
+cat("**Remote checks**: ", d_riskmetric[["remote_checks"]])
 ```
 
 
