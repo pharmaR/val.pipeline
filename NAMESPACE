@@ -3,6 +3,8 @@
 export("%>%")
 export("%e%")
 export(build_decisions_df)
+export(configure_bioc_repositories)
+export(configure_bioc_repositories_if_requested)
 export(pull_config)
 export(resolve_pkg_tree)
 export(val_build)

@@ -1,3 +1,26 @@
+# val.pipeline 0.1.6
+
+- Add `configure_bioc_repositories()` and
+  `configure_bioc_repositories_if_requested()` — helpers for
+  air-gapped Posit Package Manager environments where
+  `BiocManager::repositories()` still emits its five hard-coded
+  public `bioconductor.org` URLs alongside the internal repos on
+  `options("repos")`, causing downstream `riskmetric` metrics
+  (`assess_reverse_dependencies()`, remote checks, ...) to fail
+  with "Bioconductor version cannot be validated; no internet
+  connection?" or `cannot open the connection to
+  'https://bioconductor.org/packages/.../VIEWS'`.
+- The helper installs an in-session shim on
+  `BiocManager::repositories()` so it returns *only* the caller's
+  `options("repos")` value, and sets
+  `options(BiocManager.check_repositories = FALSE)`.
+- The entry points (`val_pipeline()`, `val_build()`,
+  `val_prep_pipeline()`) call
+  `configure_bioc_repositories_if_requested()` at startup so users
+  can opt in with the environment variable
+  `VAL_PIPELINE_INTERNAL_BIOC=1` — no code change required and no
+  effect for public-network users.
+
 # val.pipeline 0.1.4
 
 Polish and bug fixes for the individual package report PDF
