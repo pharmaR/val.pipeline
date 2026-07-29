@@ -1,3 +1,10 @@
+# val.pipeline 0.1.7
+
+- Configure `pkgdown` to autolink bare `#N` references in NEWS.md and
+  roxygen blocks to the corresponding GitHub issue/PR, and codify the
+  bare-`#N` convention in `.github/copilot-instructions.md` so future
+  NEWS entries stay autolink-friendly. (#79)
+
 # val.pipeline 0.1.6
 
 - Add `configure_bioc_repositories()` and

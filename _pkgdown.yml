@@ -1,0 +1,16 @@
+url: https://pharmar.github.io/val.pipeline
+
+# `#N` references in NEWS.md, roxygen `@description`, etc. autolink to
+# `<url>/issues/N` when `url:` above is set to the GitHub repo (pkgdown
+# resolves via the DESCRIPTION `URL:` field otherwise). Kept explicit
+# here so contributors don't have to guess where the autolink target
+# comes from — see `.github/copilot-instructions.md` for the NEWS
+# writing convention.
+
+template:
+  bootstrap: 5
+
+news:
+  releases:
+    - text: "Development version"
+      href: news/index.html
