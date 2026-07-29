@@ -1,6 +1,6 @@
 Package: val.pipeline
 Title: Validation Pipeline Example
-Version: 0.1.6
+Version: 0.1.9
 Authors@R: 
   c(
     person(
@@ -35,7 +35,9 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Suggests: 
     testthat (>= 3.0.0),
-    withr
+    withr,
+    future,
+    future.apply
 Config/testthat/edition: 3
 Imports: 
     config,

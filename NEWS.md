@@ -1,3 +1,17 @@
+# val.pipeline 0.1.9
+
+- Add a `workers` argument to `val_build()` (and threaded through
+  `val_pipeline()`). `workers = 1L` (default) preserves the original
+  serial behaviour and dep-skip short-circuiting. Values greater than
+  `1` fan the per-package assessment loop out via
+  `future.apply::future_mapply()` under a `future::multisession` plan;
+  the dep-skip short-circuit is disabled in parallel mode because its
+  state cannot cross a worker boundary, but downstream final-decision
+  propagation in `val_decision()` still applies the worst-of-any-dep
+  rule, so package-report accuracy is unchanged. `{future}` and
+  `{future.apply}` moved to `Suggests` and are only required when
+  `workers > 1`. (#80)
+
 # val.pipeline 0.1.6
 
 - Add `configure_bioc_repositories()` and

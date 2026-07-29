@@ -72,6 +72,19 @@
 #'   `val.pipeline`, and the same file is copied into `val_dir` for
 #'   record keeping. The override is scoped to this call: the prior
 #'   `val.pipeline.config_path` option is restored on exit.
+#' @param workers Integer. Number of parallel workers to use during the
+#'   per-package assessment loop. `1L` (default) preserves the original
+#'   serial behaviour with dep-skip short-circuiting (dependents of a
+#'   failed package are marked "Rejected" without being assessed).
+#'   Values greater than `1` fan the loop out via
+#'   [future.apply::future_mapply()] under a `future::multisession`
+#'   plan; the dep-skip short-circuit is disabled in that mode because
+#'   its state cannot cross a parallel worker boundary. Final risk
+#'   propagation still runs downstream via [val_decision()], so
+#'   package-report accuracy is unaffected — the only tradeoff is that
+#'   dependents of failed packages spend CPU time being assessed
+#'   instead of being short-circuited. Requires the optional `{future}`
+#'   and `{future.apply}` packages when `workers > 1`.
 #'
 #' @export
 #' 
@@ -89,7 +102,8 @@ val_build <- function(
       BioC = 'https://bioconductor.org/packages/3.22/bioc'),
     verbose = NULL,
     prep = NULL,
-    config_path = NULL
+    config_path = NULL,
+    workers = 1L
     ){
   
   #
@@ -118,6 +132,10 @@ val_build <- function(
   if (!is.null(prep) && !inherits(prep, "val_prep")) {
     stop("`prep` must be a `val_prep` object returned by val_prep_pipeline().",
          call. = FALSE)
+  }
+  workers <- suppressWarnings(as.integer(workers))
+  if (length(workers) != 1L || is.na(workers) || workers < 1L) {
+    stop("`workers` must be a single positive integer.", call. = FALSE)
   }
   apply_verbose(verbose)
   configure_bioc_repositories_if_requested(quiet = TRUE)
@@ -236,27 +254,29 @@ val_build <- function(
   failed_pkgs <- character(0)
   
   
-  # Start bundling
-  pkg_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
-    
-    # i <- 1 # for debugging
-    # pkg <- pkgs[i] # for debugging
-    # ver <- vers[i] # for debugging
-    
-    # output a message letting users know where we are
-    pkg_cnt <- which(pkgs == pkg)
+  # Start bundling.
+  #
+  # `workers > 1` fans the per-package assessment loop out via
+  # `future.apply::future_mapply()`. Dep-skip short-circuiting (setting
+  # `dont_run <<- rev_deps` in-loop) cannot cross a parallel worker
+  # boundary, so it's *disabled* in parallel mode — every package is
+  # assessed. The downstream final-decision propagation in val_decision()
+  # still applies the "worst-of-any-dep" rule, so package-report accuracy
+  # is preserved; the only tradeoff is that dependents of failed packages
+  # spend CPU time being assessed instead of being short-circuited.
+  # Callers with cohorts that fail rarely (e.g. an approved-list
+  # revalidation) get near-linear speedup; callers with lots of failures
+  # may prefer serial (workers = 1) for the short-circuit savings.
+
+  assess_one <- function(pkg, ver, pkg_cnt, is_dep_skip, failed_snapshot) {
     val_msg(paste0("\n\n#", pkg_cnt, " of ", pkgs_length, ":"),
             min_level = "normal")
-    
+
     pkg_v <- paste(pkg, ver, sep = "_")
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
-    
-    # prevent running pkgs that depend on pkgs that have already failed
-    if(!(pkg %in% dont_run)) {
-    
-      # check to make sure the pkg bundle doesn't already exist. If so, we can
-      # skip building the bundle, but we still need to assess it's dependencies
-      if(!file.exists(pkg_meta_file) | replace) {
+
+    if (!is_dep_skip) {
+      if (!file.exists(pkg_meta_file) | replace) {
         pkg_meta <- val_pkg(
           pkg = pkg,
           ver = ver,
@@ -279,57 +299,37 @@ val_build <- function(
                              pkg_idx = pkg_cnt,
                              pkg_total = pkgs_length)
       }
-      
-      # if a pkg fails, make sure it's reverse dependencies don't run an assessment
-      # if(pkg == "sys") pkg_meta$decision = "Medium" # for debugging
-      if(pkg_meta$decision != decisions[1]) {
-        val_msg(paste0("\n\n--> ", pkg, " v", ver," was assessed with a '", pkg_meta$decision,"' risk. All packages that depend on it will also be marked as '", decisions[length(decisions)],"' risk.\n\n"),
-                min_level = "normal")
-        dont_run <<- c(dont_run, pkg_meta$rev_deps) |> unique()
-        failed_pkgs <<- c(failed_pkgs, pkg) |> unique()
-      }
-      
     } else {
       # ---- Pkg is in 'dont_run'! ----
       val_msg(paste0("\nAttempted New Package: ", pkg, " v", ver,", but one of it's dependencies already failed so skipping assessment and marking risk as '", decisions[length(decisions)], "'.\n\n"),
               min_level = "normal")
-      
-      # grab depends
-      depends <- 
+
+      depends <-
         tools::package_dependencies(
           packages = pkg,
           db = available.packages(),
           which = c("Depends", "Imports", "LinkingTo"),
           recursive = TRUE
         ) |>
-        unlist(use.names = FALSE) 
-      
-      # grab suggests
-      suggests <- 
+        unlist(use.names = FALSE)
+
+      suggests <-
         tools::package_dependencies(
           packages = pkg,
           db = available.packages(),
           which = "Suggests",
-          recursive = TRUE # this really blows up for almost any pkg
+          recursive = TRUE
         ) |>
-        unlist(use.names = FALSE) 
-      
-      # Where did package come from?
+        unlist(use.names = FALSE)
+
       repo_src <- avail_pkgs |>
-        dplyr::filter(Package %in% pkg) |> 
-        dplyr::pull(Repository) |> 
-        dirname() |> dirname() # trim '/src/contrib/` ending
+        dplyr::filter(Package %in% pkg) |>
+        dplyr::pull(Repository) |>
+        dirname() |> dirname()
       repo_name <- get_repo_origin(repo_src = repo_src, pkg_name = pkg)
-      
-      # Identify which upstream pkg(s) actually failed and caused us to skip.
-      # `depends`/`suggests` are recursive char vecs; intersect with the set of
-      # pkgs that failed earlier in this run. May under-report if a dep failure
-      # came from a pkg we haven't visited yet (see issue #37 caveat), but this
-      # is the best info available at skip time.
-      dep_note <- identify_failed_deps(c(depends, suggests), failed_pkgs)
-      
-      
-      
+
+      dep_note <- identify_failed_deps(c(depends, suggests), failed_snapshot)
+
       pkg_meta <- list(
         pkg = pkg,
         ver = ver,
@@ -350,7 +350,6 @@ val_build <- function(
         rev_deps = NA_character_,
         assessment_runtime = list(txt = NA_character_, mins = NA)
       )
-      # save the pkg_meta
       saveRDS(pkg_meta, pkg_meta_file)
       val_msg("\n-->", pkg_v,"meta bundle saved.\n", min_level = "verbose")
       val_pkg_summary_line(pkg, ver, pkg_meta$decision,
@@ -358,12 +357,59 @@ val_build <- function(
                            pkg_idx = pkg_cnt,
                            pkg_total = pkgs_length)
     }
-    
-    # return!
+
     pkg_meta
-    
-  }) |>
-    purrr::set_names(nm = pkgs)
+  }
+
+  if (workers > 1L) {
+    if (!requireNamespace("future.apply", quietly = TRUE) ||
+        !requireNamespace("future", quietly = TRUE)) {
+      stop("`workers > 1` requires the {future} and {future.apply} packages.",
+           call. = FALSE)
+    }
+    val_msg(paste0("\nRunning ", pkgs_length,
+                   " package assessments across ", workers,
+                   " parallel worker(s). Dep-skip short-circuit is disabled ",
+                   "in parallel mode; final risk propagation still occurs ",
+                   "downstream via val_decision().\n"),
+            min_level = "normal")
+
+    old_plan <- future::plan(future::multisession, workers = workers)
+    on.exit(future::plan(old_plan), add = TRUE)
+
+    pkg_bundles <- future.apply::future_mapply(
+      FUN = function(pkg, ver, pkg_cnt) {
+        assess_one(pkg, ver, pkg_cnt,
+                   is_dep_skip = FALSE,
+                   failed_snapshot = character(0))
+      },
+      pkg     = pkgs,
+      ver     = vers,
+      pkg_cnt = seq_along(pkgs),
+      SIMPLIFY  = FALSE,
+      USE.NAMES = FALSE,
+      future.seed = TRUE
+    )
+    names(pkg_bundles) <- pkgs
+  } else {
+    pkg_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
+      pkg_cnt <- which(pkgs == pkg)
+      is_dep_skip <- pkg %in% dont_run
+      pkg_meta <- assess_one(pkg, ver, pkg_cnt,
+                             is_dep_skip = is_dep_skip,
+                             failed_snapshot = failed_pkgs)
+      if (!is_dep_skip && pkg_meta$decision != decisions[1]) {
+        val_msg(paste0("\n\n--> ", pkg, " v", ver," was assessed with a '",
+                       pkg_meta$decision,"' risk. All packages that depend on it will also be marked as '",
+                       decisions[length(decisions)],"' risk.\n\n"),
+                min_level = "normal")
+        dont_run    <<- c(dont_run, pkg_meta$rev_deps) |> unique()
+        failed_pkgs <<- c(failed_pkgs, pkg) |> unique()
+      }
+      pkg_meta
+    }) |>
+      purrr::set_names(nm = pkgs)
+  }
   
   # Message
   # dont_run |> length()
