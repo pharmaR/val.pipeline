@@ -1,5 +1,25 @@
 # val.pipeline 0.1.4
 
+- **Drop the redundant `## License` section** from
+  `inst/report/package/pkg_template.qmd`. The package's license is
+  already shown in the summary card table above the section, so
+  rendering it again as a paragraph was noise.
+
+- **Show a real count for `Dependencies` in the summary table**:
+  `riskreports:::summary_table()` runs every numeric metric through
+  `is_logical()`, which coerces a value of exactly `1` to the string
+  `"Yes"`. For boolean flags that's the intent, but for count
+  metrics like `dependencies` and `reverse_dependencies` a package
+  with exactly one hit was displayed as `Yes` instead of `1`. The
+  qmd now post-processes `summary_data` to restore the raw counts
+  for those two rows (formatted with `prettyNum(..., big.mark = ",")`).
+
+- **Add a `## Dependencies` and `## Reverse dependencies` section**
+  after `## Code checks`. Each renders a comma-separated paragraph
+  of package names alongside the total count. The reverse
+  dependencies section is skipped when the metric is a
+  `pkg_metric_error`, `NULL`, or otherwise unavailable.
+
 - **Populate the Context section of the individual package report**:
   the placeholder text in `inst/report/package/pkg_template.qmd` is
   replaced with the run's `val_date` and `val_dir`. A new `val_dir`

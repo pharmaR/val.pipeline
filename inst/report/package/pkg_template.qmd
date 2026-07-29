@@ -90,7 +90,7 @@ cat("- **Validation directory (`val_dir`):** ",
 
 # Package Assessments
 
-## Metric based risk assessment
+## Metric-based risk assessment
 
 The following metrics are derived from the `riskmetric` R package.
 
@@ -185,10 +185,10 @@ namespace_table <- tryCatch(
 ```{r prepare_tables_dependencies}
 deps <- d_riskmetric$dependencies
 deps$package <- gsub("\\n", " ", deps$package)
-row.names(deps) <- NULL
+# row.names(deps) <- NULL
 dependencies_table <- htmltools::div(
   htmltools::span(
-    "Overall the package has these dependencies:"
+    "The package has these dependencies:"
   ),
   reactable::reactable(
     deps,
@@ -252,6 +252,30 @@ summary_data <- summary_table(r_riskmetric[, .keep_cols, drop = FALSE]) |>
   stats::setNames(c("Metric", "Value"))
 row.names(summary_data) <- NULL
 
+# The `summary_table()` helper runs every numeric metric through
+# `is_logical()`, which coerces a value of exactly `1` to the string
+# `"Yes"`. That reads correctly for boolean flags (has_news, etc.) but
+# is misleading for count metrics like `dependencies` and
+# `reverse_dependencies` when a package happens to have exactly one.
+# Restore the raw counts for those two rows so the reader sees a number.
+.restore_count <- function(metric_row_name, count_value) {
+  if (is.null(count_value) || length(count_value) == 0) return(invisible())
+  n <- suppressWarnings(as.integer(count_value[[1]]))
+  if (is.na(n)) return(invisible())
+  idx <- which(summary_data$Metric == metric_row_name)
+  if (length(idx) == 1L) {
+    summary_data$Value[idx] <<- prettyNum(n, big.mark = ",")
+  }
+}
+.restore_count("Dependencies",
+               if (inherits(d_riskmetric$dependencies, "data.frame"))
+                 nrow(d_riskmetric$dependencies) else
+                 length(d_riskmetric$dependencies))
+.restore_count("Reverse dependencies",
+               if (is.character(d_riskmetric$reverse_dependencies))
+                 length(d_riskmetric$reverse_dependencies) else
+                 d_riskmetric$reverse_dependencies)
+
 values_collapsed_rows <- c(
   "Has news",
   "Exported namespace",
@@ -312,10 +336,10 @@ if (isTRUE(is_html)) {
 }
 ```
 
-```{r license, eval=!riskreports::is_risk_error(d_riskmetric$license) && !is.null(d_riskmetric$license), results='asis'}
-cat("## License", "\n")
-
-cat("The package uses ", d_riskmetric$license, ".", sep = "")
+```{r license, eval=FALSE, results='asis'}
+# License information already appears in the summary card table above;
+# rendering it again as a standalone section is redundant, so this chunk
+# is intentionally disabled.
 ```
 
 
@@ -438,6 +462,45 @@ cat(sprintf(
 
 ```{r remote_checks, eval=!riskreports::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
 cat("**Remote checks**: ", d_riskmetric[["remote_checks"]])
+```
+
+
+```{r dependencies_section_prep, include=FALSE}
+.deps_raw <- d_riskmetric$dependencies
+.deps_names <- character(0)
+if (inherits(.deps_raw, "data.frame") && "package" %in% names(.deps_raw)) {
+  .deps_names <- as.character(.deps_raw$package)
+} else if (is.character(.deps_raw)) {
+  .deps_names <- as.character(.deps_raw)
+}
+.deps_names <- .deps_names[nzchar(.deps_names) & !is.na(.deps_names)]
+.deps_names <- sort(unique(.deps_names))
+.has_deps <- length(.deps_names) > 0
+
+.rdep_raw <- d_riskmetric$reverse_dependencies
+.rdep_names <- character(0)
+if (!inherits(.rdep_raw, "pkg_metric_error") && is.character(.rdep_raw)) {
+  .rdep_names <- as.character(.rdep_raw)
+}
+.rdep_names <- .rdep_names[nzchar(.rdep_names) & !is.na(.rdep_names)]
+.rdep_names <- sort(unique(.rdep_names))
+.has_rdeps <- length(.rdep_names) > 0
+```
+
+```{r dependencies_section, eval=.has_deps, results='asis'}
+cat("## Dependencies", "\n\n")
+cat(sprintf("This package has %s first-order dependenc%s:\n\n",
+            prettyNum(length(.deps_names), big.mark = ","),
+            if (length(.deps_names) == 1L) "y" else "ies"))
+cat(paste(.deps_names, collapse = ", "), ".\n\n", sep = "")
+```
+
+```{r reverse_dependencies_section, eval=.has_rdeps, results='asis'}
+cat("## Reverse dependencies", "\n\n")
+cat(sprintf("This package has %s reverse dependenc%s:\n\n",
+            prettyNum(length(.rdep_names), big.mark = ","),
+            if (length(.rdep_names) == 1L) "y" else "ies"))
+cat(paste(.rdep_names, collapse = ", "), ".\n\n", sep = "")
 ```
 
 
