@@ -1,3 +1,19 @@
+# val.pipeline 0.1.5
+
+More polish for the individual package report
+(`inst/report/package/pkg_template.qmd`):
+
+- Drop the standalone `## Code checks` section — R CMD check and
+  Remote checks are now rows in the metric table.
+- Fold Downloads 1yr, Reverse dependencies, and License into the
+  metric table (retiring the separate summary-card table for
+  non-HTML output).
+- Move Origin to the Context section as a bullet.
+- Reorder the metric table: `Downloads 1yr` and
+  `Reverse dependencies` at the top; `R CMD check` and
+  `Remote checks` paired inside the existing groupings;
+  `License` pinned above `Has maintainer` at the bottom.
+
 # val.pipeline 0.1.4
 
 Polish and bug fixes for the individual package report PDF

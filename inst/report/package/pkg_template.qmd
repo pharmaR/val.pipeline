@@ -83,6 +83,9 @@ cat("- **Validation date (`val_date`):** ",
 cat("- **Validation directory (`val_dir`):** ",
     if (!is.null(val_dir) && nzchar(val_dir)) val_dir else "unknown",
     "\n", sep = "")
+cat("- **Origin (`source`):** ",
+    riskreports:::get_pkg_origin(params$source),
+    "\n", sep = "")
 ```
 
 
@@ -112,40 +115,15 @@ riskreports:::create_metrics_cards(r_riskmetric)
 
 ::: {.content-hidden when-format="html"}
 
-```{r simple_cards}
-safe_scalar <- function(x) {
-  if (is.null(x) || length(x) == 0) return("unknown")
-  x <- unname(x)
-  as.character(x[[1]])
-}
-rdep_raw <- d_riskmetric$reverse_dependencies
-rdep_display <- if (inherits(rdep_raw, "pkg_metric_error") ||
-                    is.null(rdep_raw) || length(rdep_raw) == 0) {
-  "unknown"
-} else if (is.character(rdep_raw)) {
-  prettyNum(length(rdep_raw), big.mark = ",")
-} else if (is.numeric(rdep_raw)) {
-  prettyNum(rdep_raw[[1]], big.mark = ",")
-} else {
-  "unknown"
-}
-dl_raw <- r_riskmetric$downloads_1yr
-dl_display <- if (is.numeric(dl_raw) && length(dl_raw) >= 1) {
-  prettyNum(dl_raw[[1]], big.mark = ",")
-} else {
-  safe_scalar(dl_raw)
-}
-simple_cards <- data.frame(
-  "Downloads 1 year" = dl_display,
-  "Reverse dependencies" = rdep_display,
-  "License" = safe_scalar(r_riskmetric$license),
-  "Origin" = safe_scalar(r_riskmetric$origin),
-  check.names = FALSE,
-  row.names = NULL,
-  stringsAsFactors = FALSE
-)
+```{r simple_cards, include=FALSE}
+# The Downloads 1yr / Reverse dependencies / License / Origin fields
+# that used to render as a separate summary-card table for non-HTML
+# outputs have been folded into the main metric table below.
+# Origin is now displayed as a bullet in the Context section, so this
+# chunk only clears the placeholder `$origin` column added upstream
+# (which is used by the HTML info-cards path) before `summary_table()`
+# renders the metric table.
 r_riskmetric$origin <- NULL
-knitr::kable(simple_cards)
 ```
 
 :::
@@ -338,24 +316,86 @@ if (!is.null(val_dir) && nzchar(as.character(val_dir))) {
   }
 }
 
+# --- Append rows folded in from the former "Simple cards" + "Code checks"
+# sections: Downloads 1yr, Reverse dependencies, License, R CMD check, and
+# Remote checks. Each is added only when the underlying metric is available.
+.append_row <- function(metric_row_name, val) {
+  if (is.null(val) || !length(val)) return(invisible())
+  val_chr <- as.character(val)
+  if (!nzchar(val_chr) || is.na(val_chr)) return(invisible())
+  if (metric_row_name %in% summary_data$Metric) {
+    .set_value(metric_row_name, val_chr)
+    return(invisible())
+  }
+  summary_data <<- rbind(
+    summary_data,
+    data.frame(Metric = metric_row_name, Value = val_chr,
+               stringsAsFactors = FALSE, row.names = NULL)
+  )
+}
+
+# Downloads 1yr
+.dl <- r_riskmetric$downloads_1yr
+if (is.numeric(.dl) && length(.dl) >= 1 && !is.na(.dl[[1]])) {
+  .append_row("Downloads 1yr", prettyNum(as.integer(.dl[[1]]), big.mark = ","))
+}
+
+# Reverse dependencies — pull the raw character vector from d_riskmetric
+# (r_riskmetric$reverse_dependencies has already been reduced to a count).
+.rd_raw <- d_riskmetric$reverse_dependencies
+if (is.character(.rd_raw) && length(.rd_raw) > 0) {
+  .append_row("Reverse dependencies",
+              prettyNum(length(.rd_raw), big.mark = ","))
+} else if (is.numeric(.rd_raw) && length(.rd_raw) >= 1 && !is.na(.rd_raw[[1]])) {
+  .append_row("Reverse dependencies",
+              prettyNum(as.integer(.rd_raw[[1]]), big.mark = ","))
+}
+
+# License
+.lic <- r_riskmetric$license
+if (!is.null(.lic) && length(.lic) >= 1 && nzchar(as.character(.lic[[1]]))) {
+  .append_row("License", as.character(.lic[[1]]))
+}
+
+# R CMD check — format the named-count breakdown (Notes / Errors / Warnings)
+# on one line so it sits cleanly in a table cell.
+.rc <- d_riskmetric[["r_cmd_check"]]
+if (!riskreports::is_risk_error(.rc) && !is.null(names(.rc))) {
+  .append_row(
+    "R CMD check",
+    paste(stringr::str_to_title(names(.rc)), .rc, sep = " - ",
+          collapse = ", ")
+  )
+}
+
+# Remote checks — scalar string when available.
+.rmt <- d_riskmetric[["remote_checks"]]
+if (!riskreports::is_risk_error(.rmt) && length(.rmt) >= 1) {
+  .append_row("Remote checks", as.character(.rmt[[1]]))
+}
+
 # Reorder rows into a friendlier grouping:
-#   1. Dependencies (top)
-#   2. Has news + News current (paired)
-#   3. Exported namespace + Export help (paired)
-#   4. Has examples + Has vignettes (paired)
-#   5. URL-returning fields: Has website, Has source control, Has bug
+#   1. Downloads 1yr + Reverse dependencies (top)
+#   2. Dependencies
+#   3. Has news + News current (paired)
+#   4. Exported namespace + Export help (paired)
+#   5. Has examples + Has vignettes (paired)
+#   6. URL-returning fields: Has website, Has source control, Has bug
 #      reports url, followed immediately by Bugs status.
-#   6. Everything else (e.g. Size codebase) keeps its original relative
+#   7. R CMD check + Remote checks (paired)
+#   8. Everything else (e.g. Size codebase) keeps its original relative
 #      order after the groups above.
-#   7. Has maintainer (bottom)
+#   9. License + Has maintainer (bottom)
 .preferred_order <- c(
+  "Downloads 1yr", "Reverse dependencies",
   "Dependencies",
   "Has news", "News current",
   "Exported namespace", "Export help",
   "Has examples", "Has vignettes",
-  "Has website", "Has source control", "Has bug reports url", "Bugs status"
+  "Has website", "Has source control", "Has bug reports url", "Bugs status",
+  "R CMD check", "Remote checks"
 )
-.bottom_pinned <- c("Has maintainer")
+.bottom_pinned <- c("License", "Has maintainer")
 .metric_order  <- summary_data$Metric
 .head_rows     <- intersect(.preferred_order, .metric_order)
 .tail_rows     <- intersect(.bottom_pinned, .metric_order)
@@ -425,133 +465,8 @@ if (isTRUE(is_html)) {
 ```
 
 ```{r license, eval=FALSE, results='asis'}
-# License information already appears in the summary card table above;
-# rendering it again as a standalone section is redundant, so this chunk
-# is intentionally disabled.
-```
-
-
-```{r code_checks_prep, include=FALSE}
-# Extract error / warning message text from d_riskmetric$r_cmd_check for
-# display in the Code checks section. Notes are intentionally omitted.
-# r_cmd_check can arrive in a few shapes:
-#   - a named integer vector of counts (successful run:
-#     c(notes = 0, errors = 1, warnings = 0))
-#   - a `pkg_metric_error` + `rcmdcheck_error` with $result$errors / $result$warnings
-#   - a `pkg_metric_error` + `system_command_status_error` with $stderr
-#   - a `pkg_metric_error` + simpleError with just $message
-.rcmd <- d_riskmetric[["r_cmd_check"]]
-.rcmd_errors   <- character(0)
-.rcmd_warnings <- character(0)
-.rcmd_err_count  <- 0L
-.rcmd_warn_count <- 0L
-
-# Best-effort extraction of the raw counts, whether the metric is a bare
-# named vector or nested inside a list-shaped condition.
-.rcmd_count_of <- function(x, nm) {
-  if (is.null(x)) return(0L)
-  cand <- x[[nm]] %||% NULL
-  if (is.null(cand) && is.list(x) && !is.null(x[["result"]])) {
-    cand <- x[["result"]][[nm]]
-  }
-  if (is.null(cand)) return(0L)
-  # a character vector of messages -> count = length; a numeric -> that count
-  if (is.character(cand)) return(length(cand))
-  n <- suppressWarnings(as.integer(cand[[1]]))
-  if (is.na(n)) 0L else n
-}
-`%||%` <- function(a, b) if (is.null(a)) b else a
-
-.rcmd_err_count  <- .rcmd_count_of(.rcmd, "errors")
-.rcmd_warn_count <- .rcmd_count_of(.rcmd, "warnings")
-
-if (!is.null(.rcmd)) {
-  # rcmdcheck-style result
-  res <- tryCatch(.rcmd$result, error = function(e) NULL)
-  if (!is.null(res)) {
-    if (!is.null(res$errors))   .rcmd_errors   <- as.character(res$errors)
-    if (!is.null(res$warnings)) .rcmd_warnings <- as.character(res$warnings)
-  }
-  # Named-list count with a companion text field
-  if (is.list(.rcmd) && length(.rcmd_errors) == 0 && !is.null(.rcmd$errors)) {
-    e <- .rcmd$errors
-    if (is.character(e)) .rcmd_errors <- e
-  }
-  if (is.list(.rcmd) && length(.rcmd_warnings) == 0 && !is.null(.rcmd$warnings)) {
-    w <- .rcmd$warnings
-    if (is.character(w)) .rcmd_warnings <- w
-  }
-  # Bare condition object — surface its message as an error
-  if (length(.rcmd_errors) == 0 && length(.rcmd_warnings) == 0 &&
-      inherits(.rcmd, "pkg_metric_error")) {
-    msg <- tryCatch(conditionMessage(.rcmd), error = function(e) NULL)
-    if (is.null(msg) && is.list(.rcmd) && !is.null(.rcmd$message)) msg <- .rcmd$message
-    if (is.null(msg) && is.list(.rcmd) && !is.null(.rcmd$stderr))  msg <- .rcmd$stderr
-    if (!is.null(msg) && nzchar(msg)) .rcmd_errors <- as.character(msg)
-  }
-}
-
-.rcmd_errors   <- .rcmd_errors[nzchar(.rcmd_errors)]
-.rcmd_warnings <- .rcmd_warnings[nzchar(.rcmd_warnings)]
-
-# When R CMD check reported counts > 0 but the underlying assessment did
-# not capture the full text (a common pattern for `pkg_metric_r_cmd_check`
-# named-integer results), fall back to a placeholder so the reader isn't
-# left wondering why the section is empty.
-.rcmd_errors_missing_text <- length(.rcmd_errors) == 0 && .rcmd_err_count > 0
-.rcmd_warnings_missing_text <- length(.rcmd_warnings) == 0 && .rcmd_warn_count > 0
-
-.has_code_checks <- !riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]) ||
-  !riskreports::is_risk_error(d_riskmetric[["remote_checks"]]) ||
-  length(.rcmd_errors) > 0 || length(.rcmd_warnings) > 0 ||
-  .rcmd_err_count > 0 || .rcmd_warn_count > 0
-```
-
-```{r code_checks_header, eval=.has_code_checks, results='asis'}
-cat("## Code checks", "\n")
-
-cat("Code checks for this package:", "\n")
-```
-
-```{r r_cmd_check, eval=!riskreports::is_risk_error(d_riskmetric[["r_cmd_check"]]), results='asis'}
-r_cmd <- d_riskmetric[["r_cmd_check"]]
-cat("> **R CMD check**: ", paste(stringr::str_to_title(names(r_cmd)), r_cmd, sep = " - "), "\n")
-```
-
-```{r r_cmd_check_errors, eval=length(.rcmd_errors) > 0, results='asis'}
-cat("\n\n> **R CMD check errors:**\n>\n")
-for (msg in .rcmd_errors) {
-  cat("> ```\n", paste0("> ", strsplit(msg, "\n", fixed = TRUE)[[1]], collapse = "\n"), "\n> ```\n>\n", sep = "")
-}
-cat("\n")
-```
-
-```{r r_cmd_check_errors_no_text, eval=.rcmd_errors_missing_text, results='asis'}
-cat(sprintf(
-  "\n\n> * %d error%s reported, but the error text was not captured in the assessment output.\n\n",
-  .rcmd_err_count, if (.rcmd_err_count == 1L) "" else "s"
-))
-```
-
-```{r r_cmd_check_warnings, eval=length(.rcmd_warnings) > 0, results='asis'}
-cat("\n\n> **R CMD check warnings:**\n>\n")
-for (msg in .rcmd_warnings) {
-  cat("> ```\n", paste0("> ", strsplit(msg, "\n", fixed = TRUE)[[1]], collapse = "\n"), "\n> ```\n>\n", sep = "")
-}
-cat("\n")
-```
-
-```{r r_cmd_check_warnings_no_text, eval=.rcmd_warnings_missing_text, results='asis'}
-cat(sprintf(
-  "\n\n> * %d warning%s reported, but the warning text was not captured in the assessment output.\n\n",
-  .rcmd_warn_count, if (.rcmd_warn_count == 1L) "" else "s"
-))
-```
-
-
-
-```{r remote_checks, eval=!riskreports::is_risk_error(d_riskmetric[["remote_checks"]]), results='asis'}
-cat("> **Remote checks**: ", d_riskmetric[["remote_checks"]], "\n")
+# The License is now shown as a row in the summary metric table above,
+# so this standalone section is no longer rendered.
 ```
 
 
