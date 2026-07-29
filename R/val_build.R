@@ -121,6 +121,7 @@ val_build <- function(
   }
   apply_verbose(verbose)
   configure_bioc_repositories_if_requested(quiet = TRUE)
+  configure_riskmetric_offline_if_requested(quiet = TRUE)
 
   # Route pull_config() at any depth to the user-supplied config, if any.
   old_cfg <- options()["val.pipeline.config_path"]

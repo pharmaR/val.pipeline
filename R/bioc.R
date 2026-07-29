@@ -175,3 +175,112 @@ configure_bioc_repositories_if_requested <- function(quiet = FALSE) {
   }
   configure_bioc_repositories(quiet = quiet)
 }
+
+
+#' Route `riskmetric::assess_reverse_dependencies()` through internal repos
+#'
+#' `riskmetric::assess_reverse_dependencies.default()` calls
+#' `devtools::revdep(x$name, bioconductor = TRUE)`, which in turn calls
+#' `devtools:::bioc_packages()`. That helper unconditionally reads a
+#' `VIEWS` file from `BiocManager::repositories()[["BioCsoft"]]`. On a
+#' Posit Package Manager mirror the aggregated BioC snapshot is served
+#' at `<repo>/src/contrib/PACKAGES` — there is no `<repo>/VIEWS` file at
+#' the mirror root — so the read fails with
+#'
+#' \preformatted{
+#' cannot open the connection to '.../bioc-.../latest/VIEWS'
+#' }
+#'
+#' and the reverse-dependencies metric ends up as a `pkg_metric_error`
+#' (which the package report renders as `"unknown"`).
+#'
+#' This helper installs an in-session shim on
+#' `riskmetric:::assess_reverse_dependencies.default` that computes the
+#' reverse-dependency list from `utils::available.packages()` directly
+#' (which reads from `options("repos")` — i.e. the internal PPM CRAN
+#' and BioC snapshots). No `VIEWS` file is required.
+#'
+#' The shim is intentionally opt-in; the wrapper
+#' [configure_riskmetric_offline_if_requested()] runs it only when the
+#' environment variable `VAL_PIPELINE_INTERNAL_BIOC` is truthy, so
+#' public-network users are unaffected.
+#'
+#' @param quiet Logical. When `FALSE` (the default) a short informational
+#'   message is emitted.
+#'
+#' @return `TRUE` invisibly on success, `FALSE` invisibly when the
+#'   `riskmetric` package is not installed.
+#'
+#' @seealso [configure_riskmetric_offline_if_requested()],
+#'   [configure_bioc_repositories()]
+#'
+#' @export
+configure_riskmetric_offline <- function(quiet = FALSE) {
+  if (!requireNamespace("riskmetric", quietly = TRUE)) {
+    if (!isTRUE(quiet)) {
+      message(
+        "configure_riskmetric_offline(): riskmetric is not installed; ",
+        "nothing to do."
+      )
+    }
+    return(invisible(FALSE))
+  }
+
+  revdep_offline <- function(x, ...) {
+    ap <- tryCatch(utils::available.packages(),
+                   error = function(e) NULL)
+    revdeps <- if (is.null(ap) || nrow(ap) == 0L) {
+      character(0)
+    } else {
+      tryCatch(
+        tools::dependsOnPkgs(
+          x$name,
+          dependencies = c("Depends", "Imports", "LinkingTo", "Suggests"),
+          recursive    = FALSE,
+          installed    = ap
+        ),
+        error = function(e) character(0)
+      )
+    }
+    structure(
+      sort(unique(revdeps)),
+      class = c("pkg_metric_reverse_dependencies", "pkg_metric", "character")
+    )
+  }
+
+  utils::assignInNamespace(
+    "assess_reverse_dependencies.default",
+    revdep_offline,
+    ns = "riskmetric"
+  )
+
+  if (!isTRUE(quiet)) {
+    message(
+      "configure_riskmetric_offline(): riskmetric's reverse-dependency ",
+      "lookup will now use utils::available.packages() (options(\"repos\")) ",
+      "instead of devtools::revdep(bioconductor = TRUE)."
+    )
+  }
+
+  invisible(TRUE)
+}
+
+#' Install the riskmetric offline reverse-deps shim when requested
+#'
+#' Wrapper around [configure_riskmetric_offline()] that is a no-op
+#' unless the environment variable `VAL_PIPELINE_INTERNAL_BIOC` is set
+#' to a truthy value (`"1"`, `"TRUE"`, `"true"`, `"yes"`, `"on"`).
+#'
+#' @param quiet Passed through to [configure_riskmetric_offline()].
+#'
+#' @return Invisibly, `TRUE` when the shim was installed, `FALSE`
+#'   otherwise.
+#'
+#' @export
+configure_riskmetric_offline_if_requested <- function(quiet = FALSE) {
+  flag <- Sys.getenv("VAL_PIPELINE_INTERNAL_BIOC", unset = "")
+  if (!nzchar(flag) || !tolower(flag) %in% c("1", "true", "yes", "y", "on")) {
+    return(invisible(FALSE))
+  }
+  configure_riskmetric_offline(quiet = quiet)
+}
