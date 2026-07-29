@@ -1,3 +1,22 @@
+# val.pipeline 0.1.4
+
+- **Populate the Context section of the individual package report**:
+  the placeholder text in `inst/report/package/pkg_template.qmd` is
+  replaced with the run's `val_date` and `val_dir`, plus a summary of
+  any errors, warnings, or notes from `d_riskmetric$r_cmd_check`. A
+  new `val_dir` parameter is threaded through `val_pkg.R` so the
+  report can display the directory it belongs to.
+
+- **Follow-up fix for `data.frame(... check.names = FALSE): row names
+  contain missing values`**: the earlier fix only hardened the summary
+  card `data.frame()`. The same error was still firing from
+  `summary_data <- summary_table(r_riskmetric[, !is.na(as.vector(...))])`
+  when a metric column was an error object, a list, or a multi-element
+  vector — `!is.na(as.vector(...))` recycled and produced NA-named
+  column selections. Column selection now uses a per-column
+  `vapply(..., !all(is.na(x)))` predicate and `row.names(summary_data)`
+  is explicitly nulled out.
+
 # val.pipeline 0.1.3
 
 - **Pruned `pass_primary` in `inst/config.yml`**: the bypass list is only

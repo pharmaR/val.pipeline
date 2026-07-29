@@ -523,7 +523,8 @@ val_pkg <- function(
       assessment_path = assessment_file,
       hide_reverse_deps = 'false',
       source = src_ref, # defined above
-      val_date = as.character(val_date)
+      val_date = as.character(val_date),
+      val_dir = out_dir
     ),
     quiet = TRUE, # To silence quarto output for readability
   )
