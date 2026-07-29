@@ -1,6 +1,4 @@
-# val.pipeline 0.1.2
-
-# val.pipeline 0.1.1
+# val.pipeline 0.1.3
 
 - **Pruned `pass_primary` in `inst/config.yml`**: the bypass list is only
   meant for packages that would otherwise fail the `downloads_1yr` primary
@@ -8,8 +6,7 @@
   entry and removed the 391 packages with `>= 80,000` annual downloads,
   taking the list from 575 to 184 entries. Packages with 0 reported
   downloads (base R, Bioconductor-only, GitHub-only, org-internal) were
-  kept — the bypass is exactly what they need. Audit trail and removal
-  list live in `dev/pass_primary_audit.md`. Also updated the block's
+  kept — the bypass is exactly what they need. Also updated the block's
   header comment to spell out the `< 80,000/yr` intent.
 
 - **Guard `rip_cats_by_pkg()` bypass on live download count**: the
@@ -22,6 +19,10 @@
   need it — a package on `pass_primary` that has since crossed the
   threshold now takes the normal primary path and passes on its own
   merits.
+
+# val.pipeline 0.1.2
+
+# val.pipeline 0.1.1
 
 - **Optional local repo in `pipeline.toml`**: `write_pipeline_toml()` and
   `val_prep_pipeline()` now accept a `local_repo` / `toml_local_repo`
