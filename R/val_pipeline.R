@@ -81,13 +81,18 @@ val_pipeline <- function(
          call. = FALSE)
   }
   apply_verbose(verbose)
-  configure_bioc_repositories_if_requested(quiet = TRUE)
-  configure_riskmetric_offline_if_requested(quiet = TRUE)
 
   # Route pull_config() at any depth to the user-supplied config, if any.
   old_cfg <- options()["val.pipeline.config_path"]
   on.exit(options(old_cfg), add = TRUE)
   apply_config_path(config_path)
+
+  # Validate the resolved config before anything else reads it. Warnings
+  # only — pipelines continue with best-effort defaults for typo'd rules.
+  validate_config()
+
+  configure_bioc_repositories_if_requested(quiet = TRUE)
+  configure_riskmetric_offline_if_requested(quiet = TRUE)
 
   #
   # ---- Prep phase ----

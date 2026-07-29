@@ -1,3 +1,22 @@
+# val.pipeline 0.1.7
+
+- Add `validate_config()` — checks the resolved `config.yml` for a
+  supported `config_version:`, known top-level sections, known keys
+  under `default:`, and well-formed rule blocks under `remote_reduce:`
+  and `decide:`. Runs automatically at the start of `val_pipeline()`,
+  `val_prep_pipeline()`, and `val_build()`, so key typos surface as
+  warnings pointing at the offending section instead of silently
+  falling back to defaults. Pass `strict = TRUE` to escalate warnings
+  to errors.
+- Add a `config_version:` top-level knob to `inst/config.yml`, tracked
+  by `CONFIG_VERSION_CURRENT` / `CONFIG_VERSION_MIN`. Older configs
+  are rejected; newer configs warn.
+- Add a `default: air_gapped:` config knob as a discoverable
+  alternative to setting `VAL_PIPELINE_INTERNAL_BIOC=1` for enabling
+  the Bioconductor and riskmetric shims added in 0.1.6. The env var
+  still works and takes precedence, so operators can override the
+  config from a shell.
+
 # val.pipeline 0.1.6
 
 - Add `configure_bioc_repositories()` and

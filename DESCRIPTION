@@ -1,6 +1,6 @@
 Package: val.pipeline
 Title: Validation Pipeline Example
-Version: 0.1.6
+Version: 0.1.7
 Authors@R: 
   c(
     person(
@@ -54,7 +54,8 @@ Imports:
     tibble,
     tidyr,
     tomledit,
-    tools
+    tools,
+    yaml
 Remotes: 
     pharmaR/riskmetric,
     pharmaR/riskreports,
