@@ -1,5 +1,17 @@
 # val.pipeline 0.1.4
 
+- **Reorder summary metric table rows** into a friendlier grouping:
+  `Dependencies` at the top; `Has news` / `News current` paired;
+  `Exported namespace` / `Export help` paired; `Has examples` /
+  `Has vignettes` paired; the URL-returning fields (`Has website`,
+  `Has source control`, `Has bug reports url`) grouped together
+  with `Bugs status` placed adjacent to `Has bug reports url`;
+  `Has maintainer` pinned at the bottom.
+
+- **Indent the R CMD check bullets and error/warning blocks** so they
+  sit inside the same Markdown blockquote as the R CMD check /
+  Remote checks summary lines.
+
 - **Indent the R CMD check and Remote checks lines** using a Markdown
   blockquote so they read as nested content under the `## Code checks`
   heading rather than as inline paragraphs.

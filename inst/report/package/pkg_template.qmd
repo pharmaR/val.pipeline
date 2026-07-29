@@ -338,6 +338,32 @@ if (!is.null(val_dir) && nzchar(as.character(val_dir))) {
   }
 }
 
+# Reorder rows into a friendlier grouping:
+#   1. Dependencies (top)
+#   2. Has news + News current (paired)
+#   3. Exported namespace + Export help (paired)
+#   4. Has examples + Has vignettes (paired)
+#   5. URL-returning fields: Has website, Has source control, Has bug
+#      reports url, followed immediately by Bugs status.
+#   6. Everything else (e.g. Size codebase) keeps its original relative
+#      order after the groups above.
+#   7. Has maintainer (bottom)
+.preferred_order <- c(
+  "Dependencies",
+  "Has news", "News current",
+  "Exported namespace", "Export help",
+  "Has examples", "Has vignettes",
+  "Has website", "Has source control", "Has bug reports url", "Bugs status"
+)
+.bottom_pinned <- c("Has maintainer")
+.metric_order  <- summary_data$Metric
+.head_rows     <- intersect(.preferred_order, .metric_order)
+.tail_rows     <- intersect(.bottom_pinned, .metric_order)
+.middle_rows   <- setdiff(.metric_order, c(.head_rows, .tail_rows))
+.new_order     <- c(.head_rows, .middle_rows, .tail_rows)
+summary_data   <- summary_data[match(.new_order, summary_data$Metric), , drop = FALSE]
+row.names(summary_data) <- NULL
+
 values_collapsed_rows <- c(
   "Has news",
   "Exported namespace",
@@ -493,29 +519,31 @@ cat("> **R CMD check**: ", paste(stringr::str_to_title(names(r_cmd)), r_cmd, sep
 ```
 
 ```{r r_cmd_check_errors, eval=length(.rcmd_errors) > 0, results='asis'}
-cat("\n\n**R CMD check errors:**\n\n")
+cat("\n\n> **R CMD check errors:**\n>\n")
 for (msg in .rcmd_errors) {
-  cat("```\n", msg, "\n```\n\n", sep = "")
+  cat("> ```\n", paste0("> ", strsplit(msg, "\n", fixed = TRUE)[[1]], collapse = "\n"), "\n> ```\n>\n", sep = "")
 }
+cat("\n")
 ```
 
 ```{r r_cmd_check_errors_no_text, eval=.rcmd_errors_missing_text, results='asis'}
 cat(sprintf(
-  "\n\n* %d error%s reported, but the error text was not captured in the assessment output.\n\n",
+  "\n\n> * %d error%s reported, but the error text was not captured in the assessment output.\n\n",
   .rcmd_err_count, if (.rcmd_err_count == 1L) "" else "s"
 ))
 ```
 
 ```{r r_cmd_check_warnings, eval=length(.rcmd_warnings) > 0, results='asis'}
-cat("\n\n**R CMD check warnings:**\n\n")
+cat("\n\n> **R CMD check warnings:**\n>\n")
 for (msg in .rcmd_warnings) {
-  cat("```\n", msg, "\n```\n\n", sep = "")
+  cat("> ```\n", paste0("> ", strsplit(msg, "\n", fixed = TRUE)[[1]], collapse = "\n"), "\n> ```\n>\n", sep = "")
 }
+cat("\n")
 ```
 
 ```{r r_cmd_check_warnings_no_text, eval=.rcmd_warnings_missing_text, results='asis'}
 cat(sprintf(
-  "\n\n* %d warning%s reported, but the warning text was not captured in the assessment output.\n\n",
+  "\n\n> * %d warning%s reported, but the warning text was not captured in the assessment output.\n\n",
   .rcmd_warn_count, if (.rcmd_warn_count == 1L) "" else "s"
 ))
 ```
