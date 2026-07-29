@@ -1,7 +1,5 @@
 ---
 title: "`r basename(params$package_name)` v`r params$package_version`"
-date-format: "[Validation Date:] YYYY-MM-DD"
-date: "`r if (is.null(params$val_date) || !nzchar(as.character(params$val_date))) format(Sys.Date(), '%Y-%m-%d') else params$val_date`"
 published-title: ""
 params:
   package_name: dplyr

@@ -4,10 +4,13 @@
   blockquote so they read as nested content under the `## Code checks`
   heading rather than as inline paragraphs.
 
-- **Report renders when `params$val_date` is `NULL`**: the YAML
-  `date` field now falls back to `Sys.Date()` when `val_date` is
-  missing or empty, so Quarto no longer errors on the empty
-  `date-format` before any R chunk runs.
+- **Report renders when `params$val_date` is `NULL`**: dropped the
+  YAML `date` / `date-format` fields, which were coupled to
+  `params$val_date` via a fragile inline `` `r ...` `` expression
+  and made `quarto::quarto_render()` fail with "Error running
+  quarto CLI from R" when the value was `NULL` or when the inline
+  expression wasn't evaluated at YAML parse time. The Context
+  section already displays the validation date safely.
 
 - **Richer summary-card values**:
   - `Has vignettes` shows the raw vignette count instead of `Yes`.
