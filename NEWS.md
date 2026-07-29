@@ -1,3 +1,51 @@
+# val.pipeline 0.1.6
+
+- Add `configure_bioc_repositories()` and
+  `configure_bioc_repositories_if_requested()` — helpers for
+  air-gapped Posit Package Manager environments where
+  `BiocManager::repositories()` still emits its five hard-coded
+  public `bioconductor.org` URLs alongside the internal repos on
+  `options("repos")`, causing downstream `riskmetric` metrics
+  (`assess_reverse_dependencies()`, remote checks, ...) to fail
+  with "Bioconductor version cannot be validated; no internet
+  connection?" or `cannot open the connection to
+  'https://bioconductor.org/packages/.../VIEWS'`.
+- The helper installs an in-session shim on
+  `BiocManager::repositories()` so it returns *only* the caller's
+  `options("repos")` value, and sets
+  `options(BiocManager.check_repositories = FALSE)`. When the
+  caller's repo vector uses a single flat `BioC` entry (typical
+  PPM layout), any missing `BioC*` aliases (`BioCsoft`, `BioCann`,
+  `BioCexp`, `BioCworkflows`, `BioCbooks`) are auto-populated with
+  the same URL so downstream lookups like
+  `BiocManager::repositories()[["BioCsoft"]]` (used inside
+  `riskmetric`) don't blow up with `subscript out of bounds`.
+- The entry points (`val_pipeline()`, `val_build()`,
+  `val_prep_pipeline()`) call
+  `configure_bioc_repositories_if_requested()` at startup so users
+  can opt in with the environment variable
+  `VAL_PIPELINE_INTERNAL_BIOC=1` — no code change required and no
+  effect for public-network users.
+- Add `configure_riskmetric_offline()` and its env-var-gated
+  wrapper `configure_riskmetric_offline_if_requested()`. Even with
+  the BiocManager shim in place,
+  `riskmetric::assess_reverse_dependencies.default()` calls
+  `devtools::revdep(x$name, bioconductor = TRUE)`, which in turn
+  calls `devtools:::bioc_packages()` — a helper that
+  unconditionally reads a `VIEWS` file from
+  `BiocManager::repositories()[["BioCsoft"]]`. PPM's aggregated
+  BioC snapshot is served at `<repo>/src/contrib/PACKAGES`; there
+  is no `<repo>/VIEWS` at the mirror root, so the read fails and
+  the reverse-dependencies metric becomes a `pkg_metric_error`
+  (rendered as `"unknown"` in the package report). The new
+  helper installs an in-session override for
+  `riskmetric:::assess_reverse_dependencies.default` that computes
+  the reverse-dependency list from `utils::available.packages()`
+  directly (which reads from `options("repos")` — the internal
+  PPM CRAN + BioC snapshots) with no `VIEWS` file required.
+- The entry points now also call
+  `configure_riskmetric_offline_if_requested()` at startup, so the
+  same `VAL_PIPELINE_INTERNAL_BIOC=1` opt-in enables both shims.
 # val.pipeline 0.1.5
 
 More polish for the individual package report
