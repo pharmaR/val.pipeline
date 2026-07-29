@@ -1,105 +1,40 @@
 # val.pipeline 0.1.4
 
-- **Reorder summary metric table rows** into a friendlier grouping:
-  `Dependencies` at the top; `Has news` / `News current` paired;
-  `Exported namespace` / `Export help` paired; `Has examples` /
-  `Has vignettes` paired; the URL-returning fields (`Has website`,
-  `Has source control`, `Has bug reports url`) grouped together
-  with `Bugs status` placed adjacent to `Has bug reports url`;
-  `Has maintainer` pinned at the bottom.
+Polish and bug fixes for the individual package report PDF
+(`inst/report/package/pkg_template.qmd`):
 
-- **Dependencies section rendered as a table** with `Package` and
-  `Type` columns (Depends / Imports / LinkingTo / Suggests / Enhances),
-  replacing the previous comma-separated paragraph. Rows are ordered
-  by dependency type and then alphabetically.
+- Fix reverse-dependencies field showing a Bioconductor warning
+  instead of a count.
+- Fix `data.frame(... check.names = FALSE): row names contain
+  missing values` (both at `summary_table()` input and for exports
+  whose names had leading underscores / stray quote characters).
+- Fix `cat(... covr_coverage ...)` list-argument error.
+- Populate the Context section with `val_date` and `val_dir`
+  (thread `val_dir` through `R/val_pkg.R`).
+- Surface R CMD check error / warning text under `## Code checks`,
+  with a fallback message when only counts were captured.
+- Indent R CMD check and Remote checks lines (and their bullets /
+  error / warning blocks) into a Markdown blockquote.
+- Reorder the summary metric table: `Dependencies` at the top;
+  `Has news` / `News current`, `Exported namespace` / `Export help`,
+  and `Has examples` / `Has vignettes` paired; the URL-returning
+  fields (`Has website`, `Has source control`, `Has bug reports url`)
+  grouped with `Bugs status` next to `Has bug reports url`;
+  `Has maintainer` at the bottom.
+- Richer summary-card values: real vignette count, `Export help`
+  as `N / M (P%)`, `Bugs status` rounded to one decimal,
+  `Size codebase` pretty-printed, `Has website` and
+  `Has bug reports url` show the actual URL(s), and `Dependencies`
+  shows a real count (no longer coerced to `"Yes"` when equal to 1).
+- Drop the redundant `## License` section (already in the
+  summary card table).
+- Add `## Dependencies` and `## Reverse dependencies` sections
+  after `## Code checks`. Dependencies is rendered as a table
+  with `Package` and `Type` columns.
+- Guard against `params$val_date = NULL` (dropped the fragile
+  YAML `date` / `date-format` fields that were breaking
+  `quarto::quarto_render()`).
 
-- **Indent the R CMD check bullets and error/warning blocks** so they
-  sit inside the same Markdown blockquote as the R CMD check /
-  Remote checks summary lines.
-
-- **Indent the R CMD check and Remote checks lines** using a Markdown
-  blockquote so they read as nested content under the `## Code checks`
-  heading rather than as inline paragraphs.
-
-- **Report renders when `params$val_date` is `NULL`**: dropped the
-  YAML `date` / `date-format` fields, which were coupled to
-  `params$val_date` via a fragile inline `` `r ...` `` expression
-  and made `quarto::quarto_render()` fail with "Error running
-  quarto CLI from R" when the value was `NULL` or when the inline
-  expression wasn't evaluated at YAML parse time. The Context
-  section already displays the validation date safely.
-
-- **Richer summary-card values**:
-  - `Has vignettes` shows the raw vignette count instead of `Yes`.
-  - `Export help` shows `N / M (P%)` — number of exports with help
-    over total exports — computed from the raw per-export logical.
-  - `Bugs status` is rounded to one decimal (`60.0% closed` rather
-    than `60.00% closed`).
-  - `Size codebase` is pretty-printed with a thousands separator.
-  - `Has website` shows the associated URL(s) rather than `Yes`.
-  - `Has bug reports url` shows the actual URL when it can be read
-    from `<val_dir>/sourced/<pkg>/DESCRIPTION` (falls back to the
-    prior boolean when the DESCRIPTION isn't available).
-
-- **Drop the redundant `## License` section** from
-  `inst/report/package/pkg_template.qmd`. The package's license is
-  already shown in the summary card table above the section, so
-  rendering it again as a paragraph was noise.
-
-- **Show a real count for `Dependencies` in the summary table**:
-  `riskreports:::summary_table()` runs every numeric metric through
-  `is_logical()`, which coerces a value of exactly `1` to the string
-  `"Yes"`. For boolean flags that's the intent, but for count
-  metrics like `dependencies` and `reverse_dependencies` a package
-  with exactly one hit was displayed as `Yes` instead of `1`. The
-  qmd now post-processes `summary_data` to restore the raw counts
-  for those two rows (formatted with `prettyNum(..., big.mark = ",")`).
-
-- **Add a `## Dependencies` and `## Reverse dependencies` section**
-  after `## Code checks`. Each renders a comma-separated paragraph
-  of package names alongside the total count. The reverse
-  dependencies section is skipped when the metric is a
-  `pkg_metric_error`, `NULL`, or otherwise unavailable.
-
-- **Populate the Context section of the individual package report**:
-  the placeholder text in `inst/report/package/pkg_template.qmd` is
-  replaced with the run's `val_date` and `val_dir`. A new `val_dir`
-  parameter is threaded through `val_pkg.R` so the report can display
-  the directory it belongs to.
-
-- **Surface R CMD check error and warning text in the "Code checks"
-  section**: previously the "Code checks" chunk only showed the
-  count breakdown (`Notes - 0 Errors - 1 Warnings - 0`) and had no
-  affordance for the actual message text. The section now extracts
-  any error / warning text from the metric (whether it arrives as an
-  `rcmdcheck_error` with `$result$errors` / `$result$warnings`, a
-  `system_command_status_error` with `$stderr`, or a bare
-  condition's `$message`) and renders it under labeled subsections.
-  When the metric is a plain named-integer count with `errors > 0`
-  or `warnings > 0` but no text was captured (the typical shape from
-  `riskmetric::pkg_metric_r_cmd_check`), an explicit fallback line
-  is shown so the reader isn't left wondering why the section is
-  empty. Notes are intentionally omitted.
-
-- **Fix `data.frame(... check.names = FALSE): row names contain
-  missing values` for packages whose exports include names with
-  leading underscores** (e.g. `cli`'s `__cli_update_due`). Some
-  assessments store `export_help` names with literal surrounding
-  quote characters (`"__cli_update_due"`, 18 bytes) while
-  `exported_namespace` stores the same identifier without quotes
-  (`__cli_update_due`, 16 bytes), so
-  `export_help[sort(exported_namespace)]` inside
-  `riskreports:::prepare_namespace_table()` returned NA-named
-  entries and `as.data.frame()` complained about missing row
-  names. The report now strips stray surrounding quotes from both
-  metrics before calling `prepare_namespace_table()`, and wraps
-  the call in `tryCatch()` so any residual failure degrades to a
-  short message instead of aborting the whole render.
-
-- **Follow-up fix for the same error at the `summary_table()` input**:
-  replaced `r_riskmetric[, !is.na(as.vector(r_riskmetric))]` with a
-  per-column `vapply(..., !all(is.na(x)))` predicate and set
-  `row.names(summary_data) <- NULL`.
 
 # val.pipeline 0.1.3
 
