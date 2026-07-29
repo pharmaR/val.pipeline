@@ -1,3 +1,41 @@
+# val.pipeline 0.1.4
+
+Polish and bug fixes for the individual package report PDF
+(`inst/report/package/pkg_template.qmd`):
+
+- Fix reverse-dependencies field showing a Bioconductor warning
+  instead of a count.
+- Fix `data.frame(... check.names = FALSE): row names contain
+  missing values` (both at `summary_table()` input and for exports
+  whose names had leading underscores / stray quote characters).
+- Fix `cat(... covr_coverage ...)` list-argument error.
+- Populate the Context section with `val_date` and `val_dir`
+  (thread `val_dir` through `R/val_pkg.R`).
+- Surface R CMD check error / warning text under `## Code checks`,
+  with a fallback message when only counts were captured.
+- Indent R CMD check and Remote checks lines (and their bullets /
+  error / warning blocks) into a Markdown blockquote.
+- Reorder the summary metric table: `Dependencies` at the top;
+  `Has news` / `News current`, `Exported namespace` / `Export help`,
+  and `Has examples` / `Has vignettes` paired; the URL-returning
+  fields (`Has website`, `Has source control`, `Has bug reports url`)
+  grouped with `Bugs status` next to `Has bug reports url`;
+  `Has maintainer` at the bottom.
+- Richer summary-card values: real vignette count, `Export help`
+  as `N / M (P%)`, `Bugs status` rounded to one decimal,
+  `Size codebase` pretty-printed, `Has website` and
+  `Has bug reports url` show the actual URL(s), and `Dependencies`
+  shows a real count (no longer coerced to `"Yes"` when equal to 1).
+- Drop the redundant `## License` section (already in the
+  summary card table).
+- Add `## Dependencies` and `## Reverse dependencies` sections
+  after `## Code checks`. Dependencies is rendered as a table
+  with `Package` and `Type` columns.
+- Guard against `params$val_date = NULL` (dropped the fragile
+  YAML `date` / `date-format` fields that were breaking
+  `quarto::quarto_render()`).
+
+
 # val.pipeline 0.1.3
 
 - **Pruned `pass_primary` in `inst/config.yml`**: the bypass list is only
@@ -21,6 +59,23 @@
   merits.
 
 # val.pipeline 0.1.2
+
+- **Individual package report PDF fixes**: hardened
+  `inst/report/package/pkg_template.qmd` against three failure modes
+  seen in real reports: (1) the "Reverse dependencies" cell in the
+  summary card table sometimes rendered an error/warning string (e.g.
+  "Bioconductor version cannot be validated...") instead of a count —
+  it is now coerced to a length via `length()` when the metric is a
+  character vector of package names, and shown as "unknown" for
+  `pkg_metric_error` / `NULL` values; (2) `data.frame(... check.names
+  = FALSE): row names contain missing values` right below that table
+  — every card column is now forced to a single unnamed character
+  scalar with explicit `row.names = NULL`; (3) `cat(... covr_coverage
+  ...): argument 2 (type 'list') cannot be handled by 'cat'` in the
+  "Code coverage" section — the chunk now extracts a scalar from the
+  `list(totalcoverage=, filecoverage=)` structure, formats numeric
+  values as a percentage, and skips the section entirely when no
+  usable coverage value is available.
 
 # val.pipeline 0.1.1
 
