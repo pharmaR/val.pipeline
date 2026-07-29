@@ -1,3 +1,25 @@
+# val.pipeline 0.1.3
+
+- **Pruned `pass_primary` in `inst/config.yml`**: the bypass list is only
+  meant for packages that would otherwise fail the `downloads_1yr` primary
+  metric (< 80,000 annual downloads). Ran a cranlogs audit against every
+  entry and removed the 391 packages with `>= 80,000` annual downloads,
+  taking the list from 575 to 184 entries. Packages with 0 reported
+  downloads (base R, Bioconductor-only, GitHub-only, org-internal) were
+  kept — the bypass is exactly what they need. Also updated the block's
+  header comment to spell out the `< 80,000/yr` intent.
+
+- **Guard `rip_cats_by_pkg()` bypass on live download count**: the
+  bypass branch that drops `downloads_1yr` from the primary metric set
+  now additionally requires the package's own `downloads_1yr` to be
+  `NA` or `< min_dwnld_bound`, where `min_dwnld_bound` is the lowest
+  boundary of the `downloads_1yr` primary rule, parsed out of `dec_df`
+  via `to_the_limit()` at call time so it stays in sync with the
+  config. This keeps the bypass targeted at packages that actually
+  need it — a package on `pass_primary` that has since crossed the
+  threshold now takes the normal primary path and passes on its own
+  merits.
+
 # val.pipeline 0.1.2
 
 - **Individual package report PDF fixes**: hardened
