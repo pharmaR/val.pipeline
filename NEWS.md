@@ -13,7 +13,13 @@
 - The helper installs an in-session shim on
   `BiocManager::repositories()` so it returns *only* the caller's
   `options("repos")` value, and sets
-  `options(BiocManager.check_repositories = FALSE)`.
+  `options(BiocManager.check_repositories = FALSE)`. When the
+  caller's repo vector uses a single flat `BioC` entry (typical
+  PPM layout), any missing `BioC*` aliases (`BioCsoft`, `BioCann`,
+  `BioCexp`, `BioCworkflows`, `BioCbooks`) are auto-populated with
+  the same URL so downstream lookups like
+  `BiocManager::repositories()[["BioCsoft"]]` (used inside
+  `riskmetric`) don't blow up with `subscript out of bounds`.
 - The entry points (`val_pipeline()`, `val_build()`,
   `val_prep_pipeline()`) call
   `configure_bioc_repositories_if_requested()` at startup so users

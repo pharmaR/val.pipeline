@@ -1,3 +1,29 @@
+# Alias a `BioC` entry (if present) to the conventional BiocManager
+# names `BioCsoft`, `BioCann`, `BioCexp`, `BioCworkflows`, and
+# `BioCbooks` when those are absent. This keeps callers that look up
+# `BiocManager::repositories()[["BioCsoft"]]` by name working when the
+# repos vector uses a single flat internal BioC snapshot (typical PPM
+# layout), while leaving existing `BioC*` entries untouched.
+.val_pipeline_alias_bioc <- function(repos) {
+  if (is.null(repos) || length(repos) == 0 || is.null(names(repos))) {
+    return(repos)
+  }
+  bioc_names <- c("BioCsoft", "BioCann", "BioCexp",
+                  "BioCworkflows", "BioCbooks")
+  source <- if ("BioC" %in% names(repos)) {
+    unname(repos[["BioC"]])
+  } else if ("BioCsoft" %in% names(repos)) {
+    unname(repos[["BioCsoft"]])
+  } else {
+    NULL
+  }
+  if (is.null(source) || !nzchar(source)) return(repos)
+  for (nm in bioc_names) {
+    if (!nm %in% names(repos)) repos[[nm]] <- source
+  }
+  repos
+}
+
 #' Configure BiocManager to use only user-supplied repositories
 #'
 #' Some validation environments (typically air-gapped Posit Package Manager
@@ -35,6 +61,15 @@
 #' version. If the caller has not set the `R_BIOC_VERSION` environment
 #' variable, this helper leaves it untouched — that is the caller's
 #' responsibility (typical value: `"3.22"`).
+#'
+#' If the caller's repo vector contains a single flat `BioC` entry
+#' (typical Posit Package Manager layout, where the whole BioC snapshot
+#' lives under one URL rather than being split into `BioCsoft`,
+#' `BioCann`, `BioCexp`, `BioCworkflows`, `BioCbooks`), the shim also
+#' auto-aliases any missing `BioC*` names to the same URL. This keeps
+#' downstream callers that index by name — for example
+#' `BiocManager::repositories()[["BioCsoft"]]` inside `riskmetric`'s
+#' reverse-dependency assessment — working out of the box.
 #'
 #' @param repos Optional named character vector of repository URLs. When
 #'   supplied it is used as the shim's return value; when `NULL` (the
@@ -82,9 +117,9 @@ configure_bioc_repositories <- function(repos = NULL, quiet = FALSE) {
     if (length(repos) > 0 && is.null(names(repos))) {
       stop("`repos` must be a *named* character vector.", call. = FALSE)
     }
-    repos_fn <- function(...) repos
+    repos_fn <- function(...) .val_pipeline_alias_bioc(repos)
   } else {
-    repos_fn <- function(...) getOption("repos")
+    repos_fn <- function(...) .val_pipeline_alias_bioc(getOption("repos"))
   }
 
   # Skip the online version-validity check so BiocManager does not try

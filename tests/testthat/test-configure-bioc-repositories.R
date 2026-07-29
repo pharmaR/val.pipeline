@@ -35,6 +35,20 @@ test_that("configure_bioc_repositories() accepts an explicit `repos` vector", {
                      BioC = "https://explicit.test/bioc"))
 })
 
+test_that("configure_bioc_repositories() aliases a flat BioC entry to the BioC* names", {
+  skip_if_not_installed("BiocManager")
+  out <- configure_bioc_repositories(
+    repos = c(CRAN = "https://explicit.test/cran",
+              BioC = "https://explicit.test/bioc"),
+    quiet = TRUE
+  )
+  expect_true(all(c("CRAN", "BioC", "BioCsoft", "BioCann", "BioCexp",
+                    "BioCworkflows", "BioCbooks") %in% names(out)))
+  expect_identical(unname(out[["BioCsoft"]]), "https://explicit.test/bioc")
+  expect_identical(unname(BiocManager::repositories()[["BioCsoft"]]),
+                   "https://explicit.test/bioc")
+})
+
 test_that("configure_bioc_repositories() rejects an unnamed `repos` vector", {
   expect_error(
     configure_bioc_repositories(
