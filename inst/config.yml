@@ -49,7 +49,6 @@ default:
     
     gt
   ] 
-  decisions_lst: [Low, Medium, High]
   # Which riskmetric ref type to use for the *initial* assessment pass of
   # Bioconductor packages inside val_pkg(). Options:
   #   "install" — use pkg_ref(pkg, source = "pkg_install", lib.loc = .libPaths()[1]).
@@ -68,7 +67,14 @@ default:
   #     is not useful for your BioC subset and you're happy to pay the
   #     coverage cost on every BioC package.
   # CRAN / GitHub packages are unaffected by this knob.
+  #
+  # Positioned above `decisions_lst` deliberately: pull_config() treats
+  # every key that appears *after* `decisions_lst` as a rule entry, so
+  # placing scalar defaults below it would push them into `rule_lst` and
+  # blow up build_decisions_df() with `subscript out of bounds` when it
+  # tries to read a non-existent `cond` element off a bare string.
   bioc_initial_ref: install
+  decisions_lst: [Low, Medium, High]
   opt_repos: 
     CRAN: https://packagemanager.posit.co/cran/2026-06-21
     BioC: https://bioconductor.org/packages/3.22/bioc #https://packagemanager.posit.co/bioconductor/latest 

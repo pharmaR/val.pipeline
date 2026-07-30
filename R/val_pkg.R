@@ -250,7 +250,7 @@ val_pkg <- function(
       )
       val_msg("\n-->", pkg_v, "initial reference complete (",
               init_source, ").\n",
-              min_level = "verbose")
+              min_level = "normal")
 
       # Pull available {riskmetric} assessments
       init_metrics <- riskmetric::all_assessments()
