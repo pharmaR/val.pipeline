@@ -1,13 +1,13 @@
 Package: val.pipeline
 Title: Validation Pipeline Example
-Version: 0.1.10
+Version: 0.1.11
 Authors@R: 
   c(
     person(
       "Aaron", "Clark",
       email = "clark.aaronchris@gmail.com",
       role = c("aut", "cre"),
-      comment = c(ORCID = "0000-0002-0123-0970")data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAbElEQVR4Xs2RQQrAMAgEfZgf7W9LAguybljJpR3wEse5JOL3ZObDb4x1loDhHbBOFU6i2Ddnw2KNiXcdAXygJlwE8OFVBHDgKrLgSInN4WMe9iXiqIVsTMjH7z/GhNTEibOxQswcYIWYOR/zAjBJfiXh3jZ6AAAAAElFTkSuQmCC
+      comment = c(ORCID = "0000-0002-0123-0970")
     ),
     person(
       "Jeff", "Thompson",
