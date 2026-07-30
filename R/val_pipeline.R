@@ -47,6 +47,16 @@
 #'   `val.pipeline.config_path` option is restored on exit. When `NULL`
 #'   (default), the pre-packaged config is used (or whatever the caller
 #'   has already set via `options(val.pipeline.config_path = ...)`).
+#' @param workers Integer. Number of parallel workers to use during the
+#'   per-package assessment loop inside [val_build()]. `1L` (default)
+#'   preserves the original serial behaviour, including dep-skip
+#'   short-circuiting when a package fails. Values greater than `1`
+#'   fan the loop out via [future.apply::future_mapply()] under a
+#'   `future::multisession` plan; the dep-skip short-circuit is
+#'   disabled in that mode (final risk propagation still runs
+#'   downstream via [val_decision()], so package-report accuracy is
+#'   unaffected). Requires the optional `{future}` and
+#'   `{future.apply}` packages when `workers > 1`.
 #' @return A list containing the validation directory and a data frame of
 #'   package assessments.
 #'
@@ -69,7 +79,8 @@ val_pipeline <- function(
       BioC = 'https://bioconductor.org/packages/3.22/bioc'),
   verbose = NULL,
   prep = NULL,
-  config_path = NULL
+  config_path = NULL,
+  workers = 1L
   ){
 
   # Assess args
@@ -132,7 +143,8 @@ val_pipeline <- function(
     out             = out,
     opt_repos       = prep$opt_repos,
     prep            = prep,
-    config_path     = config_path
+    config_path     = config_path,
+    workers         = workers
   )
   
   

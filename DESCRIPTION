@@ -37,7 +37,9 @@ Suggests:
     BiocManager,
     memoise,
     testthat (>= 3.0.0),
-    withr
+    withr,
+    future,
+    future.apply
 Config/testthat/edition: 3
 Imports: 
     config,
