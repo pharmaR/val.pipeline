@@ -52,3 +52,50 @@ test_that("configure_riskmetric_offline() installs an override on the assess met
     }
   )
 })
+
+
+test_that("configure_riskmetric_offline() also shims memoise_bioc_available", {
+  skip_if_not_installed("riskmetric")
+  skip_if_not_installed("memoise")
+
+  orig <- getFromNamespace("memoise_bioc_available", ns = "riskmetric")
+  on.exit(
+    utils::assignInNamespace("memoise_bioc_available", orig, ns = "riskmetric"),
+    add = TRUE
+  )
+
+  expect_true(configure_riskmetric_offline(quiet = TRUE))
+
+  patched <- getFromNamespace("memoise_bioc_available", ns = "riskmetric")
+  expect_false(identical(patched, orig))
+
+  # Under a stubbed available.packages() the shim must succeed rather than
+  # trying to reach bioconductor.org/packages/release/bioc/src/contrib/PACKAGES.
+  fake_ap <- matrix(
+    c("BiocGenerics", "0.99.0", "https://internal.example.com/bioc/src/contrib"),
+    nrow = 1, byrow = TRUE,
+    dimnames = list(NULL, c("Package", "Version", "Repository"))
+  )
+  fake_repos <- c(BioCsoft = "https://internal.example.com/bioc")
+
+  called <- 0L
+  with_mocked_bindings(
+    available.packages = function(repos = NULL, ...) {
+      called <<- called + 1L
+      fake_ap
+    },
+    .package = "utils",
+    {
+      with_mocked_bindings(
+        repositories = function(...) fake_repos,
+        .package = "BiocManager",
+        {
+          df <- patched()
+          expect_s3_class(df, "data.frame")
+          expect_true("BiocGenerics" %in% df[["Package"]])
+        }
+      )
+    }
+  )
+  expect_gt(called, 0L)
+})

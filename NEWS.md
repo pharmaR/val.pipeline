@@ -1,3 +1,18 @@
+# val.pipeline 0.1.10
+
+- `configure_riskmetric_offline()` now installs a second in-session
+  shim on `riskmetric:::memoise_bioc_available`, replacing its
+  hard-coded `read.dcf(url("https://bioconductor.org/packages/release/bioc/src/contrib/PACKAGES"))`
+  lookup with a `utils::available.packages()` call against every
+  `BioC*` repo advertised by `BiocManager::repositories()`. Fixes
+  `pkg_ref("<BioCPkg>")` failing on air-gapped hosts with
+  `cannot open the connection to
+  'https://bioconductor.org/packages/release/bioc/src/contrib/PACKAGES'`
+  even after `configure_bioc_repositories()` had already re-pointed
+  BiocManager at the internal mirrors — that URL is contacted
+  directly, bypassing `BiocManager::repositories()`. Upstream fix
+  proposed at `pharmaR/riskmetric#402`. (#81)
+
 # val.pipeline 0.1.6
 
 - Add `configure_bioc_repositories()` and
