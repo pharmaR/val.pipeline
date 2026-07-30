@@ -17,7 +17,7 @@ test_that("bioc_initial_ref accepts the four documented values", {
       "  decisions_lst: [Low, Medium, High]",
       paste0("  bioc_initial_ref: ", v)
     ), cfg)
-    withr::local_options(val.pipeline.config = cfg)
+    withr::local_options(val.pipeline.config_path = cfg)
     expect_equal(
       pull_config(val = "bioc_initial_ref", rule_type = "default"),
       v

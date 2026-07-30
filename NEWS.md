@@ -1,3 +1,28 @@
+# val.pipeline 0.1.9
+
+- Fix five Ubuntu R CMD check failures in the test suite that had been
+  masking real regressions on CI:
+  - `test-bioc-initial-ref-config.R` set the wrong session option
+    (`val.pipeline.config`) when swapping in a temp yaml, so
+    `resolve_config_path()` kept returning the packaged config. Three
+    of the four iterations then silently re-asserted the default value.
+    Switched to the actual option `val.pipeline.config_path`.
+  - `test-configure-bioc-repositories.R` still expected the shim's
+    output to be identical to the caller's 2-entry `c(CRAN, BioC)`
+    vector, but `configure_bioc_repositories()` now auto-populates the
+    classic `BioC*` aliases (`BioCsoft`, `BioCann`, `BioCexp`,
+    `BioCworkflows`, `BioCbooks`) so downstream lookups like
+    `BiocManager::repositories()[["BioCsoft"]]` resolve. Relaxed the
+    two `expect_identical()` assertions to check the caller's entries
+    survive untouched (aliasing has its own dedicated test).
+  - `test-configure-riskmetric-offline.R` used
+    `utils::assignInNamespace("available.packages", ...)` to swap in a
+    fake `available.packages`. Newer R (>= 4.4) hard-locks base package
+    bindings, so this errored with
+    `locked binding of 'available.packages' cannot be changed`.
+    Replaced with `testthat::local_mocked_bindings(.package = "utils")`
+    which unlocks + restores safely. (#83)
+
 # val.pipeline 0.1.8
 
 - `configure_riskmetric_offline()` now installs four in-session shims
