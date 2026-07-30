@@ -1,5 +1,23 @@
 # val.pipeline 0.1.9
 
+- Clean up Ubuntu R CMD check on `main`. CI runs `rcmdcheck` with
+  `error_on = "warning"`, so three real WARNINGs were failing the
+  build even though every test passed:
+  - `checking dependencies in R code` — `BiocManager::` and `memoise::`
+    are called from `R/bioc.R` (the four riskmetric shims) but neither
+    was declared in `DESCRIPTION`. Added both to `Suggests:`; the code
+    already gates them behind `requireNamespace()`.
+  - `checking for missing documentation entries` — the four exported
+    `configure_bioc_repositories*` / `configure_riskmetric_offline*`
+    helpers have full roxygen blocks in `R/bioc.R`, but the matching
+    `man/*.Rd` files had never been regenerated. Re-ran
+    `devtools::document()` and committed the four new Rd files.
+  - `checking for unstated dependencies in 'tests'` — same
+    `BiocManager` issue reappearing for the test suite. Fixed by the
+    same `Suggests:` addition above.
+- Also cleared the `getFromNamespace` NOTE (`checking R code for
+  possible problems`) by adding `@importFrom utils getFromNamespace
+  assignInNamespace` to `configure_riskmetric_offline()`.
 - Fix five Ubuntu R CMD check failures in the test suite that had been
   masking real regressions on CI:
   - `test-bioc-initial-ref-config.R` set the wrong session option

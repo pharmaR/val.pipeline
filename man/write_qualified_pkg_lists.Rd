@@ -35,7 +35,7 @@ text file per source (\code{repo_name}) into \code{out_dir}. Each file is named
 \verb{qualified-<source>.txt} and contains, one package per line, the
 names of every package whose \code{final_decision} matches
 \code{qualified_decision}. \verb{<source>} is the value of the \code{repo_name}
-column produced by \code{\link[=val_pkg]{val_pkg()}} — typically \code{CRAN}, \code{BioC}, or
+column produced by \code{\link[=val_pkg]{val_pkg()}} -- typically \code{CRAN}, \code{BioC}, or
 \code{github} (every non-CRAN/BioC github-hosted source is normalised to
 a single \code{github} bucket by \code{\link[=get_repo_origin]{get_repo_origin()}}).
 }
@@ -58,7 +58,7 @@ it row-by-row from the \code{repos} install URL by round-tripping through
 \code{\link[=get_repo_origin]{get_repo_origin()}} against the current session's
 \code{getOption("repos")}. Any URL that no longer maps to a configured
 repo resolves to \code{"unknown"} and lands in \code{qualified-NA.txt}. If
-neither \code{repo_name} nor \code{repos} is present the helper errors — the
+neither \code{repo_name} nor \code{repos} is present the helper errors -- the
 source of every qualified package can't be recovered from thin air.
 }
 \keyword{internal}

@@ -17,7 +17,7 @@ packages (typically \code{"High"}).}
 \code{val_build()} call (\code{"depends"} or \code{"suggests"}). Only when \code{"Suggests"}
 is present will Suggests-failures propagate.}
 
-\item{decisions}{Character vector. Ordered risk categories, low → high
+\item{decisions}{Character vector. Ordered risk categories, low -> high
 (e.g. \code{c("Low", "Medium", "High")}). Only used to identify the "not
 failed" baseline (\code{decisions[1]}) when \code{failed_pkgs} is \code{NULL}.}
 
