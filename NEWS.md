@@ -1,4 +1,4 @@
-# val.pipeline 0.1.12
+# val.pipeline 0.1.13
 
 - Fix two `val_build(workers > 1)` bugs surfaced by a real 8-worker run:
   - `quarto::quarto_render()` was blowing up with
