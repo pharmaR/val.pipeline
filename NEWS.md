@@ -1,3 +1,13 @@
+# val.pipeline 0.1.11
+
+- Hotfix: strip a stray `data:image/png;base64,...` blob that had been
+  accidentally glued onto the maintainer's `ORCID` field in
+  `Authors@R`. R CMD check on Ubuntu was failing every downstream PR
+  with `checking DESCRIPTION meta-information ... ERROR / Malformed
+  Authors@R field:`. The blob was introduced in `main` via #84 and had
+  begun propagating to every branch that merged main. No other
+  change. (#85)
+
 # val.pipeline 0.1.10
 
 - Restrict the `pkg_bioc_remote` initial-assessment pass to a
