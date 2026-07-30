@@ -12,6 +12,68 @@
   `{future.apply}` moved to `Suggests` and are only required when
   `workers > 1`. (#80)
 
+# val.pipeline 0.1.8
+
+- `configure_riskmetric_offline()` now installs four in-session shims
+  on `riskmetric` to make BioC assessments work on air-gapped hosts,
+  replacing the two shims previously introduced in this branch.
+  Upstream fix proposed at `pharmaR/riskmetric#402`.
+  - Shim 1 (unchanged): swaps
+    `riskmetric:::assess_reverse_dependencies.default()` for a version
+    that computes reverse dependencies via `utils::available.packages()`
+    + `tools::dependsOnPkgs()` instead of
+    `devtools::revdep(bioconductor = TRUE)` (which reads a `VIEWS`
+    file the internal PPM does not serve).
+  - Shim 2 replaces `riskmetric:::memoise_bioc_available()`'s
+    hard-coded
+    `read.dcf(url("https://bioconductor.org/packages/release/bioc/src/contrib/PACKAGES"))`
+    lookup with a `utils::available.packages()` call. The BioC-repo
+    resolver now handles setups where the BioC PPM is exposed via
+    `options("repos")` without a `BioC*` name; callers can also
+    override detection explicitly via
+    `options(val.pipeline.bioc_repos = ...)` or
+    `Sys.setenv(VAL_PIPELINE_BIOC_REPOS = "<comma-separated URLs>")`.
+  - Shim 3 wraps `riskmetric:::is_available_cran()` so a package that
+    is also present in `memoise_bioc_available()` no longer wins the
+    CRAN check, restoring `pkg_bioc_remote` classification for BioC
+    packages served alongside CRAN in `options("repos")` (fixes
+    `pkg_ref("BiocGenerics")` being classified as `pkg_cran_remote`).
+  - Shim 4 replaces `riskmetric:::pkg_bioc()` so the resulting
+    `pkg_bioc_remote` reference carries the internal PPM BioC URL in
+    `x$repo` / `x$repo_base_url` instead of the released code's
+    hard-coded `https://bioconductor.org/packages/release/bioc`.
+    Fixes a family of `pkg_assess()` metrics (`has_news`,
+    `remote_checks`, `news_current`, `has_vignettes`, `has_maintainer`,
+    `bugs_status`, `has_source_control`, `has_bug_reports_url`,
+    `license`, ...) failing with
+    `Failed to connect to bioconductor.org port 443: Connection refused`
+    because they scrape `x$web_html` derived from `x$repo_base_url`.
+  (#81)
+
+# val.pipeline 0.1.7
+
+- `val_pkg()` now prefers a disk-only reference for the initial
+  assessment of Bioconductor packages instead of scraping
+  `bioconductor.org` via `pkg_bioc_remote`. On air-gapped Posit
+  Package Manager mirrors that broken scrape wiped out roughly half a
+  dozen primary metrics (`has_vignettes`, `has_news`, `license`,
+  `has_maintainer`, `has_bug_reports_url`, `has_source_control`) and
+  effectively forced `covr_coverage` to run on every BioC package,
+  defeating the point of the initial pass.
+  - The new fallback order for BioC packages is: `pkg_install` (when
+    the pkg is in `.libPaths()[1]`) -> `pkg_source` (when the tarball
+    has been untarred) -> skip.
+  - A new `default: bioc_initial_ref:` config knob controls the order,
+    with allowed values `install` (default), `source`, `remote`
+    (legacy scrape behaviour) and `skip` (no initial pass; final
+    `pkg_source` assessment always includes `covr_coverage`).
+  - `workable_assessments(source_ref = ...)` now records the actual
+    provenance of the initial pass (`install`, `source`, or `remote`)
+    rather than always claiming `"remote"`, so downstream reports no
+    longer misrepresent where BioC metrics came from.
+  - CRAN / GitHub packages are unaffected: the initial pass continues
+    to run as `pkg_cran_remote`. (#82)
+
 # val.pipeline 0.1.6
 
 - Add `configure_bioc_repositories()` and

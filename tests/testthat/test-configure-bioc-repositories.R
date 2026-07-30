@@ -12,11 +12,16 @@ test_that("configure_bioc_repositories_if_requested() honors truthy env values",
               BioC = "https://example.test/bioc")
   ))
   out <- configure_bioc_repositories_if_requested(quiet = TRUE)
-  expect_named(out, c("CRAN", "BioC"))
-  # After the shim, BiocManager::repositories() should return exactly our repos.
-  expect_identical(BiocManager::repositories(),
-                   c(CRAN = "https://example.test/cran",
-                     BioC = "https://example.test/bioc"))
+  # The shim now auto-populates the classic BioC* aliases (BioCsoft,
+  # BioCann, BioCexp, BioCworkflows, BioCbooks) so downstream lookups
+  # like BiocManager::repositories()[["BioCsoft"]] resolve. The caller's
+  # CRAN + BioC entries must survive untouched.
+  expect_true(all(c("CRAN", "BioC") %in% names(out)))
+  expect_identical(unname(out[["CRAN"]]), "https://example.test/cran")
+  expect_identical(unname(out[["BioC"]]), "https://example.test/bioc")
+  repos_after <- BiocManager::repositories()
+  expect_identical(unname(repos_after[["CRAN"]]), "https://example.test/cran")
+  expect_identical(unname(repos_after[["BioC"]]), "https://example.test/bioc")
 })
 
 test_that("configure_bioc_repositories() accepts an explicit `repos` vector", {
@@ -27,12 +32,15 @@ test_that("configure_bioc_repositories() accepts an explicit `repos` vector", {
               BioC = "https://explicit.test/bioc"),
     quiet = TRUE
   )
-  expect_identical(out,
-                   c(CRAN = "https://explicit.test/cran",
-                     BioC = "https://explicit.test/bioc"))
-  expect_identical(BiocManager::repositories(),
-                   c(CRAN = "https://explicit.test/cran",
-                     BioC = "https://explicit.test/bioc"))
+  # The caller's CRAN + BioC entries must survive untouched. The shim
+  # additionally populates the BioC* aliases — that is covered by the
+  # dedicated aliasing test below and is not re-asserted here.
+  expect_true(all(c("CRAN", "BioC") %in% names(out)))
+  expect_identical(unname(out[["CRAN"]]), "https://explicit.test/cran")
+  expect_identical(unname(out[["BioC"]]), "https://explicit.test/bioc")
+  repos_after <- BiocManager::repositories()
+  expect_identical(unname(repos_after[["CRAN"]]), "https://explicit.test/cran")
+  expect_identical(unname(repos_after[["BioC"]]), "https://explicit.test/bioc")
 })
 
 test_that("configure_bioc_repositories() aliases a flat BioC entry to the BioC* names", {

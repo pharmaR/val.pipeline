@@ -49,6 +49,60 @@ default:
     
     gt
   ] 
+  # Which riskmetric ref type to use for the *initial* assessment pass of
+  # Bioconductor packages inside val_pkg(). Options:
+  #   "install" — use pkg_ref(pkg, source = "pkg_install", lib.loc = .libPaths()[1]).
+  #     Recommended default: reads DESCRIPTION/NEWS from the pipeline library
+  #     with no bioconductor.org scraping (works on air-gapped PPM hosts
+  #     where the /html/, /news/ and /checkResults/ trees are not mirrored).
+  #     Falls back to "source" when the package isn't installed yet, and to
+  #     "skip" when neither an install nor an untarred source is available.
+  #   "source"  — use pkg_ref(<sourced/pkg>, source = "pkg_source") when
+  #     ref = "source". Same offline behaviour, but slower than "install".
+  #   "remote"  — use pkg_ref(pkg, source = "pkg_bioc_remote"). Legacy
+  #     behaviour: scrapes bioconductor.org. Only useful on hosts with
+  #     outbound network access to bioconductor.org.
+  #   "skip"    — no initial pass; the final pkg_source assessment runs
+  #     with covr_coverage always included. Set this if the initial pass
+  #     is not useful for your BioC subset and you're happy to pay the
+  #     coverage cost on every BioC package.
+  # CRAN / GitHub packages are unaffected by this knob.
+  #
+  # Positioned above `decisions_lst` deliberately: pull_config() treats
+  # every key that appears *after* `decisions_lst` as a rule entry, so
+  # placing scalar defaults below it would push them into `rule_lst` and
+  # blow up build_decisions_df() with `subscript out of bounds` when it
+  # tries to read a non-existent `cond` element off a bare string.
+  bioc_initial_ref: remote
+  # Whitelist of `riskmetric` assessment names to run when the initial
+  # BioC assessment uses `pkg_bioc_remote` (i.e. `bioc_initial_ref:
+  # remote`). Most `pkg_bioc_remote` metrics scrape bioconductor.org
+  # through `x$web_html` / `x$repo_base_url` — `has_news`,
+  # `remote_checks`, `news_current`, `has_vignettes`, `has_maintainer`,
+  # `bugs_status`, `has_source_control`, `has_bug_reports_url`,
+  # `license`, ... — and on air-gapped PPM hosts those return
+  # `<pkg_metric_error: Failed to connect to bioconductor.org port 443:
+  # Connection refused>` even after
+  # `configure_riskmetric_offline_if_requested()` has installed the
+  # four riskmetric shims (the shims fix classification and the
+  # `Repository` URL but PPM mirrors typically do not serve the
+  # `/html/`, `/news/`, `/checkResults/` trees). Running them anyway
+  # just fills the initial score frame with NAs and pushes packages
+  # into unnecessary `covr_coverage` runs downstream.
+  #
+  # Metrics listed below are the ones whose result does *not* depend
+  # on scraping the BioC mirror once the offline shims are installed:
+  #   - `assess_reverse_dependencies` runs through
+  #     `utils::available.packages()` after Shim 1.
+  #   - `assess_dependencies` reads DESCRIPTION fields already cached
+  #     by `memoise_bioc_available()` (Shim 2), no HTTP.
+  # Set to `~` (YAML null) or delete the key to run every assessment
+  # `riskmetric::all_assessments()` returns; that matches the pre-0.1.10
+  # behaviour and is only appropriate on hosts with real outbound
+  # access to bioconductor.org.
+  bioc_remote_initial_metrics:
+    - assess_reverse_dependencies
+    - assess_dependencies
   decisions_lst: [Low, Medium, High]
   opt_repos: 
     CRAN: https://packagemanager.posit.co/cran/2026-06-21

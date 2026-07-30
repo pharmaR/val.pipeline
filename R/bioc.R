@@ -177,7 +177,14 @@ configure_bioc_repositories_if_requested <- function(quiet = FALSE) {
 }
 
 
-#' Route `riskmetric::assess_reverse_dependencies()` through internal repos
+#' Route `riskmetric`'s Bioconductor lookups through internal repos
+#'
+#' Installs four in-session shims on `riskmetric` so its Bioconductor-facing
+#' code paths stop reaching out to public `bioconductor.org` URLs and
+#' instead consult `options("repos")` — i.e. the same internal PPM CRAN
+#' and BioC snapshots the rest of `val.pipeline` uses.
+#'
+#' # Shim 1: `assess_reverse_dependencies.default`
 #'
 #' `riskmetric::assess_reverse_dependencies.default()` calls
 #' `devtools::revdep(x$name, bioconductor = TRUE)`, which in turn calls
@@ -191,19 +198,86 @@ configure_bioc_repositories_if_requested <- function(quiet = FALSE) {
 #' cannot open the connection to '.../bioc-.../latest/VIEWS'
 #' }
 #'
-#' and the reverse-dependencies metric ends up as a `pkg_metric_error`
-#' (which the package report renders as `"unknown"`).
+#' The shim replaces it with a version that computes reverse
+#' dependencies from `utils::available.packages()` +
+#' `tools::dependsOnPkgs()`. No `VIEWS` file is required.
 #'
-#' This helper installs an in-session shim on
-#' `riskmetric:::assess_reverse_dependencies.default` that computes the
-#' reverse-dependency list from `utils::available.packages()` directly
-#' (which reads from `options("repos")` — i.e. the internal PPM CRAN
-#' and BioC snapshots). No `VIEWS` file is required.
+#' # Shim 2: `memoise_bioc_available`
 #'
-#' The shim is intentionally opt-in; the wrapper
-#' [configure_riskmetric_offline_if_requested()] runs it only when the
-#' environment variable `VAL_PIPELINE_INTERNAL_BIOC` is truthy, so
-#' public-network users are unaffected.
+#' `riskmetric:::memoise_bioc_available()` hard-codes
+#' `read.dcf(url("https://bioconductor.org/packages/release/bioc/src/contrib/PACKAGES"))`
+#' to build its Bioconductor package index. That URL is contacted
+#' *directly*, bypassing `BiocManager::repositories()`, so
+#' [configure_bioc_repositories()] alone can't rescue it and
+#' `pkg_ref("<BioCPkg>")` fails on an air-gapped host with
+#'
+#' \preformatted{
+#' cannot open the connection to 'https://bioconductor.org/packages/release/bioc/src/contrib/PACKAGES'
+#' }
+#'
+#' The shim replaces it with a version that queries the set of
+#' Bioconductor repos advertised to the session and passes them to
+#' `utils::available.packages()`. That set is resolved, in order of
+#' specificity, from:
+#'
+#' \enumerate{
+#'   \item `options("val.pipeline.bioc_repos")` — explicit override
+#'     (named `character` or single URL);
+#'   \item `Sys.getenv("VAL_PIPELINE_BIOC_REPOS")` — comma-separated URLs;
+#'   \item `BiocManager::repositories()` entries whose names begin `BioC`;
+#'   \item `options("repos")` entries whose name begins `BioC` *or*
+#'     whose URL contains `bioconductor` / `/bioc/` (case-insensitive);
+#'   \item `options("repos")` in full, as a last resort.
+#' }
+#'
+#' Step 4 lets consolidated PPM setups — where one URL serves both CRAN
+#' and BioC snapshots — work without having to synthesise five fake
+#' `BioC*` entries. The result is memoised with `memoise::memoise()`,
+#' matching the upstream contract, so repeated `pkg_ref()` calls hit
+#' the cache. Upstream fix proposed at
+#' \href{https://github.com/pharmaR/riskmetric/pull/402}{pharmaR/riskmetric#402}.
+#'
+#' # Shim 3: `is_available_cran`
+#'
+#' `riskmetric:::verify_pkg_source()` calls `is_available_cran()` before
+#' `is_available_bioc()`. When one consolidated PPM repo advertises both
+#' CRAN and Bioconductor packages, BioC packages such as `BiocGenerics`
+#' are found by the CRAN check first and classified as `pkg_cran_remote`
+#' — which then breaks Bioconductor-specific downstream code (for
+#' example the `has_examples` metric has no `pkg_cran_remote` method,
+#' and reverse-dependency lookups follow the wrong code path). The shim
+#' wraps `is_available_cran` so any package that is also present in
+#' `memoise_bioc_available()` no longer counts as CRAN, and dispatch
+#' falls through to `is_available_bioc()`. `pkg_ref("BiocGenerics")`
+#' then correctly returns a `pkg_bioc_remote`.
+#'
+#' # Shim 4: `pkg_bioc`
+#'
+#' Released `riskmetric::pkg_bioc()` builds the `pkg_bioc_remote`
+#' reference with a hard-coded
+#' `repo = "https://bioconductor.org/packages/release/bioc"`, discarding
+#' the `Repository` column returned by `memoise_bioc_available()`. Every
+#' downstream metric that follows `x$repo_base_url` — `has_news`,
+#' `remote_checks`, `news_current`, `has_vignettes`, `has_maintainer`,
+#' `bugs_status`, `has_source_control`, `has_bug_reports_url`, `license`,
+#' and friends — then fetches from `bioconductor.org` and fails with
+#'
+#' \preformatted{
+#' Failed to connect to bioconductor.org port 443: Connection refused
+#' }
+#'
+#' on air-gapped hosts. The shim replaces `pkg_bioc()` with a version
+#' that uses the `Repository` column from the shimmed
+#' `memoise_bioc_available()` (i.e. the internal PPM BioC URL), so
+#' `x$repo_base_url` points at the mirror and every derived scrape hits
+#' the mirror too. Mirrors the upstream fix at
+#' \href{https://github.com/pharmaR/riskmetric/pull/402}{pharmaR/riskmetric#402}.
+#'
+#' All four shims are intentionally opt-in; the wrapper
+#' [configure_riskmetric_offline_if_requested()] runs this helper only
+#' when the run is flagged as air-gapped (env var
+#' `VAL_PIPELINE_INTERNAL_BIOC` truthy, or `default: air_gapped: true`
+#' in `config.yml`), so public-network users are unaffected.
 #'
 #' @param quiet Logical. When `FALSE` (the default) a short informational
 #'   message is emitted.
@@ -213,6 +287,8 @@ configure_bioc_repositories_if_requested <- function(quiet = FALSE) {
 #'
 #' @seealso [configure_riskmetric_offline_if_requested()],
 #'   [configure_bioc_repositories()]
+#'
+#' @importFrom utils getFromNamespace assignInNamespace
 #'
 #' @export
 configure_riskmetric_offline <- function(quiet = FALSE) {
@@ -254,11 +330,168 @@ configure_riskmetric_offline <- function(quiet = FALSE) {
     ns = "riskmetric"
   )
 
+  # riskmetric's memoise_bioc_available() hard-codes a read.dcf() against
+  #   https://bioconductor.org/packages/release/bioc/src/contrib/PACKAGES
+  # (see pharmaR/riskmetric R/utils_memoised.R line ~39). It's called by
+  # riskmetric::pkg_bioc() / pkg_ref() to look up a BioC package's
+  # version + repo. On an air-gapped host the read fails with
+  #   Error in read.dcf(con): cannot open the connection to
+  #   'https://bioconductor.org/packages/release/bioc/src/contrib/PACKAGES'
+  # even after configure_bioc_repositories() has repointed BiocManager at
+  # the internal repos, because this call bypasses BiocManager entirely.
+  #
+  # Replace it with a version that queries every BioC* repo advertised by
+  # BiocManager::repositories() via utils::available.packages(), which
+  # reads options("repos"). No public bioconductor.org URL is contacted.
+  # Upstream fix proposed at pharmaR/riskmetric#402.
+  # Detect the set of Bioconductor repositories to query.
+  # Users on air-gapped hosts often have a *single consolidated* BioC PPM
+  # repo rather than the five named entries (BioCsoft/BioCann/...) that
+  # BiocManager::repositories() returns on the public network — so we
+  # look in several places, in order of specificity:
+  #   1. options("val.pipeline.bioc_repos") — explicit override.
+  #   2. Sys.getenv("VAL_PIPELINE_BIOC_REPOS") — comma-separated URLs.
+  #   3. BiocManager::repositories() entries whose names start "BioC".
+  #   4. options("repos") entries whose name starts "BioC" *or* whose
+  #      URL contains "bioconductor" / "/bioc/" (case-insensitive).
+  #   5. As a last resort, options("repos") in full — honest but noisy.
+  bioc_repos_from_config <- function() {
+    opt <- getOption("val.pipeline.bioc_repos", NULL)
+    if (length(opt)) return(opt)
+    env <- Sys.getenv("VAL_PIPELINE_BIOC_REPOS", unset = "")
+    if (nzchar(env)) return(trimws(strsplit(env, ",", fixed = TRUE)[[1]]))
+    repos <- tryCatch(BiocManager::repositories(), error = function(e) NULL)
+    if (length(repos)) {
+      nms <- names(repos)
+      if (!is.null(nms)) {
+        hits <- repos[startsWith(nms, "BioC")]
+        if (length(hits)) return(hits)
+      }
+    }
+    all_repos <- getOption("repos", character())
+    if (length(all_repos)) {
+      nms <- names(all_repos)
+      if (is.null(nms)) nms <- rep("", length(all_repos))
+      match_name <- startsWith(nms, "BioC")
+      match_url  <- grepl("bioconductor|/bioc(/|$)",
+                          all_repos, ignore.case = TRUE)
+      hits <- all_repos[match_name | match_url]
+      if (length(hits)) return(hits)
+      return(all_repos)
+    }
+    character()
+  }
+  bioc_available_offline <- function() {
+    bioc_repos <- bioc_repos_from_config()
+    if (length(bioc_repos) == 0L) {
+      return(data.frame(
+        Package = character(0), Version = character(0),
+        Repository = character(0), stringsAsFactors = FALSE))
+    }
+    ap <- tryCatch(
+      utils::available.packages(repos = bioc_repos),
+      error = function(e) NULL
+    )
+    if (is.null(ap) || nrow(ap) == 0L) {
+      return(data.frame(
+        Package = character(0), Version = character(0),
+        Repository = character(0), stringsAsFactors = FALSE))
+    }
+    df <- as.data.frame(ap, stringsAsFactors = FALSE)
+    df[!duplicated(df[["Package"]]), , drop = FALSE]
+  }
+  # memoise the offline function the same way riskmetric memoised the
+  # original so repeated pkg_ref() calls hit the cache after the first
+  # query and don't re-shell to available.packages().
+  memoised_offline <- if (requireNamespace("memoise", quietly = TRUE)) {
+    memoise::memoise(bioc_available_offline)
+  } else {
+    bioc_available_offline
+  }
+  utils::assignInNamespace(
+    "memoise_bioc_available",
+    memoised_offline,
+    ns = "riskmetric"
+  )
+
+  # Shim 3: riskmetric:::is_available_cran() runs *before*
+  # is_available_bioc() in pkg_ref() dispatch. When the caller's PPM
+  # serves both CRAN and BioC packages under a single consolidated repo
+  # (or when the BioC PPM is exposed via options("repos") without a
+  # BioC* name), a BioC package like BiocGenerics is found by
+  # available.packages() first and classified as "pkg_cran_remote".
+  # That in turn breaks BioC-only assessments (has_examples has no
+  # pkg_cran_remote method; reverse_dependencies hits the wrong URL).
+  #
+  # Wrap is_available_cran so a package that is *also* in
+  # memoise_bioc_available() no longer counts as CRAN; classification
+  # falls through to is_available_bioc(), and the ref becomes a
+  # pkg_bioc_remote as intended.
+  is_available_cran_orig <- tryCatch(
+    getFromNamespace("is_available_cran", ns = "riskmetric"),
+    error = function(e) NULL
+  )
+  if (!is.null(is_available_cran_orig)) {
+    is_available_cran_shim <- function(x, repos, p) {
+      in_bioc <- tryCatch(
+        x %in% getFromNamespace("memoise_bioc_available",
+                                ns = "riskmetric")()[, "Package"],
+        error = function(e) FALSE
+      )
+      if (isTRUE(in_bioc)) return(FALSE)
+      is_available_cran_orig(x, repos, p)
+    }
+    utils::assignInNamespace(
+      "is_available_cran", is_available_cran_shim, ns = "riskmetric"
+    )
+  }
+
+  # Shim 4: released riskmetric's pkg_bioc() hard-codes
+  #   repo = "https://bioconductor.org/packages/release/bioc"
+  # ignoring the Repository column from memoise_bioc_available(). Every
+  # downstream metric that scrapes x$web_html then derives its URL from
+  # bioconductor.org and fails on air-gapped hosts with
+  #   Failed to connect to bioconductor.org port 443: Connection refused
+  # (has_news, remote_checks, news_current, has_vignettes, has_maintainer,
+  # bugs_status, has_source_control, has_bug_reports_url, license, ...).
+  # Replace pkg_bioc() with a version that uses the Repository column
+  # from our shimmed memoise_bioc_available() -- i.e. the internal PPM
+  # BioC URL -- and falls back to the first repo returned by
+  # bioc_repos_from_config() when the pkg is unknown. Mirrors the fix
+  # upstream at pharmaR/riskmetric#402.
+  new_pkg_ref_fn <- tryCatch(
+    getFromNamespace("new_pkg_ref", ns = "riskmetric"),
+    error = function(e) NULL
+  )
+  if (!is.null(new_pkg_ref_fn)) {
+    pkg_bioc_offline <- function(x) {
+      bp <- getFromNamespace("memoise_bioc_available", ns = "riskmetric")()
+      info <- bp[bp[, "Package"] == x, , drop = FALSE]
+      repo <- if ("Repository" %in% colnames(info) && nrow(info) > 0L) {
+        sub("/src/contrib$", "", info[, "Repository"][1])
+      } else {
+        fallback <- bioc_repos_from_config()
+        if (length(fallback)) unname(fallback[1]) else
+          "https://bioconductor.org/packages/release/bioc"
+      }
+      version <- if (nrow(info) > 0L) info[, "Version"] else NA_character_
+      new_pkg_ref_fn(
+        x,
+        version = version,
+        repo    = repo,
+        source  = c("pkg_bioc_remote")
+      )
+    }
+    utils::assignInNamespace("pkg_bioc", pkg_bioc_offline, ns = "riskmetric")
+  }
+
   if (!isTRUE(quiet)) {
     message(
       "configure_riskmetric_offline(): riskmetric's reverse-dependency ",
-      "lookup will now use utils::available.packages() (options(\"repos\")) ",
-      "instead of devtools::revdep(bioconductor = TRUE)."
+      "lookup and Bioconductor package index will now use ",
+      "utils::available.packages() (options(\"repos\")) instead of ",
+      "devtools::revdep(bioconductor = TRUE) and a hard-coded ",
+      "bioconductor.org/packages/release/bioc URL."
     )
   }
 

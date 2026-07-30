@@ -183,113 +183,243 @@ val_pkg <- function(
     #
     ### Initial Assessment ###
     #
-    
-    # We will ALWAYS perform a "pkg_cran_remote" assessment first, because it is
-    # WAY faster (even faster than a "pkg_source" while excluding
-    # "covr_coverage") so that if any primary metrics have an auto_accept
-    # condition, we can then run again with a "pkg_source" ref while excluding
-    # "covr_coverage" for final output. However, 
-    init_pkg_ref <- riskmetric::pkg_ref(pkg, source = 
-        if(stringr::str_detect(tolower(repo_name), "bioc")) "pkg_bioc_remote" else "pkg_cran_remote")
-    val_msg("\n-->", pkg_v, "initial reference complete.\n",
-            min_level = "verbose")
-    
-    # Pull available {riskmetric} assessments
-    init_metrics <- riskmetric::all_assessments()
-    
-    # if it's a 'remote_only' pkg, and we only want to assess primary metrics,
-    # then we could do that here (below). For now, we'll leave it all since
-    # we'll want a report that is the most populated as possible
-    # remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
-    # if(pkg %in% remote_pkgs) {
-    #   # pull primary metrics only
-    #   prime_metrics <- build_decisions_df(rule_type = "decide") |>
-    #     dplyr::filter(tolower(metric_type) == "primary") |>
-    #     dplyr::pull(metric) |>
-    #     unique() %>%
-    #     paste("assess", ., sep = "_")
-    #   init_metrics <- init_metrics[names(init_metrics) %in% prime_metrics] 
-    # }
-    
-    # rm(pkg_assessment0)
-    init_pkg_assessment0 <-
-      init_pkg_ref |>
-      # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
-      riskmetric::pkg_assess(assessments = init_metrics)
-    
-    # strip assessment of '.recording' attribute:
-    init_pkg_assessment <-
-      init_pkg_assessment0 |> 
-      strip_recording()
-    
-    init_pkg_scores <- riskmetric::pkg_score(init_pkg_assessment)
-    
-    init_assessed_end <- Sys.time()
-    init_ass_mins <- difftime(init_assessed_end, start, units = "mins")
-    init_ass_mins_txt <- utils::capture.output(init_assessed_end - start)
-    val_msg("\n-->", pkg_v, "initial assessment complete.\n",
-            min_level = "normal")
-    val_msg("----> (", init_ass_mins_txt, ")\n", min_level = "normal")
-    
-    
-    # Create workable DF of assessments
-    init_assessment_record <- workable_assessments(
-      pkg = pkg,
-      ver = ver,
-      val_date = val_date,
-      metric_pkg = metric_pkg,
-      source = list(assessment = init_pkg_assessment, scores = init_pkg_scores),
-      source_ref = "remote"
-    )
-    
-    # 
-    #### Initial Decision
-    #
-    init_viable_metrics <- init_pkg_scores |>
-      dplyr::as_tibble() |>
-      t() |>
-      as.data.frame() |>
-      dplyr::filter(!is.na(V1)) |>
-      # make rownames a column
-      tibble::rownames_to_column(var = "metric") |>
-      dplyr::pull(metric)
-    
-    if("r_cmd_check" %in% init_viable_metrics){
-      init_vm <- init_viable_metrics[which(init_viable_metrics != "r_cmd_check")]
-      init_viable_metrics <- c(init_vm, "r_cmd_check_warnings", "r_cmd_check_errors")
-    }
-    
-    init_decision <- 
-      val_decision( 
-        pkg = pkg,
-        source_df = init_assessment_record,
-        excl_metrics = NULL, # "covr_coverage", # Subset not really necessary
-        decisions = decisions,
-        else_cat = decisions[length(decisions)],
-        decisions_df = build_decisions_df(
-          rule_type = "decide",
-          # rule_type = "remote_reduce",  # Could use this one here.
-          viable_metrics = init_viable_metrics
-          )
-      )
-    
-    auto_accepted <-
-      init_decision |> 
-      # dplyr::select(package, final_risk, dplyr::ends_with("cataa"))
-      dplyr::select(dplyr::ends_with("cataa")) |>
-      as.vector() |> unlist() |> any()
 
-    # Should I also consider an auto_fail threshold?
+    # For BioC packages, an initial `pkg_bioc_remote` assessment scrapes
+    # the Bioconductor package HTML landing pages, NEWS pages and
+    # checkResults pages under bioconductor.org. Air-gapped PPM mirrors
+    # do not surface those paths (see dev/air-gapped-bioc-mirror-config.txt),
+    # so a family of primary metrics (`has_vignettes`, `has_news`,
+    # `license`, `has_maintainer`, `has_bug_reports_url`,
+    # `has_source_control`) collapse to NA and the resulting `auto_accepted`
+    # signal is almost always FALSE. That defeats the whole point of the
+    # initial pass (short-circuiting `covr_coverage` on genuinely low-risk
+    # packages) *and* misrepresents the package in a "remote" report.
+    #
+    # For BioC packages we therefore prefer a disk-only initial ref that
+    # riskmetric can service without any HTML scraping: `pkg_install` when
+    # the package is present in the pipeline's library (the common case:
+    # val_prep_pipeline() has already staged it into .libPaths()[1]),
+    # falling back to `pkg_source` when the tarball has been untarred but
+    # the package hasn't been installed yet. If neither is available the
+    # initial pass is skipped entirely; the final pkg_source assessment
+    # then always runs with `covr_coverage` included.
+    bioc_pkg <- isTRUE(stringr::str_detect(tolower(repo_name), "bioc"))
+    bioc_initial_ref <- if (bioc_pkg) {
+      knob <- tryCatch(
+        pull_config(val = "bioc_initial_ref", rule_type = "default"),
+        error = function(e) NULL
+      )
+      if (is.null(knob) || !nzchar(as.character(knob))) "install" else as.character(knob)
+    } else NA_character_
+
+    installed_here <- if (bioc_pkg) {
+      pkg %in% rownames(utils::installed.packages(lib.loc = .libPaths()[1]))
+    } else FALSE
+    source_here <- if (bioc_pkg && ref == "source") {
+      dir.exists(file.path(sourced, pkg))
+    } else FALSE
+
+    init_source <- if (!bioc_pkg) {
+      "pkg_cran_remote"
+    } else if (identical(bioc_initial_ref, "skip")) {
+      NA_character_
+    } else if (identical(bioc_initial_ref, "remote")) {
+      "pkg_bioc_remote"
+    } else if (identical(bioc_initial_ref, "source") && source_here) {
+      "pkg_source"
+    } else if (installed_here) {
+      "pkg_install"
+    } else if (source_here) {
+      "pkg_source"
+    } else {
+      NA_character_
+    }
+
+    do_init <- !is.na(init_source)
+
+    if (do_init) {
+      init_pkg_ref <- switch(
+        init_source,
+        pkg_install = riskmetric::pkg_ref(
+          pkg, source = "pkg_install", lib.loc = .libPaths()[1]
+        ),
+        pkg_source  = riskmetric::pkg_ref(
+          file.path(sourced, pkg), source = "pkg_source"
+        ),
+        riskmetric::pkg_ref(pkg, source = init_source)
+      )
+      val_msg("\n-->", pkg_v, "initial reference complete (",
+              init_source, ").\n",
+              min_level = "normal")
+
+      # Pull available {riskmetric} assessments
+      init_metrics <- riskmetric::all_assessments()
+
+      # if it's a 'remote_only' pkg, and we only want to assess primary metrics,
+      # then we could do that here (below). For now, we'll leave it all since
+      # we'll want a report that is the most populated as possible
+      # remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
+      # if(pkg %in% remote_pkgs) {
+      #   # pull primary metrics only
+      #   prime_metrics <- build_decisions_df(rule_type = "decide") |>
+      #     dplyr::filter(tolower(metric_type) == "primary") |>
+      #     dplyr::pull(metric) |>
+      #     unique() %>%
+      #     paste("assess", ., sep = "_")
+      #   init_metrics <- init_metrics[names(init_metrics) %in% prime_metrics]
+      # }
+
+      # covr_coverage is expensive; keep it off the initial pass. It runs in
+      # the final pkg_source assessment when auto_accepted is FALSE.
+      init_metrics$assess_covr_coverage <- NULL
+
+      # When the initial pass is `pkg_bioc_remote`, most riskmetric
+      # assessments scrape bioconductor.org via `x$web_html` and return
+      # `pkg_metric_error` on air-gapped hosts even with the offline
+      # shims in place (the shims fix classification + the Repository
+      # URL, but PPM BioC mirrors typically do not serve the `/html/`,
+      # `/news/`, `/checkResults/` trees). Restrict the initial pass to
+      # a config-defined whitelist so we only spend cycles on metrics
+      # that will actually produce a usable score. Set
+      # `default: bioc_remote_initial_metrics: ~` (or omit the key) in
+      # config.yml to opt out of the whitelist and run every metric.
+      if (identical(init_source, "pkg_bioc_remote")) {
+        safe_metrics <- pull_config(
+          val = "bioc_remote_initial_metrics",
+          rule_type = "default"
+        )
+        if (!is.null(safe_metrics) && length(safe_metrics) > 0) {
+          keep <- names(init_metrics) %in% safe_metrics
+          if (any(keep)) {
+            init_metrics <- init_metrics[keep]
+            val_msg(
+              "--> ", pkg_v,
+              " initial pkg_bioc_remote pass restricted to ",
+              length(init_metrics), " metric(s): ",
+              paste(names(init_metrics), collapse = ", "), "\n",
+              min_level = "normal"
+            )
+          } else {
+            warning(
+              "bioc_remote_initial_metrics did not match any assessments ",
+              "returned by riskmetric::all_assessments(); falling back ",
+              "to the full metric set for ", pkg, ".",
+              call. = FALSE
+            )
+          }
+        }
+      }
+
+      init_pkg_assessment0 <-
+        init_pkg_ref |>
+        # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
+        riskmetric::pkg_assess(assessments = init_metrics)
+
+      # strip assessment of '.recording' attribute:
+      init_pkg_assessment <-
+        init_pkg_assessment0 |>
+        strip_recording()
+
+      init_pkg_scores <- riskmetric::pkg_score(init_pkg_assessment)
+
+      init_assessed_end <- Sys.time()
+      init_ass_mins <- difftime(init_assessed_end, start, units = "mins")
+      init_ass_mins_txt <- utils::capture.output(init_assessed_end - start)
+      val_msg("\n-->", pkg_v, "initial assessment complete.\n",
+              min_level = "normal")
+      val_msg("----> (", init_ass_mins_txt, ")\n", min_level = "normal")
+
+
+      # Create workable DF of assessments. `source_ref` records the
+      # provenance of the *initial* pass rather than always claiming
+      # "remote" -- BioC pkgs will read "install" or "source" now.
+      init_source_ref <- switch(init_source,
+        pkg_install = "install",
+        pkg_source  = "source",
+        "remote"
+      )
+      init_assessment_record <- workable_assessments(
+        pkg = pkg,
+        ver = ver,
+        val_date = val_date,
+        metric_pkg = metric_pkg,
+        source = list(assessment = init_pkg_assessment, scores = init_pkg_scores),
+        source_ref = init_source_ref
+      )
+
+      #
+      #### Initial Decision
+      #
+      init_viable_metrics <- init_pkg_scores |>
+        dplyr::as_tibble() |>
+        t() |>
+        as.data.frame() |>
+        dplyr::filter(!is.na(V1)) |>
+        # make rownames a column
+        tibble::rownames_to_column(var = "metric") |>
+        dplyr::pull(metric)
+
+      if("r_cmd_check" %in% init_viable_metrics){
+        init_vm <- init_viable_metrics[which(init_viable_metrics != "r_cmd_check")]
+        init_viable_metrics <- c(init_vm, "r_cmd_check_warnings", "r_cmd_check_errors")
+      }
+
+      init_decision <-
+        val_decision(
+          pkg = pkg,
+          source_df = init_assessment_record,
+          excl_metrics = NULL, # "covr_coverage", # Subset not really necessary
+          decisions = decisions,
+          else_cat = decisions[length(decisions)],
+          decisions_df = build_decisions_df(
+            rule_type = "decide",
+            # rule_type = "remote_reduce",  # Could use this one here.
+            viable_metrics = init_viable_metrics
+            )
+        )
+
+      auto_accepted <-
+        init_decision |>
+        # dplyr::select(package, final_risk, dplyr::ends_with("cataa"))
+        dplyr::select(dplyr::ends_with("cataa")) |>
+        as.vector() |> unlist() |> any()
+
+      # Should I also consider an auto_fail threshold?
+    } else {
+      # BioC pkg with no local install or source available (or user asked
+      # for "skip"). Skip the initial pass; the final pkg_source assessment
+      # below will always include covr_coverage.
+      val_msg("\n-->", pkg_v,
+              "skipped initial assessment (BioC pkg, no local install/source or bioc_initial_ref='skip').\n",
+              min_level = "normal")
+      init_pkg_ref        <- NULL
+      init_pkg_assessment <- NULL
+      init_pkg_scores     <- NULL
+      init_assessment_record <- NULL
+      init_decision       <- NULL
+      init_viable_metrics <- character(0)
+      auto_accepted       <- FALSE
+      init_ass_mins       <- as.difftime(0, units = "mins")
+    }
     
     
     #
     #### Final Assessment ###
     #
     src_ref <- if(ref == "source") 'pkg_source' else 'pkg_cran_remote'
-    if(src_ref == "pkg_cran_remote") {
+    # Reuse the initial assessment as the final one when the user asked
+    # for a remote-only run AND the initial pass actually happened AND
+    # it wasn't a stand-in for a source assessment (e.g. BioC + pkg_install
+    # or pkg_source used as the initial). Otherwise fall through to a
+    # full pkg_source pass.
+    reuse_init <- src_ref == "pkg_cran_remote" &&
+                  do_init &&
+                  !identical(init_source, "pkg_source")
+    if (reuse_init) {
       pkg_assessment <- init_pkg_assessment
       pkg_scores <- init_pkg_scores
-      val_msg("\n-->", pkg_v, "used initial 'pkg_cran_remote' assessment.\n",
+      val_msg("\n-->", pkg_v, "used initial '", init_source,
+              "' assessment as the final remote result.\n",
               min_level = "normal")
       exclude_met <- NULL
     } else {
