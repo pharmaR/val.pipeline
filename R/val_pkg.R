@@ -273,6 +273,43 @@ val_pkg <- function(
       # the final pkg_source assessment when auto_accepted is FALSE.
       init_metrics$assess_covr_coverage <- NULL
 
+      # When the initial pass is `pkg_bioc_remote`, most riskmetric
+      # assessments scrape bioconductor.org via `x$web_html` and return
+      # `pkg_metric_error` on air-gapped hosts even with the offline
+      # shims in place (the shims fix classification + the Repository
+      # URL, but PPM BioC mirrors typically do not serve the `/html/`,
+      # `/news/`, `/checkResults/` trees). Restrict the initial pass to
+      # a config-defined whitelist so we only spend cycles on metrics
+      # that will actually produce a usable score. Set
+      # `default: bioc_remote_initial_metrics: ~` (or omit the key) in
+      # config.yml to opt out of the whitelist and run every metric.
+      if (identical(init_source, "pkg_bioc_remote")) {
+        safe_metrics <- pull_config(
+          val = "bioc_remote_initial_metrics",
+          rule_type = "default"
+        )
+        if (!is.null(safe_metrics) && length(safe_metrics) > 0) {
+          keep <- names(init_metrics) %in% safe_metrics
+          if (any(keep)) {
+            init_metrics <- init_metrics[keep]
+            val_msg(
+              "--> ", pkg_v,
+              " initial pkg_bioc_remote pass restricted to ",
+              length(init_metrics), " metric(s): ",
+              paste(names(init_metrics), collapse = ", "), "\n",
+              min_level = "normal"
+            )
+          } else {
+            warning(
+              "bioc_remote_initial_metrics did not match any assessments ",
+              "returned by riskmetric::all_assessments(); falling back ",
+              "to the full metric set for ", pkg, ".",
+              call. = FALSE
+            )
+          }
+        }
+      }
+
       init_pkg_assessment0 <-
         init_pkg_ref |>
         # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports

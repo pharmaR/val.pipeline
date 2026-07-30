@@ -1,3 +1,30 @@
+# val.pipeline 0.1.10
+
+- Restrict the `pkg_bioc_remote` initial-assessment pass to a
+  config-defined whitelist of metrics that actually produce valid
+  results after `configure_riskmetric_offline_if_requested()` has
+  installed its four shims. The `has_news`, `remote_checks`,
+  `news_current`, `has_vignettes`, `has_maintainer`, `bugs_status`,
+  `has_source_control`, `has_bug_reports_url`, and `license` metrics
+  all scrape `bioconductor.org` via `x$web_html` /
+  `x$repo_base_url` and return `<pkg_metric_error: Failed to connect
+  to bioconductor.org port 443: Connection refused>` on air-gapped
+  PPM hosts (whose BioC mirrors typically do not serve the `/html/`,
+  `/news/`, `/checkResults/` trees). Running them anyway just fills
+  the initial score frame with NAs.
+- Added `default: bioc_remote_initial_metrics:` config knob shipped
+  with `c("assess_reverse_dependencies", "assess_dependencies")` —
+  the two riskmetric assessments that go through
+  `utils::available.packages()` (via Shim 1) and DESCRIPTION fields
+  cached in `memoise_bioc_available()` (via Shim 2) respectively, so
+  neither depends on scraping the BioC HTML tree. Set to `~` (YAML
+  null) or delete the key to run every metric
+  `riskmetric::all_assessments()` returns — the pre-0.1.10
+  behaviour, only appropriate on hosts with real outbound access to
+  `bioconductor.org`.
+- CRAN packages, GitHub packages, and BioC packages using
+  `bioc_initial_ref: install|source|skip` are unaffected. (#84)
+
 # val.pipeline 0.1.9
 
 - Clean up Ubuntu R CMD check on `main`. CI runs `rcmdcheck` with
