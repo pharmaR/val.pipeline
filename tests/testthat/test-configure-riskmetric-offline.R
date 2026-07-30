@@ -99,3 +99,31 @@ test_that("configure_riskmetric_offline() also shims memoise_bioc_available", {
   )
   expect_gt(called, 0L)
 })
+
+
+test_that("configure_riskmetric_offline() also shims is_available_cran to prefer BioC", {
+  skip_if_not_installed("riskmetric")
+
+  orig <- getFromNamespace("is_available_cran", ns = "riskmetric")
+  orig_bioc <- getFromNamespace("memoise_bioc_available", ns = "riskmetric")
+  on.exit({
+    utils::assignInNamespace("is_available_cran", orig, ns = "riskmetric")
+    utils::assignInNamespace("memoise_bioc_available", orig_bioc,
+                             ns = "riskmetric")
+  }, add = TRUE)
+
+  expect_true(configure_riskmetric_offline(quiet = TRUE))
+  patched <- getFromNamespace("is_available_cran", ns = "riskmetric")
+  expect_false(identical(patched, orig))
+
+  # Force memoise_bioc_available to report BiocGenerics as a BioC pkg,
+  # then verify the shim vetos the CRAN classification.
+  fake_bioc <- data.frame(
+    Package = "BiocGenerics", Version = "0.99.0",
+    Repository = "https://internal.example.com/bioc/src/contrib",
+    stringsAsFactors = FALSE
+  )
+  utils::assignInNamespace("memoise_bioc_available",
+                           function() fake_bioc, ns = "riskmetric")
+  expect_false(patched("BiocGenerics", repos = character(), p = NULL))
+})
