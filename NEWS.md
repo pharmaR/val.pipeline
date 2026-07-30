@@ -1,21 +1,40 @@
 # val.pipeline 0.1.7
 
-- `configure_riskmetric_offline()` now installs three in-session shims
-  on `riskmetric` (was two). Shim 2 continues to replace
-  `riskmetric:::memoise_bioc_available()`'s hard-coded
-  `read.dcf(url("https://bioconductor.org/packages/release/bioc/src/contrib/PACKAGES"))`
-  lookup with a `utils::available.packages()` call; its BioC-repo
-  resolver is now flexible enough to handle consolidated PPM setups
-  where one URL serves both CRAN and Bioconductor snapshots. Callers
-  can override detection explicitly via
-  `options(val.pipeline.bioc_repos = ...)` or
-  `Sys.setenv(VAL_PIPELINE_BIOC_REPOS = "<comma-separated URLs>")`.
-  A new Shim 3 wraps `riskmetric:::is_available_cran()` so that a
-  package which is also present in `memoise_bioc_available()` no
-  longer wins the CRAN check, restoring `pkg_bioc_remote`
-  classification for BioC packages served from a shared repo (fixes
-  `pkg_ref("BiocGenerics")` being classified as `pkg_cran_remote`).
-  Upstream fix proposed at `pharmaR/riskmetric#402`. (#81)
+- `configure_riskmetric_offline()` now installs four in-session shims
+  on `riskmetric` to make BioC assessments work on air-gapped hosts,
+  replacing the two shims previously introduced in this branch.
+  Upstream fix proposed at `pharmaR/riskmetric#402`.
+  - Shim 1 (unchanged): swaps
+    `riskmetric:::assess_reverse_dependencies.default()` for a version
+    that computes reverse dependencies via `utils::available.packages()`
+    + `tools::dependsOnPkgs()` instead of
+    `devtools::revdep(bioconductor = TRUE)` (which reads a `VIEWS`
+    file the internal PPM does not serve).
+  - Shim 2 replaces `riskmetric:::memoise_bioc_available()`'s
+    hard-coded
+    `read.dcf(url("https://bioconductor.org/packages/release/bioc/src/contrib/PACKAGES"))`
+    lookup with a `utils::available.packages()` call. The BioC-repo
+    resolver now handles setups where the BioC PPM is exposed via
+    `options("repos")` without a `BioC*` name; callers can also
+    override detection explicitly via
+    `options(val.pipeline.bioc_repos = ...)` or
+    `Sys.setenv(VAL_PIPELINE_BIOC_REPOS = "<comma-separated URLs>")`.
+  - Shim 3 wraps `riskmetric:::is_available_cran()` so a package that
+    is also present in `memoise_bioc_available()` no longer wins the
+    CRAN check, restoring `pkg_bioc_remote` classification for BioC
+    packages served alongside CRAN in `options("repos")` (fixes
+    `pkg_ref("BiocGenerics")` being classified as `pkg_cran_remote`).
+  - Shim 4 replaces `riskmetric:::pkg_bioc()` so the resulting
+    `pkg_bioc_remote` reference carries the internal PPM BioC URL in
+    `x$repo` / `x$repo_base_url` instead of the released code's
+    hard-coded `https://bioconductor.org/packages/release/bioc`.
+    Fixes a family of `pkg_assess()` metrics (`has_news`,
+    `remote_checks`, `news_current`, `has_vignettes`, `has_maintainer`,
+    `bugs_status`, `has_source_control`, `has_bug_reports_url`,
+    `license`, ...) failing with
+    `Failed to connect to bioconductor.org port 443: Connection refused`
+    because they scrape `x$web_html` derived from `x$repo_base_url`.
+  (#81)
 
 # val.pipeline 0.1.6
 

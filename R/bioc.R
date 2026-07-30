@@ -179,7 +179,7 @@ configure_bioc_repositories_if_requested <- function(quiet = FALSE) {
 
 #' Route `riskmetric`'s Bioconductor lookups through internal repos
 #'
-#' Installs three in-session shims on `riskmetric` so its Bioconductor-facing
+#' Installs four in-session shims on `riskmetric` so its Bioconductor-facing
 #' code paths stop reaching out to public `bioconductor.org` URLs and
 #' instead consult `options("repos")` — i.e. the same internal PPM CRAN
 #' and BioC snapshots the rest of `val.pipeline` uses.
@@ -251,7 +251,29 @@ configure_bioc_repositories_if_requested <- function(quiet = FALSE) {
 #' falls through to `is_available_bioc()`. `pkg_ref("BiocGenerics")`
 #' then correctly returns a `pkg_bioc_remote`.
 #'
-#' All three shims are intentionally opt-in; the wrapper
+#' # Shim 4: `pkg_bioc`
+#'
+#' Released `riskmetric::pkg_bioc()` builds the `pkg_bioc_remote`
+#' reference with a hard-coded
+#' `repo = "https://bioconductor.org/packages/release/bioc"`, discarding
+#' the `Repository` column returned by `memoise_bioc_available()`. Every
+#' downstream metric that follows `x$repo_base_url` — `has_news`,
+#' `remote_checks`, `news_current`, `has_vignettes`, `has_maintainer`,
+#' `bugs_status`, `has_source_control`, `has_bug_reports_url`, `license`,
+#' and friends — then fetches from `bioconductor.org` and fails with
+#'
+#' \preformatted{
+#' Failed to connect to bioconductor.org port 443: Connection refused
+#' }
+#'
+#' on air-gapped hosts. The shim replaces `pkg_bioc()` with a version
+#' that uses the `Repository` column from the shimmed
+#' `memoise_bioc_available()` (i.e. the internal PPM BioC URL), so
+#' `x$repo_base_url` points at the mirror and every derived scrape hits
+#' the mirror too. Mirrors the upstream fix at
+#' \href{https://github.com/pharmaR/riskmetric/pull/402}{pharmaR/riskmetric#402}.
+#'
+#' All four shims are intentionally opt-in; the wrapper
 #' [configure_riskmetric_offline_if_requested()] runs this helper only
 #' when the run is flagged as air-gapped (env var
 #' `VAL_PIPELINE_INTERNAL_BIOC` truthy, or `default: air_gapped: true`
@@ -420,6 +442,45 @@ configure_riskmetric_offline <- function(quiet = FALSE) {
     utils::assignInNamespace(
       "is_available_cran", is_available_cran_shim, ns = "riskmetric"
     )
+  }
+
+  # Shim 4: released riskmetric's pkg_bioc() hard-codes
+  #   repo = "https://bioconductor.org/packages/release/bioc"
+  # ignoring the Repository column from memoise_bioc_available(). Every
+  # downstream metric that scrapes x$web_html then derives its URL from
+  # bioconductor.org and fails on air-gapped hosts with
+  #   Failed to connect to bioconductor.org port 443: Connection refused
+  # (has_news, remote_checks, news_current, has_vignettes, has_maintainer,
+  # bugs_status, has_source_control, has_bug_reports_url, license, ...).
+  # Replace pkg_bioc() with a version that uses the Repository column
+  # from our shimmed memoise_bioc_available() -- i.e. the internal PPM
+  # BioC URL -- and falls back to the first repo returned by
+  # bioc_repos_from_config() when the pkg is unknown. Mirrors the fix
+  # upstream at pharmaR/riskmetric#402.
+  new_pkg_ref_fn <- tryCatch(
+    getFromNamespace("new_pkg_ref", ns = "riskmetric"),
+    error = function(e) NULL
+  )
+  if (!is.null(new_pkg_ref_fn)) {
+    pkg_bioc_offline <- function(x) {
+      bp <- getFromNamespace("memoise_bioc_available", ns = "riskmetric")()
+      info <- bp[bp[, "Package"] == x, , drop = FALSE]
+      repo <- if ("Repository" %in% colnames(info) && nrow(info) > 0L) {
+        sub("/src/contrib$", "", info[, "Repository"][1])
+      } else {
+        fallback <- bioc_repos_from_config()
+        if (length(fallback)) unname(fallback[1]) else
+          "https://bioconductor.org/packages/release/bioc"
+      }
+      version <- if (nrow(info) > 0L) info[, "Version"] else NA_character_
+      new_pkg_ref_fn(
+        x,
+        version = version,
+        repo    = repo,
+        source  = c("pkg_bioc_remote")
+      )
+    }
+    utils::assignInNamespace("pkg_bioc", pkg_bioc_offline, ns = "riskmetric")
   }
 
   if (!isTRUE(quiet)) {
