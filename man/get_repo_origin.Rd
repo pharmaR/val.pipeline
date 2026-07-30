@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{get_repo_origin}
 \alias{get_repo_origin}
-\title{Get Repo Origin}
+\title{Helper function to determine which repo a package came from}
 \usage{
 get_repo_origin(repo_src = NULL, pkg_name = NULL, names_only = FALSE)
 }

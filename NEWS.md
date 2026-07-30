@@ -1,3 +1,46 @@
+# val.pipeline 0.1.9
+
+- Clean up Ubuntu R CMD check on `main`. CI runs `rcmdcheck` with
+  `error_on = "warning"`, so three real WARNINGs were failing the
+  build even though every test passed:
+  - `checking dependencies in R code` — `BiocManager::` and `memoise::`
+    are called from `R/bioc.R` (the four riskmetric shims) but neither
+    was declared in `DESCRIPTION`. Added both to `Suggests:`; the code
+    already gates them behind `requireNamespace()`.
+  - `checking for missing documentation entries` — the four exported
+    `configure_bioc_repositories*` / `configure_riskmetric_offline*`
+    helpers have full roxygen blocks in `R/bioc.R`, but the matching
+    `man/*.Rd` files had never been regenerated. Re-ran
+    `devtools::document()` and committed the four new Rd files.
+  - `checking for unstated dependencies in 'tests'` — same
+    `BiocManager` issue reappearing for the test suite. Fixed by the
+    same `Suggests:` addition above.
+- Also cleared the `getFromNamespace` NOTE (`checking R code for
+  possible problems`) by adding `@importFrom utils getFromNamespace
+  assignInNamespace` to `configure_riskmetric_offline()`.
+- Fix five Ubuntu R CMD check failures in the test suite that had been
+  masking real regressions on CI:
+  - `test-bioc-initial-ref-config.R` set the wrong session option
+    (`val.pipeline.config`) when swapping in a temp yaml, so
+    `resolve_config_path()` kept returning the packaged config. Three
+    of the four iterations then silently re-asserted the default value.
+    Switched to the actual option `val.pipeline.config_path`.
+  - `test-configure-bioc-repositories.R` still expected the shim's
+    output to be identical to the caller's 2-entry `c(CRAN, BioC)`
+    vector, but `configure_bioc_repositories()` now auto-populates the
+    classic `BioC*` aliases (`BioCsoft`, `BioCann`, `BioCexp`,
+    `BioCworkflows`, `BioCbooks`) so downstream lookups like
+    `BiocManager::repositories()[["BioCsoft"]]` resolve. Relaxed the
+    two `expect_identical()` assertions to check the caller's entries
+    survive untouched (aliasing has its own dedicated test).
+  - `test-configure-riskmetric-offline.R` used
+    `utils::assignInNamespace("available.packages", ...)` to swap in a
+    fake `available.packages`. Newer R (>= 4.4) hard-locks base package
+    bindings, so this errored with
+    `locked binding of 'available.packages' cannot be changed`.
+    Replaced with `testthat::local_mocked_bindings(.package = "utils")`
+    which unlocks + restores safely. (#83)
+
 # val.pipeline 0.1.8
 
 - `configure_riskmetric_offline()` now installs four in-session shims

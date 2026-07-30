@@ -288,6 +288,8 @@ configure_bioc_repositories_if_requested <- function(quiet = FALSE) {
 #' @seealso [configure_riskmetric_offline_if_requested()],
 #'   [configure_bioc_repositories()]
 #'
+#' @importFrom utils getFromNamespace assignInNamespace
+#'
 #' @export
 configure_riskmetric_offline <- function(quiet = FALSE) {
   if (!requireNamespace("riskmetric", quietly = TRUE)) {

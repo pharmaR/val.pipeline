@@ -33,24 +33,20 @@ test_that("configure_riskmetric_offline() installs an override on the assess met
     nrow = 2, byrow = TRUE,
     dimnames = list(NULL, c("Package", "Version", "Repository", "Depends"))
   )
-  withr::with_options(
-    list(),
-    {
-      trace_calls <- 0L
-      local_mock <- function(...) { trace_calls <<- trace_calls + 1L; fake_db }
-      # Temporarily replace utils::available.packages so we can prove no
-      # network call is made.
-      orig_ap <- utils::available.packages
-      utils::assignInNamespace("available.packages", local_mock, ns = "utils")
-      on.exit(
-        utils::assignInNamespace("available.packages", orig_ap, ns = "utils"),
-        add = TRUE
-      )
-      out <- patched(list(name = "target"))
-      expect_s3_class(out, "pkg_metric_reverse_dependencies")
-      expect_true(trace_calls >= 1L)
-    }
+  trace_calls <- 0L
+  local_mock <- function(...) { trace_calls <<- trace_calls + 1L; fake_db }
+  # `utils::available.packages` lives in a locked namespace on newer R,
+  # so assignInNamespace() would blow up with `locked binding of
+  # 'available.packages' cannot be changed`. Use testthat's
+  # local_mocked_bindings() which unlocks + restores safely for the
+  # duration of the test.
+  testthat::local_mocked_bindings(
+    available.packages = local_mock,
+    .package = "utils"
   )
+  out <- patched(list(name = "target"))
+  expect_s3_class(out, "pkg_metric_reverse_dependencies")
+  expect_true(trace_calls >= 1L)
 })
 
 

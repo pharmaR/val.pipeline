@@ -24,7 +24,7 @@ Given a single-row \code{data.frame} produced by \code{\link[=val_decision]{val_
 underlying \verb{rip_cats_*} helpers), return the names of the per-metric
 categorization columns (\verb{<metric>_cat}) whose category equals the
 \code{final_risk} for that row. Only metrics that "tie" the final risk category
-are returned — i.e. the metrics that drove the package out of the lowest
+are returned -- i.e. the metrics that drove the package out of the lowest
 risk category.
 }
 \details{
