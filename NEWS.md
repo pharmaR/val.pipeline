@@ -1,3 +1,27 @@
+# val.pipeline 0.1.7
+
+- `val_pkg()` now prefers a disk-only reference for the initial
+  assessment of Bioconductor packages instead of scraping
+  `bioconductor.org` via `pkg_bioc_remote`. On air-gapped Posit
+  Package Manager mirrors that broken scrape wiped out roughly half a
+  dozen primary metrics (`has_vignettes`, `has_news`, `license`,
+  `has_maintainer`, `has_bug_reports_url`, `has_source_control`) and
+  effectively forced `covr_coverage` to run on every BioC package,
+  defeating the point of the initial pass.
+  - The new fallback order for BioC packages is: `pkg_install` (when
+    the pkg is in `.libPaths()[1]`) -> `pkg_source` (when the tarball
+    has been untarred) -> skip.
+  - A new `default: bioc_initial_ref:` config knob controls the order,
+    with allowed values `install` (default), `source`, `remote`
+    (legacy scrape behaviour) and `skip` (no initial pass; final
+    `pkg_source` assessment always includes `covr_coverage`).
+  - `workable_assessments(source_ref = ...)` now records the actual
+    provenance of the initial pass (`install`, `source`, or `remote`)
+    rather than always claiming `"remote"`, so downstream reports no
+    longer misrepresent where BioC metrics came from.
+  - CRAN / GitHub packages are unaffected: the initial pass continues
+    to run as `pkg_cran_remote`. (#82)
+
 # val.pipeline 0.1.6
 
 - Add `configure_bioc_repositories()` and

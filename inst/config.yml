@@ -50,6 +50,25 @@ default:
     gt
   ] 
   decisions_lst: [Low, Medium, High]
+  # Which riskmetric ref type to use for the *initial* assessment pass of
+  # Bioconductor packages inside val_pkg(). Options:
+  #   "install" — use pkg_ref(pkg, source = "pkg_install", lib.loc = .libPaths()[1]).
+  #     Recommended default: reads DESCRIPTION/NEWS from the pipeline library
+  #     with no bioconductor.org scraping (works on air-gapped PPM hosts
+  #     where the /html/, /news/ and /checkResults/ trees are not mirrored).
+  #     Falls back to "source" when the package isn't installed yet, and to
+  #     "skip" when neither an install nor an untarred source is available.
+  #   "source"  — use pkg_ref(<sourced/pkg>, source = "pkg_source") when
+  #     ref = "source". Same offline behaviour, but slower than "install".
+  #   "remote"  — use pkg_ref(pkg, source = "pkg_bioc_remote"). Legacy
+  #     behaviour: scrapes bioconductor.org. Only useful on hosts with
+  #     outbound network access to bioconductor.org.
+  #   "skip"    — no initial pass; the final pkg_source assessment runs
+  #     with covr_coverage always included. Set this if the initial pass
+  #     is not useful for your BioC subset and you're happy to pay the
+  #     coverage cost on every BioC package.
+  # CRAN / GitHub packages are unaffected by this knob.
+  bioc_initial_ref: install
   opt_repos: 
     CRAN: https://packagemanager.posit.co/cran/2026-06-21
     BioC: https://bioconductor.org/packages/3.22/bioc #https://packagemanager.posit.co/bioconductor/latest 
