@@ -1,4 +1,4 @@
-# val.pipeline 0.1.7
+# val.pipeline 0.1.8
 
 - `configure_riskmetric_offline()` now installs four in-session shims
   on `riskmetric` to make BioC assessments work on air-gapped hosts,
@@ -35,6 +35,9 @@
     `Failed to connect to bioconductor.org port 443: Connection refused`
     because they scrape `x$web_html` derived from `x$repo_base_url`.
   (#81)
+
+# val.pipeline 0.1.7
+
 - `val_pkg()` now prefers a disk-only reference for the initial
   assessment of Bioconductor packages instead of scraping
   `bioconductor.org` via `pkg_bioc_remote`. On air-gapped Posit
