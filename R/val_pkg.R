@@ -640,9 +640,25 @@ val_pkg <- function(
   #
   # ---- Build Report ----
   #
-  
+
   # file.edit(system.file("report/package/pkg_template.qmd", package = "riskreports"))
-  options(riskreports_output_dir = reports)
+  # `riskreports::package_report()` copies its template files into
+  # `options("riskreports_output_dir")`, `file.rename()`s one file to a
+  # pkg-specific `prefix_output`, then `file.remove()`s the leftovers.
+  # When multiple `val_pkg()` calls run in parallel (workers > 1 in
+  # val_build()) they all reach for the same shared `reports/`
+  # directory and race on the mid-flight copy/rename/remove sequence,
+  # so a sibling worker's `quarto::quarto_render()` blows up mid-flight
+  # with 'Error running quarto CLI from R'. Give each package its own
+  # scratch render directory so template files don't collide, then
+  # copy the produced output(s) back into the shared `reports/`
+  # afterwards. The parent workflow already indexes reports by their
+  # pkg/version filename, so the final layout is unchanged.
+  pkg_render_dir <- file.path(reports, paste0(".render_", pkg_v))
+  dir.create(pkg_render_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(pkg_render_dir, recursive = TRUE, force = TRUE),
+          add = TRUE)
+  options(riskreports_output_dir = pkg_render_dir)
   pr <- riskreports::package_report(
     package_name = pkg,
     package_version = ver,
@@ -658,6 +674,16 @@ val_pkg <- function(
     ),
     quiet = TRUE, # To silence quarto output for readability
   )
+  # Move the produced output file(s) up into the shared reports dir so
+  # downstream lookups (which key off `reports/`) keep working. `pr` is
+  # the character vector of paths riskreports produced; anything else in
+  # the scratch dir is a template artifact and gets cleaned up by the
+  # on.exit() above.
+  if (length(pr) > 0L) {
+    dest_files <- file.path(reports, basename(pr))
+    file.copy(pr, dest_files, overwrite = TRUE, copy.date = TRUE)
+    pr <- dest_files
+  }
   # pr
   
   val_msg("\n-->", pkg_v,"Report built.\n", min_level = "normal")

@@ -1,3 +1,28 @@
+# val.pipeline 0.1.12
+
+- Fix two `val_build(workers > 1)` bugs surfaced by a real 8-worker run:
+  - `quarto::quarto_render()` was blowing up with
+    `Error running quarto CLI from R` in every worker but one.
+    `riskreports::package_report()` copies its template files into
+    `options("riskreports_output_dir")`, renames one file to a
+    pkg-specific `prefix_output`, and then removes the leftovers.
+    `val_pkg()` pointed that option at a single shared `reports/`
+    directory, so 8 concurrent workers raced on the mid-flight
+    copy/rename/remove sequence and one worker's `quarto_render()`
+    tripped over another's cleanup. `val_pkg()` now renders into a
+    per-package scratch dir (`reports/.render_<pkg>_v<ver>/`), then
+    copies the produced output(s) up into `reports/` and cleans the
+    scratch dir on exit. Final layout is unchanged.
+  - `verbose = "minimal"` was silently reverting to `"normal"` inside
+    workers. `future::multisession` boots each worker in a fresh R
+    session that does *not* inherit the parent's `options()`, so the
+    `val.pipeline.verbose` option `apply_verbose()` set in the parent
+    never reached `val_msg()` inside the worker. The parallel branch
+    of `val_build()` now captures the resolved tier
+    (`getOption("val.pipeline.verbose")`) plus the user-supplied
+    `val.pipeline.config_path` and re-applies both at the top of every
+    `future_mapply()` task. (#80)
+
 # val.pipeline 0.1.11
 
 - Hotfix: strip a stray `data:image/png;base64,...` blob that had been

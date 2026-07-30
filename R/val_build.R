@@ -377,8 +377,23 @@ val_build <- function(
     old_plan <- future::plan(future::multisession, workers = workers)
     on.exit(future::plan(old_plan), add = TRUE)
 
+    # `future::multisession` boots each worker in a fresh R session
+    # that does NOT inherit the parent's `options()`. Capture the
+    # verbose tier the parent resolved via apply_verbose() and re-apply
+    # it inside every worker task so val_msg()/val_pkg() honour the
+    # caller's `verbose = "minimal"` etc. instead of silently reverting
+    # to the "normal" default.
+    verbose_tier <- getOption("val.pipeline.verbose", "normal")
+    # Same story for the user-supplied config path -- resolve_config_path()
+    # inside the worker will otherwise fall back to the packaged config.
+    config_path_tier <- getOption("val.pipeline.config_path", NULL)
+
     pkg_bundles <- future.apply::future_mapply(
       FUN = function(pkg, ver, pkg_cnt) {
+        options(val.pipeline.verbose = verbose_tier)
+        if (!is.null(config_path_tier)) {
+          options(val.pipeline.config_path = config_path_tier)
+        }
         assess_one(pkg, ver, pkg_cnt,
                    is_dep_skip = FALSE,
                    failed_snapshot = character(0))
