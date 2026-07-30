@@ -4,6 +4,7 @@
 .Ruserdata
 .Renviron
 dev/riskassessments/*
+dev/riskmetric-bioc-available-shim.txt
 
 # testthat scratch directories: some upstream packages' test suites
 # copy themselves into <pkg>-tests/ dirs at the repo root when they

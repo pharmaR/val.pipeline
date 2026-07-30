@@ -1,4 +1,4 @@
-# val.pipeline 0.1.10
+# val.pipeline 0.1.7
 
 - `configure_riskmetric_offline()` now installs a second in-session
   shim on `riskmetric:::memoise_bioc_available`, replacing its

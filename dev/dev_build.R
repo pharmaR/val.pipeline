@@ -31,8 +31,19 @@ pkgs[!pkgs %in% report_pkgs]
 # qual <- readRDS(file.path(val_dir, paste0("qual_evidence_", val_date_txt, ".rds")))
 
 
-
-
+Sys.setenv(R_BIOC_VERSION = "3.22")
+options(BioCManager.check_repositories = FALSE)
+configure_bioc_repositories_if_requested(quiet = TRUE)
+configure_riskmetric_offline_if_requested(quiet = TRUE)
+assess_metrics <- riskmetric::all_assessments()
+p <- riskmetric::pkg_ref("BiocGenerics")
+riskmetric::assess_has_examples(p)
+bg_assess <- p |> 
+  dplyr::as_tibble() |>
+  riskmetric::pkg_assess(p)
+bg_assess |>
+  dplyr::as_tibble() |>
+  t()
 
 # Create qualified pkg data.frame
 # source("dev/pkg_lists.R") # build_pkgs & pkgs for CRAN only
