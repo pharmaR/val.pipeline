@@ -1,3 +1,29 @@
+# val.pipeline 0.1.14
+
+- Per-package timing instrumentation inside `val_pkg()`. A new
+  `val_time_block(label, expr)` helper fences the expensive blocks
+  (`download`, `untar`, `assess_initial`, `assess_final`, `decision`,
+  `report`), emits an `[timing] <label>: N.NNs` line at the `"normal"`
+  tier, and accumulates the elapsed seconds in a per-package session
+  option that `val_pkg()` attaches to the returned `meta_list` as
+  `$timings`. `val_build()` aggregates every package's `$timings`
+  post-run into a long-format `timings.csv` under `val_dir`
+  (columns: `pkg`, `ver`, `phase`, `seconds`) so we can profile
+  where a multi-hour run's time actually goes. Timings are recorded
+  even when the fenced expression errors, so failures still surface
+  "we spent N seconds here before it blew up". (#87)
+- Single-file run log. `val_build()` now teees every `val_msg()` /
+  `val_print()` / `val_pkg_summary_line()` call to
+  `val_dir/val_pipeline.log`. Console tier and log-file tier are
+  decoupled -- set `options(val.pipeline.log_level = "verbose")` to
+  keep a rich on-disk record while running `verbose = "minimal"` at
+  the console. The parallel branch of `val_build()` propagates
+  `val.pipeline.log_file` and `val.pipeline.log_level` into workers
+  via the same options-in-worker plumbing added in #80, so every
+  worker appends to the same log. POSIX O_APPEND is atomic for
+  line-sized writes and NFSv4.2 upholds it, so concurrent worker
+  appends interleave cleanly. (#87)
+
 # val.pipeline 0.1.13
 
 - Fix two `val_build(workers > 1)` bugs surfaced by a real 8-worker run:

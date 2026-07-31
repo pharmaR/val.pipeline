@@ -17,7 +17,8 @@ val_build(
     "https://bioconductor.org/packages/3.22/bioc"),
   verbose = NULL,
   prep = NULL,
-  config_path = NULL
+  config_path = NULL,
+  workers = 1L
 )
 }
 \arguments{
@@ -72,6 +73,20 @@ run reads from that file instead of the \code{config.yml} bundled with
 \code{val.pipeline}, and the same file is copied into \code{val_dir} for
 record keeping. The override is scoped to this call: the prior
 \code{val.pipeline.config_path} option is restored on exit.}
+
+\item{workers}{Integer. Number of parallel workers to use during the
+per-package assessment loop. \code{1L} (default) preserves the original
+serial behaviour with dep-skip short-circuiting (dependents of a
+failed package are marked "Rejected" without being assessed).
+Values greater than \code{1} fan the loop out via
+\code{\link[future.apply:future_mapply]{future.apply::future_mapply()}} under a \code{future::multisession}
+plan; the dep-skip short-circuit is disabled in that mode because
+its state cannot cross a parallel worker boundary. Final risk
+propagation still runs downstream via \code{\link[=val_decision]{val_decision()}}, so
+package-report accuracy is unaffected — the only tradeoff is that
+dependents of failed packages spend CPU time being assessed
+instead of being short-circuited. Requires the optional \code{{future}}
+and \code{{future.apply}} packages when \code{workers > 1}.}
 }
 \value{
 A list containing:

@@ -19,4 +19,9 @@ Companion to \code{val_msg()} for lines that use \code{print()} (typically to
 render a small data.frame or table). No-ops when the current session
 tier is below \code{min_level}.
 }
+\details{
+Also tees the print output to
+\code{options("val.pipeline.log_file")} when that option is set and the
+log-file tier is at least \code{min_level}.
+}
 \keyword{internal}

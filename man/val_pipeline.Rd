@@ -16,7 +16,8 @@ val_pipeline(
     "https://bioconductor.org/packages/3.22/bioc"),
   verbose = NULL,
   prep = NULL,
-  config_path = NULL
+  config_path = NULL,
+  workers = 1L
 )
 }
 \arguments{
@@ -67,6 +68,17 @@ run reads from that file instead of the \code{config.yml} bundled with
 \code{val.pipeline.config_path} option is restored on exit. When \code{NULL}
 (default), the pre-packaged config is used (or whatever the caller
 has already set via \code{options(val.pipeline.config_path = ...)}).}
+
+\item{workers}{Integer. Number of parallel workers to use during the
+per-package assessment loop inside \code{\link[=val_build]{val_build()}}. \code{1L} (default)
+preserves the original serial behaviour, including dep-skip
+short-circuiting when a package fails. Values greater than \code{1}
+fan the loop out via \code{\link[future.apply:future_mapply]{future.apply::future_mapply()}} under a
+\code{future::multisession} plan; the dep-skip short-circuit is
+disabled in that mode (final risk propagation still runs
+downstream via \code{\link[=val_decision]{val_decision()}}, so package-report accuracy is
+unaffected). Requires the optional \code{{future}} and
+\code{{future.apply}} packages when \code{workers > 1}.}
 }
 \value{
 A list containing the validation directory and a data frame of
