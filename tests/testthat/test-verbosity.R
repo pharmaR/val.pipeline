@@ -253,3 +253,151 @@ test_that("apply_verbose() propagates errors from bad verbose input", {
   # Option still unchanged after failed call.
   expect_identical(getOption("val.pipeline.verbose"), "normal")
 })
+
+
+# ---- Log-file tee -----------------------------------------------------
+
+test_that("val_log_at_least() reads val.pipeline.log_level and defaults to 'normal'", {
+  op <- options(val.pipeline.log_level = NULL)
+  on.exit(options(op), add = TRUE)
+
+  expect_true(val_log_at_least("normal"))
+  expect_true(val_log_at_least("minimal"))
+  expect_false(val_log_at_least("verbose"))
+
+  options(val.pipeline.log_level = "verbose")
+  expect_true(val_log_at_least("verbose"))
+
+  options(val.pipeline.log_level = "quiet")
+  expect_false(val_log_at_least("minimal"))
+})
+
+
+test_that("val_log_target() reports inactive when log_file is unset or empty", {
+  op <- options(val.pipeline.log_file = NULL,
+                val.pipeline.log_level = "normal")
+  on.exit(options(op), add = TRUE)
+
+  expect_false(val_log_target("normal")$active)
+  expect_null(val_log_target("normal")$path)
+
+  options(val.pipeline.log_file = "")
+  expect_false(val_log_target("normal")$active)
+})
+
+
+test_that("init_val_log() sets the option and writes the header", {
+  tmp <- tempfile(fileext = ".log")
+  on.exit(unlink(tmp), add = TRUE)
+  op <- options(val.pipeline.log_file = NULL,
+                val.pipeline.log_level = "normal")
+  on.exit(options(op), add = TRUE)
+
+  init_val_log(tmp, header = "=== header ===\n")
+  expect_identical(getOption("val.pipeline.log_file"), tmp)
+  expect_true(file.exists(tmp))
+  expect_true(any(grepl("=== header ===", readLines(tmp))))
+
+  # NULL disables teeing.
+  init_val_log(NULL)
+  expect_null(getOption("val.pipeline.log_file"))
+})
+
+
+test_that("val_msg() tees to the log file when configured", {
+  tmp <- tempfile(fileext = ".log")
+  on.exit(unlink(tmp), add = TRUE)
+  op <- options(val.pipeline.verbose   = "normal",
+                val.pipeline.log_file  = tmp,
+                val.pipeline.log_level = "normal")
+  on.exit(options(op), add = TRUE)
+
+  # The message should hit both console and log.
+  out <- capture.output(val_msg("hello world\n", min_level = "normal"),
+                        type = "output")
+  expect_true(any(grepl("hello world", out)))
+  expect_true(any(grepl("hello world", readLines(tmp))))
+})
+
+
+test_that("val_msg() log tier is decoupled from console tier", {
+  tmp <- tempfile(fileext = ".log")
+  on.exit(unlink(tmp), add = TRUE)
+  # Console is quiet, but log tier is 'normal' -> log captures, console
+  # stays silent.
+  op <- options(val.pipeline.verbose   = "minimal",
+                val.pipeline.log_file  = tmp,
+                val.pipeline.log_level = "normal")
+  on.exit(options(op), add = TRUE)
+
+  out <- capture.output(val_msg("only in log\n", min_level = "normal"),
+                        type = "output")
+  expect_false(any(grepl("only in log", out)))
+  expect_true(any(grepl("only in log", readLines(tmp))))
+})
+
+
+test_that("val_msg() honours log_level gating when both console and log active", {
+  tmp <- tempfile(fileext = ".log")
+  on.exit(unlink(tmp), add = TRUE)
+  # Log tier "minimal" -> "normal" messages don't reach the log even
+  # though the console (also "minimal") suppresses them too.
+  op <- options(val.pipeline.verbose   = "verbose",
+                val.pipeline.log_file  = tmp,
+                val.pipeline.log_level = "minimal")
+  on.exit(options(op), add = TRUE)
+
+  file.create(tmp)
+  val_msg("should skip log\n", min_level = "normal")
+  expect_false(any(grepl("should skip log", readLines(tmp))))
+})
+
+
+# ---- val_time_block() -------------------------------------------------
+
+test_that("val_time_block() returns the expression value", {
+  op <- options(val.pipeline.pkg_timings = list(),
+                val.pipeline.verbose = "quiet")
+  on.exit(options(op), add = TRUE)
+
+  res <- val_time_block("add", 1 + 2)
+  expect_identical(res, 3)
+})
+
+
+test_that("val_time_block() accumulates timings under the given label", {
+  op <- options(val.pipeline.pkg_timings = list(),
+                val.pipeline.verbose = "quiet")
+  on.exit(options(op), add = TRUE)
+  reset_pkg_timings()
+
+  val_time_block("phase_a", Sys.sleep(0.01))
+  val_time_block("phase_b", Sys.sleep(0.01))
+  val_time_block("phase_a", Sys.sleep(0.01))  # same label twice
+
+  timings <- get_pkg_timings()
+  expect_named(timings, c("phase_a", "phase_b"), ignore.order = TRUE)
+  expect_length(timings[["phase_a"]], 2L)
+  expect_length(timings[["phase_b"]], 1L)
+  expect_true(all(unlist(timings) >= 0))
+})
+
+
+test_that("val_time_block() records timing even when the expression errors", {
+  op <- options(val.pipeline.pkg_timings = list(),
+                val.pipeline.verbose = "quiet")
+  on.exit(options(op), add = TRUE)
+  reset_pkg_timings()
+
+  expect_error(val_time_block("boom", stop("nope")), "nope")
+  timings <- get_pkg_timings()
+  expect_true("boom" %in% names(timings))
+  expect_true(timings[["boom"]] >= 0)
+})
+
+
+test_that("reset_pkg_timings() clears the accumulator", {
+  options(val.pipeline.pkg_timings = list(seed = 1))
+  reset_pkg_timings()
+  expect_identical(get_pkg_timings(), list())
+})

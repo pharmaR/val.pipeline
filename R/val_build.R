@@ -240,6 +240,26 @@ val_build <- function(
   )
   
   #
+  # ---- Init run log ----
+  #
+  # Tee every `val_msg()` / `val_print()` / `val_pkg_summary_line()`
+  # call to `val_dir/val_pipeline.log` for the duration of this
+  # `val_build()` invocation. Console tier and log tier are
+  # decoupled -- `verbose = "minimal"` at the console can coexist
+  # with `options(val.pipeline.log_level = "verbose")` on disk. See
+  # #87.
+  log_file <- file.path(val_dir, "val_pipeline.log")
+  init_val_log(
+    log_file,
+    header = paste0("\n=== val_build() @ ",
+                    format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"),
+                    " (R ", getRversion(), ", metric_pkg=", metric_pkg,
+                    ", ref=", ref, ", workers=", workers, ") ===\n")
+  )
+  old_log_opts <- options(val.pipeline.log_file = log_file)
+  on.exit(options(old_log_opts), add = TRUE)
+  
+  #
   # ---- Build pkg bundles ----
   #
   
@@ -387,12 +407,23 @@ val_build <- function(
     # Same story for the user-supplied config path -- resolve_config_path()
     # inside the worker will otherwise fall back to the packaged config.
     config_path_tier <- getOption("val.pipeline.config_path", NULL)
+    # And the run log path + tier -- workers append their `val_msg()`
+    # output to the same on-disk log as the parent, and the log-file
+    # tier (independent of console tier) needs to survive the
+    # multisession boot too. NFSv4.2 O_APPEND is atomic for line-sized
+    # writes so concurrent worker appends interleave cleanly. See #87.
+    log_file_tier    <- getOption("val.pipeline.log_file", NULL)
+    log_level_tier   <- getOption("val.pipeline.log_level", "normal")
 
     pkg_bundles <- future.apply::future_mapply(
       FUN = function(pkg, ver, pkg_cnt) {
         options(val.pipeline.verbose = verbose_tier)
         if (!is.null(config_path_tier)) {
           options(val.pipeline.config_path = config_path_tier)
+        }
+        if (!is.null(log_file_tier) && nzchar(log_file_tier)) {
+          options(val.pipeline.log_file  = log_file_tier,
+                  val.pipeline.log_level = log_level_tier)
         }
         assess_one(pkg, ver, pkg_cnt,
                    is_dep_skip = FALSE,
@@ -595,6 +626,40 @@ val_build <- function(
   
   val_msg("\n--> Updated", nrow(changed_pkgs),"pkg metadata files.\n",
           min_level = "normal")
+  
+  #
+  # ---- Aggregate per-package timings ----
+  #
+  # Every val_pkg() bundle carries a `$timings` list keyed by the
+  # val_time_block() labels (`download`, `untar`, `assess_initial`,
+  # `assess_final`, `decision`, `report`). Explode those into a long
+  # data.frame and write it as `timings.csv` under val_dir for
+  # later profiling analysis. Skipped pkgs (dep-skip pre-filter) have
+  # no timings; they contribute zero rows. See #87.
+  timings_df <- purrr::imap(pkg_bundles, function(bundle, pkg_name) {
+    tmap <- bundle[["timings"]]
+    if (is.null(tmap) || length(tmap) == 0L) return(NULL)
+    ver <- bundle[["ver"]]
+    if (is.null(ver)) ver <- NA_character_
+    purrr::imap(tmap, function(secs, phase) {
+      data.frame(
+        pkg     = pkg_name,
+        ver     = as.character(ver),
+        phase   = phase,
+        seconds = as.numeric(secs),
+        stringsAsFactors = FALSE
+      )
+    }) |> purrr::list_rbind()
+  }) |> purrr::list_rbind()
+  
+  if (nrow(timings_df) > 0L) {
+    timings_file <- file.path(val_dir, "timings.csv")
+    utils::write.csv(timings_df, timings_file, row.names = FALSE)
+    val_msg(paste0("\n--> Wrote per-phase timings for ",
+                   length(unique(timings_df$pkg)), " pkg(s) to ",
+                   timings_file, "\n"),
+            min_level = "minimal")
+  }
   
   val_end <- Sys.time()
   val_end_txt <- utils::capture.output(val_end - val_start)

@@ -62,6 +62,7 @@ val_pkg <- function(
   metric_pkg <- match.arg(metric_pkg)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
   apply_verbose(verbose)
+  reset_pkg_timings()
   
   pkg_v <- paste(pkg, ver, sep = "_")
   start <- Sys.time()
@@ -111,10 +112,11 @@ val_pkg <- function(
     # ---- Download Tarball ----
     #
     tarball_url <- file.path(repo_src_contrib, paste0(pkg_v,".tar.gz"))
-    dwn_ld <- try(utils::download.file(tarball_url,
-                                       file.path(tarballs, basename(tarball_url)), 
-                                       quiet = TRUE, mode = "wb"),
-                  silent = TRUE)
+    dwn_ld <- val_time_block("download",
+      try(utils::download.file(tarball_url,
+                               file.path(tarballs, basename(tarball_url)),
+                               quiet = TRUE, mode = "wb"),
+          silent = TRUE))
     if (inherits(dwn_ld, "try-error") | dwn_ld != 0) {
       wrn_msg <- glue::glue("Unable to download the source files for {pkg} from '{tarball_url}'.")
       warning(wrn_msg)
@@ -126,7 +128,7 @@ val_pkg <- function(
     # ---- Untar ---- 
     #
     tar_file <- file.path(tarballs, glue::glue("{pkg_v}.tar.gz"))
-    utils::untar(tar_file, exdir = sourced)
+    val_time_block("untar", utils::untar(tar_file, exdir = sourced))
     val_msg("\n-->", pkg_v,"untarred.\n", min_level = "verbose")
   }
   
@@ -310,10 +312,10 @@ val_pkg <- function(
         }
       }
 
-      init_pkg_assessment0 <-
+      init_pkg_assessment0 <- val_time_block("assess_initial",
         init_pkg_ref |>
-        # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
-        riskmetric::pkg_assess(assessments = init_metrics)
+          # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
+          riskmetric::pkg_assess(assessments = init_metrics))
 
       # strip assessment of '.recording' attribute:
       init_pkg_assessment <-
@@ -446,9 +448,10 @@ val_pkg <- function(
         exclude_met <- NULL
       }
       
-      pkg_assessment0 <- pkg_ref |>
-        # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
-        riskmetric::pkg_assess(assessments = assess_metrics)
+      pkg_assessment0 <- val_time_block("assess_final",
+        pkg_ref |>
+          # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
+          riskmetric::pkg_assess(assessments = assess_metrics))
       
       # strip assessment of '.recording' attribute:
       pkg_assessment <-  pkg_assessment0 |> 
@@ -570,10 +573,10 @@ val_pkg <- function(
     viable_metrics <- c(vm, "r_cmd_check_warnings", "r_cmd_check_errors")
   }
   
-  decision <- 
-    val_decision( 
+  decision <- val_time_block("decision",
+    val_decision(
       pkg = pkg,
-      source_df = assessment_record, 
+      source_df = assessment_record,
       excl_metrics = exclude_met, # Subset if desired
       decisions = decisions,
       else_cat = decisions[length(decisions)],
@@ -582,7 +585,7 @@ val_pkg <- function(
         rule_type = "decide",
         viable_metrics = viable_metrics
         )
-    )
+    ))
   decision_aa <- decision |>
     dplyr::select(dplyr::ends_with("cataa")) |>
     as.vector() |> unlist() |> any()
@@ -659,21 +662,22 @@ val_pkg <- function(
   on.exit(unlink(pkg_render_dir, recursive = TRUE, force = TRUE),
           add = TRUE)
   options(riskreports_output_dir = pkg_render_dir)
-  pr <- riskreports::package_report(
-    package_name = pkg,
-    package_version = ver,
-    template_path = system.file("report/package", package = "val.pipeline"),
-    output_format = "typst", # Options include html, gfm, and typst. Supplying 'all' does all 3
-    # params list: https://github.com/pharmaR/riskreports/blob/main/inst/report/package/pkg_template.qmd
-    params = list(
-      assessment_path = assessment_file,
-      hide_reverse_deps = 'false',
-      source = src_ref, # defined above
-      val_date = as.character(val_date),
-      val_dir = out_dir
-    ),
-    quiet = TRUE, # To silence quarto output for readability
-  )
+  pr <- val_time_block("report",
+    riskreports::package_report(
+      package_name = pkg,
+      package_version = ver,
+      template_path = system.file("report/package", package = "val.pipeline"),
+      output_format = "typst", # Options include html, gfm, and typst. Supplying 'all' does all 3
+      # params list: https://github.com/pharmaR/riskreports/blob/main/inst/report/package/pkg_template.qmd
+      params = list(
+        assessment_path = assessment_file,
+        hide_reverse_deps = 'false',
+        source = src_ref, # defined above
+        val_date = as.character(val_date),
+        val_dir = out_dir
+      ),
+      quiet = TRUE, # To silence quarto output for readability
+    ))
   # Move the produced output file(s) up into the shared reports dir so
   # downstream lookups (which key off `reports/`) keep working. `pr` is
   # the character vector of paths riskreports produced; anything else in
@@ -718,7 +722,13 @@ val_pkg <- function(
     depends = if(identical(depends, character(0))) NA_character_ else depends,
     suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
     rev_deps = if(is.null(pkg_assessment$reverse_dependencies)) NA_character_ else pkg_assessment$reverse_dependencies |> as.vector(),
-    assessment_runtime = list(txt = ass_mins_txt, mins = ass_mins)
+    assessment_runtime = list(txt = ass_mins_txt, mins = ass_mins),
+    # Per-phase elapsed seconds captured via val_time_block() around
+    # the fat blocks (download, untar, assess_initial, assess_final,
+    # decision, report). Named list; each value is a numeric vector
+    # (usually length 1). val_build() aggregates these across the
+    # cohort into `timings.csv` under val_dir. See #87.
+    timings = get_pkg_timings()
   )
   # meta_list <- readRDS(file.path(assessed, glue::glue("{pkg_v}_meta.rds")))
   # meta_list$rev_deps

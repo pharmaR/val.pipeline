@@ -17,4 +17,12 @@ Drop-in replacement for \code{cat()} used throughout the \verb{val_*} internals.
 No-ops when the current session tier is below \code{min_level}. Warnings
 and errors are never gated -- only console chatter is.
 }
+\details{
+Additionally tees the message to
+\code{options("val.pipeline.log_file")} when that option is set and the
+current log-file tier (\code{options("val.pipeline.log_level")}) is at
+least \code{min_level}. The log tier is independent of the console tier
+so a \code{verbose = "minimal"} run can still capture a full \code{"normal"}
+record on disk.
+}
 \keyword{internal}
