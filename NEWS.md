@@ -22,6 +22,21 @@
     (`getOption("val.pipeline.verbose")`) plus the user-supplied
     `val.pipeline.config_path` and re-applies both at the top of every
     `future_mapply()` task. (#80)
+- Config + lockfile drift picked up while shaking down the parallel
+  build: bump the pinned CRAN snapshot from `2026-06-21` to
+  `2026-07-21`, tighten the `downloads_1yr` Medium/Low cutoff from
+  240k to 200k, and comment out the `bioc_remote_initial_metrics`
+  block (the whitelist is currently blocking valid Bioc assessments
+  on hosts with outbound access; will revisit under a dedicated
+  issue). Adds `future`, `future.apply`, `globals`, `listenv`,
+  `parallelly`, and `codetools` to `renv.lock` so the parallel
+  branch of `val_build()` boots cleanly under `renv::restore()`.
+- `dev/dev_pipeline.R`: swap `devtools::load_all()` for
+  `devtools::install(quick = TRUE) + library(val.pipeline)` so
+  `workers > 1` doesn't hit `FutureLaunchError: there is no package
+  called 'val.pipeline'` — `future::multisession` workers boot with
+  the plain `.libPaths()` and can't see a `load_all()`-only shadow
+  namespace.
 
 # val.pipeline 0.1.11
 

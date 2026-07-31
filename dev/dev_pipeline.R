@@ -8,7 +8,9 @@
 # restart R
 
 # Load package
-devtools::load_all()
+# devtools::load_all()
+devtools::install(quick = TRUE, upgrade = "never", quiet = TRUE)
+library(val.pipeline)
 
 workers = 6
 ref = "source"
