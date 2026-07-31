@@ -10,6 +10,7 @@ default:
     logrx, admiral, sdtm.oak, cardinal, admiral.test, admiralonco, admiralvaccine, tidytlg,
     pharmaversesdtm, pharmaverseadam, rlistings, sdtmchecks, metatools, admiraldev, admiralophtha,
     datacutr, admiralci, envsetup, cards, cardx, mmrm,
+    
     addinexamples, apt, assertr, autoslider.core, base, bbr,
     bbr.bayes, bcrm, berryFunctions, BiocParallel, BiocVersion, blogdown, chevron, clinfun,
     compareDF, compiler, condSURV, constructive, covtracer, crmPack, CTP, daff, data.validator,
@@ -100,12 +101,12 @@ default:
   # `riskmetric::all_assessments()` returns; that matches the pre-0.1.10
   # behaviour and is only appropriate on hosts with real outbound
   # access to bioconductor.org.
-  bioc_remote_initial_metrics:
-    - assess_reverse_dependencies
-    - assess_dependencies
+  # bioc_remote_initial_metrics:
+  #   - assess_reverse_dependencies
+  #   - assess_dependencies
   decisions_lst: [Low, Medium, High]
   opt_repos: 
-    CRAN: https://packagemanager.posit.co/cran/2026-06-21
+    CRAN: https://packagemanager.posit.co/cran/2026-07-21
     BioC: https://bioconductor.org/packages/3.22/bioc #https://packagemanager.posit.co/bioconductor/latest 
     
 remote_reduce:
@@ -113,8 +114,8 @@ remote_reduce:
   downloads_1yr:
     cond:
       High: ~ is.na(.x) | .x < 80000
-      Medium: ~ dplyr::between(.x, 80000, 240000)
-      Low: ~ .x > 240000
+      Medium: ~ dplyr::between(.x, 80000, 200000)
+      Low: ~ .x > 200000
     type: primary
     accept_cats: Low
     promote_min: ~ .x > 60000 # bare minimum needed for promo

@@ -1,3 +1,43 @@
+# val.pipeline 0.1.13
+
+- Fix two `val_build(workers > 1)` bugs surfaced by a real 8-worker run:
+  - `quarto::quarto_render()` was blowing up with
+    `Error running quarto CLI from R` in every worker but one.
+    `riskreports::package_report()` copies its template files into
+    `options("riskreports_output_dir")`, renames one file to a
+    pkg-specific `prefix_output`, and then removes the leftovers.
+    `val_pkg()` pointed that option at a single shared `reports/`
+    directory, so 8 concurrent workers raced on the mid-flight
+    copy/rename/remove sequence and one worker's `quarto_render()`
+    tripped over another's cleanup. `val_pkg()` now renders into a
+    per-package scratch dir (`reports/.render_<pkg>_v<ver>/`), then
+    copies the produced output(s) up into `reports/` and cleans the
+    scratch dir on exit. Final layout is unchanged.
+  - `verbose = "minimal"` was silently reverting to `"normal"` inside
+    workers. `future::multisession` boots each worker in a fresh R
+    session that does *not* inherit the parent's `options()`, so the
+    `val.pipeline.verbose` option `apply_verbose()` set in the parent
+    never reached `val_msg()` inside the worker. The parallel branch
+    of `val_build()` now captures the resolved tier
+    (`getOption("val.pipeline.verbose")`) plus the user-supplied
+    `val.pipeline.config_path` and re-applies both at the top of every
+    `future_mapply()` task. (#80)
+- Config + lockfile drift picked up while shaking down the parallel
+  build: bump the pinned CRAN snapshot from `2026-06-21` to
+  `2026-07-21`, tighten the `downloads_1yr` Medium/Low cutoff from
+  240k to 200k, and comment out the `bioc_remote_initial_metrics`
+  block (the whitelist is currently blocking valid Bioc assessments
+  on hosts with outbound access; will revisit under a dedicated
+  issue). Adds `future`, `future.apply`, `globals`, `listenv`,
+  `parallelly`, and `codetools` to `renv.lock` so the parallel
+  branch of `val_build()` boots cleanly under `renv::restore()`.
+- `dev/dev_pipeline.R`: swap `devtools::load_all()` for
+  `devtools::install(quick = TRUE) + library(val.pipeline)` so
+  `workers > 1` doesn't hit `FutureLaunchError: there is no package
+  called 'val.pipeline'` — `future::multisession` workers boot with
+  the plain `.libPaths()` and can't see a `load_all()`-only shadow
+  namespace.
+
 # val.pipeline 0.1.12
 
 - Add a `workers` argument to `val_build()` (and threaded through
