@@ -17,7 +17,8 @@ val_prep_pipeline(
   toml_path = NULL,
   toml_project_name = "val.pipeline run",
   toml_local_repo = NULL,
-  config_path = NULL
+  config_path = NULL,
+  freeze_opt_repos = FALSE
 )
 }
 \arguments{
@@ -72,6 +73,18 @@ run reads from that file instead of the \code{config.yml} bundled with
 \code{val.pipeline.config_path} option is restored on exit. When \code{NULL}
 (default), the pre-packaged config is used (or whatever the caller
 has already set via \code{options(val.pipeline.config_path = ...)}).}
+
+\item{freeze_opt_repos}{Logical(1). When \code{FALSE} (default), the
+config's \code{opt_repos} CRAN URL is rewritten to match \code{val_date}
+via \code{\link[=update_opt_repos]{update_opt_repos()}} (existing behaviour). When \code{TRUE}, the
+config's \code{opt_repos} is used verbatim so \code{val_date} can drift from
+the frozen PPM snapshot without silently changing which packages
+the pipeline pulls. Useful when the org has pinned CRAN to a
+specific date in \code{inst/config.yml} but wants each run's output
+folder (\verb{R_<ver>/<YYYYMMDD>/}) to reflect the date the analysis
+was actually executed. \code{val_date} still governs the output
+directory name and every \code{val_date} field written to metadata.
+See #89.}
 }
 \value{
 A list of class \code{"val_prep"} containing:

@@ -57,6 +57,17 @@
 #'   downstream via [val_decision()], so package-report accuracy is
 #'   unaffected). Requires the optional `{future}` and
 #'   `{future.apply}` packages when `workers > 1`.
+#' @param freeze_opt_repos Logical(1). When `FALSE` (default), the
+#'   config's `opt_repos` CRAN URL is rewritten to match `val_date`
+#'   via [update_opt_repos()] (existing behaviour). When `TRUE`, the
+#'   config's `opt_repos` is used verbatim so `val_date` can drift from
+#'   the frozen PPM snapshot without silently changing which packages
+#'   the pipeline pulls. Useful when the org has pinned CRAN to a
+#'   specific date in `inst/config.yml` but wants each run's output
+#'   folder (`R_<ver>/<YYYYMMDD>/`) to reflect the date the analysis
+#'   was actually executed. `val_date` still governs the output
+#'   directory name and every `val_date` field written to metadata.
+#'   See #89.
 #' @return A list containing the validation directory and a data frame of
 #'   package assessments.
 #'
@@ -80,13 +91,16 @@ val_pipeline <- function(
   verbose = NULL,
   prep = NULL,
   config_path = NULL,
-  workers = 1L
+  workers = 1L,
+  freeze_opt_repos = FALSE
   ){
 
   # Assess args
   ref <- match.arg(ref)
   metric_pkg <- match.arg(metric_pkg)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
+  stopifnot(is.logical(freeze_opt_repos), length(freeze_opt_repos) == 1L,
+            !is.na(freeze_opt_repos))
   if (!is.null(prep) && !inherits(prep, "val_prep")) {
     stop("`prep` must be a `val_prep` object returned by val_prep_pipeline().",
          call. = FALSE)
@@ -116,7 +130,8 @@ val_pipeline <- function(
       out             = out,
       opt_repos       = opt_repos,
       verbose         = verbose,
-      config_path     = config_path
+      config_path     = config_path,
+      freeze_opt_repos = freeze_opt_repos
     )
   }
 

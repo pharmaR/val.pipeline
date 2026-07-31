@@ -1,3 +1,19 @@
+# val.pipeline 0.1.15
+
+- Decouple `val_date` from the CRAN URL rewrite. New logical argument
+  `freeze_opt_repos` on `val_pipeline()` and `val_prep_pipeline()`
+  (default `FALSE`, preserves the pre-existing behaviour where
+  `update_opt_repos()` rewrites the config's CRAN URL to match
+  `val_date`). When `TRUE`, `update_opt_repos()` is skipped and the
+  config's `opt_repos` is used verbatim, so `val_date` can drift from
+  the frozen PPM snapshot without silently changing which packages
+  the pipeline pulls. Useful when the org has pinned CRAN to a
+  specific date in `inst/config.yml` but wants each run's output
+  folder (`R_<ver>/<YYYYMMDD>/`) to reflect the date the analysis was
+  actually executed. `val_date` still governs the output directory
+  name and every `val_date` field written to metadata -- only the
+  URL rewrite is gated off. (#89)
+
 # val.pipeline 0.1.14
 
 - Per-package timing instrumentation inside `val_pkg()`. A new
