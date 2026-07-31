@@ -17,7 +17,8 @@ val_pipeline(
   verbose = NULL,
   prep = NULL,
   config_path = NULL,
-  workers = 1L
+  workers = 1L,
+  freeze_opt_repos = FALSE
 )
 }
 \arguments{
@@ -79,6 +80,18 @@ disabled in that mode (final risk propagation still runs
 downstream via \code{\link[=val_decision]{val_decision()}}, so package-report accuracy is
 unaffected). Requires the optional \code{{future}} and
 \code{{future.apply}} packages when \code{workers > 1}.}
+
+\item{freeze_opt_repos}{Logical(1). When \code{FALSE} (default), the
+config's \code{opt_repos} CRAN URL is rewritten to match \code{val_date}
+via \code{\link[=update_opt_repos]{update_opt_repos()}} (existing behaviour). When \code{TRUE}, the
+config's \code{opt_repos} is used verbatim so \code{val_date} can drift from
+the frozen PPM snapshot without silently changing which packages
+the pipeline pulls. Useful when the org has pinned CRAN to a
+specific date in \code{inst/config.yml} but wants each run's output
+folder (\verb{R_<ver>/<YYYYMMDD>/}) to reflect the date the analysis
+was actually executed. \code{val_date} still governs the output
+directory name and every \code{val_date} field written to metadata.
+See #89.}
 }
 \value{
 A list containing the validation directory and a data frame of

@@ -75,13 +75,16 @@ val_prep_pipeline <- function(
   toml_path = NULL,
   toml_project_name = "val.pipeline run",
   toml_local_repo = NULL,
-  config_path = NULL
+  config_path = NULL,
+  freeze_opt_repos = FALSE
 ){
 
   # Assess args
   ref <- match.arg(ref)
   metric_pkg <- match.arg(metric_pkg)
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
+  stopifnot(is.logical(freeze_opt_repos), length(freeze_opt_repos) == 1L,
+            !is.na(freeze_opt_repos))
   apply_verbose(verbose)
   configure_bioc_repositories_if_requested(quiet = TRUE)
   configure_riskmetric_offline_if_requested(quiet = TRUE)
@@ -169,7 +172,19 @@ val_prep_pipeline <- function(
   #
   # ---- Update repos option to val_date snapshot ----
   #
-  opt_repos <- update_opt_repos(val_date = val_date, opt_repos = opt_repos)
+  # When `freeze_opt_repos = TRUE`, respect the config's `opt_repos`
+  # verbatim so `val_date` can drift from the frozen PPM snapshot
+  # without silently rewriting the CRAN URL. `val_date` still governs
+  # the output directory name and every `val_date` field written to
+  # metadata -- only the CRAN URL date rewrite is gated off. See #89.
+  if (isTRUE(freeze_opt_repos)) {
+    val_msg(paste0("\n--> `freeze_opt_repos = TRUE`; leaving config's ",
+                   "opt_repos untouched (val_date = ", val_date,
+                   " governs the output folder only).\n"),
+            min_level = "normal")
+  } else {
+    opt_repos <- update_opt_repos(val_date = val_date, opt_repos = opt_repos)
+  }
   options(repos = opt_repos, pkgType = "source", scipen = 999)
 
   #
