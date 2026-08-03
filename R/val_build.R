@@ -415,6 +415,31 @@ val_build <- function(
     log_file_tier    <- getOption("val.pipeline.log_file", NULL)
     log_level_tier   <- getOption("val.pipeline.log_level", "normal")
 
+    # Pre-filter already-assessed pkgs before dispatch. In parallel
+    # mode there's no dep-skip state to update in-loop, so any pkg
+    # whose `_meta.rds` is already on disk (and `replace = FALSE`)
+    # would just hit the cached branch of `assess_one()` after paying
+    # a full future/IPC round-trip and a spam of val_msg lines. Filter
+    # those out up front. This turns a crashed 40-hr run's restart
+    # from "dispatch 6000 workers that each print a 'cached' line"
+    # into "dispatch only the N pkgs that still need real work". #91.
+    todo <- seq_along(pkgs)
+    if (!replace) {
+      pkg_v_all <- paste(pkgs, vers, sep = "_")
+      existing_meta <- file.path(assessed,
+                                 paste0(pkg_v_all, "_meta.rds"))
+      already_done <- file.exists(existing_meta)
+      n_skip <- sum(already_done)
+      if (n_skip > 0L) {
+        val_msg(paste0("\n--> Skipping ", n_skip, " of ", pkgs_length,
+                       " package(s) already assessed on disk ",
+                       "(`_meta.rds` present under `assessed/`). ",
+                       "Set `replace = TRUE` to re-run them.\n"),
+                min_level = "minimal")
+        todo <- which(!already_done)
+      }
+    }
+
     # Workers discard the meta_list return: val_pkg() has already
     # persisted every artifact we care about (`_meta.rds`,
     # `_assess_record.rds`, `_assessments.rds`, `_scores.rds`) inside
@@ -423,28 +448,36 @@ val_build <- function(
     # ~6000 bundles was a multi-GB memory sink on full CRAN+BioC runs
     # and was the primary driver of the OOM crashes users hit mid-run.
     # Downstream collation now streams from disk instead. See #91.
-    future.apply::future_mapply(
-      FUN = function(pkg, ver, pkg_cnt) {
-        options(val.pipeline.verbose = verbose_tier)
-        if (!is.null(config_path_tier)) {
-          options(val.pipeline.config_path = config_path_tier)
-        }
-        if (!is.null(log_file_tier) && nzchar(log_file_tier)) {
-          options(val.pipeline.log_file  = log_file_tier,
-                  val.pipeline.log_level = log_level_tier)
-        }
-        assess_one(pkg, ver, pkg_cnt,
-                   is_dep_skip = FALSE,
-                   failed_snapshot = character(0))
-        invisible(NULL)
-      },
-      pkg     = pkgs,
-      ver     = vers,
-      pkg_cnt = seq_along(pkgs),
-      SIMPLIFY  = FALSE,
-      USE.NAMES = FALSE,
-      future.seed = TRUE
-    )
+    if (length(todo) > 0L) {
+      future.apply::future_mapply(
+        FUN = function(pkg, ver, pkg_cnt) {
+          options(val.pipeline.verbose = verbose_tier)
+          if (!is.null(config_path_tier)) {
+            options(val.pipeline.config_path = config_path_tier)
+          }
+          if (!is.null(log_file_tier) && nzchar(log_file_tier)) {
+            options(val.pipeline.log_file  = log_file_tier,
+                    val.pipeline.log_level = log_level_tier)
+          }
+          assess_one(pkg, ver, pkg_cnt,
+                     is_dep_skip = FALSE,
+                     failed_snapshot = character(0))
+          invisible(NULL)
+        },
+        pkg     = pkgs[todo],
+        ver     = vers[todo],
+        pkg_cnt = todo,
+        SIMPLIFY  = FALSE,
+        USE.NAMES = FALSE,
+        future.seed = TRUE
+      )
+    } else {
+      val_msg(paste0("\n--> All ", pkgs_length,
+                     " package(s) already assessed on disk; ",
+                     "skipping the parallel assessment phase and ",
+                     "proceeding straight to collation.\n"),
+              min_level = "minimal")
+    }
   } else {
     # Serial mode: dep-skip short-circuit lives here. We only need
     # `$decision` + `$rev_deps` from each pkg_meta to update the

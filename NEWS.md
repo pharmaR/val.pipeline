@@ -21,7 +21,15 @@
   Mid-run crash recovery is unchanged and free: rerun `val_pipeline()`
   with the same args and the cached branch of `assess_one()`
   short-circuits every previously-assessed pkg via its `_meta.rds`
-  file. (#91)
+  file. When `workers > 1`, the parallel branch now *also*
+  pre-filters those already-assessed pkgs out of the dispatch list
+  entirely (was: dispatch every pkg and let each worker hit the
+  cached branch, paying a full future/IPC round-trip plus cached
+  val_msg lines for zero real work). Restarting a crashed 40-hr run
+  now only re-dispatches the pkgs that still need real work. Serial
+  mode (`workers = 1`) still walks cached pkgs so it can accumulate
+  `dont_run` / `failed_pkgs` state for its dep-skip short-circuit.
+  (#91)
 
 # val.pipeline 0.1.15
 
