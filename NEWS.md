@@ -1,3 +1,28 @@
+# val.pipeline 0.1.16
+
+- Stop accumulating per-package `meta_list` bundles in memory during
+  `val_build()`. Prior behaviour built a named list `pkg_bundles` of
+  every assessed pkg's full meta (recursive `depends`/`suggests`, a
+  full `R.Version()` dump under `sys_info`, plus `rev_deps` and
+  `timings`), and in parallel mode also shipped each bundle back
+  through the `future` IPC channel -- easily 1-3 GB on full CRAN +
+  BioC cohorts (~6000 pkgs) and a primary driver of the OOM crashes
+  that forced users to restart 40-hour runs 2-3 times. `val_build()`
+  now discards worker returns (`val_pkg()` already writes
+  `_meta.rds` to disk) and streams collation from those files:
+  `qual_metadata0.rds` (`pkgs_df0`) and `timings.csv` are built in a
+  single one-bundle-at-a-time disk pass, cutting collation-phase
+  peak memory from O(all bundles) to O(one bundle + derived rows).
+  `assessment_bundle` is also `rm()`+`gc()`'d immediately after
+  `qual_assessments.rds` is saved so it no longer overlaps
+  `pkgs_df0` in memory. No public API change; downstream artifacts
+  (`qual_assessments.rds`, `qual_metadata0.rds`, `qual_metadata.rds`,
+  per-pkg `_meta.rds`, `timings.csv`) are byte-equivalent to before.
+  Mid-run crash recovery is unchanged and free: rerun `val_pipeline()`
+  with the same args and the cached branch of `assess_one()`
+  short-circuits every previously-assessed pkg via its `_meta.rds`
+  file. (#91)
+
 # val.pipeline 0.1.15
 
 - Decouple `val_date` from the CRAN URL rewrite. New logical argument

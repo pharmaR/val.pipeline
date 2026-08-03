@@ -415,7 +415,15 @@ val_build <- function(
     log_file_tier    <- getOption("val.pipeline.log_file", NULL)
     log_level_tier   <- getOption("val.pipeline.log_level", "normal")
 
-    pkg_bundles <- future.apply::future_mapply(
+    # Workers discard the meta_list return: val_pkg() has already
+    # persisted every artifact we care about (`_meta.rds`,
+    # `_assess_record.rds`, `_assessments.rds`, `_scores.rds`) inside
+    # `assessed/`. Shipping the full `meta_list` back through the
+    # `future` IPC channel and accumulating it into a named list of
+    # ~6000 bundles was a multi-GB memory sink on full CRAN+BioC runs
+    # and was the primary driver of the OOM crashes users hit mid-run.
+    # Downstream collation now streams from disk instead. See #91.
+    future.apply::future_mapply(
       FUN = function(pkg, ver, pkg_cnt) {
         options(val.pipeline.verbose = verbose_tier)
         if (!is.null(config_path_tier)) {
@@ -428,6 +436,7 @@ val_build <- function(
         assess_one(pkg, ver, pkg_cnt,
                    is_dep_skip = FALSE,
                    failed_snapshot = character(0))
+        invisible(NULL)
       },
       pkg     = pkgs,
       ver     = vers,
@@ -436,12 +445,19 @@ val_build <- function(
       USE.NAMES = FALSE,
       future.seed = TRUE
     )
-    names(pkg_bundles) <- pkgs
   } else {
-    pkg_bundles <- purrr::map2(pkgs, vers, function(pkg, ver){
-      pkg_cnt <- which(pkgs == pkg)
+    # Serial mode: dep-skip short-circuit lives here. We only need
+    # `$decision` + `$rev_deps` from each pkg_meta to update the
+    # `dont_run` / `failed_pkgs` state; the full meta_list is discarded
+    # after each iteration (already saved to disk by `val_pkg()` /
+    # the dep-skip branch of `assess_one()`). A plain `for` loop makes
+    # the per-iter release explicit and avoids the ~1-3 GB `pkg_bundles`
+    # list that used to accumulate on full CRAN+BioC cohorts. See #91.
+    for (i in seq_along(pkgs)) {
+      pkg <- pkgs[[i]]
+      ver <- vers[[i]]
       is_dep_skip <- pkg %in% dont_run
-      pkg_meta <- assess_one(pkg, ver, pkg_cnt,
+      pkg_meta <- assess_one(pkg, ver, i,
                              is_dep_skip = is_dep_skip,
                              failed_snapshot = failed_pkgs)
       if (!is_dep_skip && pkg_meta$decision != decisions[1]) {
@@ -449,12 +465,11 @@ val_build <- function(
                        pkg_meta$decision,"' risk. All packages that depend on it will also be marked as '",
                        decisions[length(decisions)],"' risk.\n\n"),
                 min_level = "normal")
-        dont_run    <<- c(dont_run, pkg_meta$rev_deps) |> unique()
-        failed_pkgs <<- c(failed_pkgs, pkg) |> unique()
+        dont_run    <- c(dont_run, pkg_meta$rev_deps) |> unique()
+        failed_pkgs <- c(failed_pkgs, pkg) |> unique()
       }
-      pkg_meta
-    }) |>
-      purrr::set_names(nm = pkgs)
+      rm(pkg_meta)
+    }
   }
   
   # Message
@@ -495,44 +510,62 @@ val_build <- function(
   val_msg(paste0("\n--> Saved assessment records to ",
                  qual_assessments_file, "\n"),
           min_level = "minimal")
-  
-  
+  # Release the (multi-hundred-MB on large cohorts) assessment_bundle
+  # before we start reading _meta.rds files back into memory. Prior
+  # behaviour held this alongside pkg_bundles and pkgs_df0 for the
+  # remainder of val_build(), spiking peak RSS. See #91.
+  rm(assessment_bundle)
+  invisible(gc(verbose = FALSE))
+
+
   #
   # ---- Collate Pkg Meta into DF ----
   #
-    # For Debugging
-    # meta_files <- list.files(assessed, pattern = "_meta.rds$")
-    # meta_length <- meta_files |> length() # assessment file count
-    # pkg_bundles <- purrr::map(meta_files, function(file){
-    #   # file <- meta_files[1] # for debugging
-    #   meta_cnt <- which(meta_files == file)
-    #   pkg_v <- gsub("_meta.rds", "", file)
-    #   pkg <- stringr::word(pkg_v, 1, sep = "_")
-    #   ver <- stringr::word(pkg_v, 2, sep = "_")
-    #   cat(paste0("\n\n#", meta_cnt, " of ", meta_length, ": ", pkg))
-    #   readRDS(file.path(assessed, file))
-    # }) 
-  
-  
-  # Reduce package bundles down into a data.frame containing specific info
-  # names(pkg_bundles)
-  # NB: single `dplyr::bind_rows(list_of_tibbles)` call instead of
-  # `purrr::reduce(bind_rows)` — same O(n) vs O(n^2) reason as the assessment
-  # collation above (#69).
-  pkgs_df0 <- purrr::map( pkg_bundles, ~ {
-      # .x <- pkg_bundles$askpass
-      x <- purrr::list_flatten(.x)
-      # x$depends  <- if(all(is.na(x$depends)))  NA_character_ else paste(x$depends, collapse = ", ")
-      # x$suggests <- if(all(is.na(x$suggests))) NA_character_ else paste(x$suggests, collapse = ", ")
-      
-      x$depends <- list(x$depends)
-      x$suggests <- list(x$suggests)
-      x$rev_deps <- list(x$rev_deps)
-      x$sys_info <- list(x$sys_info)
-      # x$repos <- list(x$repos)
-      dplyr::as_tibble(x)
-    }) |> 
-    dplyr::bind_rows()
+  # Stream `_meta.rds` files one at a time and derive both the
+  # `pkgs_df0` tibble rows AND the per-phase `timings_df` rows in a
+  # single disk pass. Peak memory during collation is O(1 bundle +
+  # accumulated 1-row tibbles) instead of O(all bundles), which cuts
+  # ~1-3 GB off the RSS ceiling on full CRAN+BioC runs. See #91.
+  meta_files <- list.files(assessed, pattern = "_meta.rds$")
+  if (length(meta_files) == 0L) {
+    stop("No `_meta.rds` files found under ", assessed,
+         " to collate into `qual_metadata0.rds`.", call. = FALSE)
+  }
+
+  pkgs_df0_rows <- vector("list", length(meta_files))
+  timings_rows  <- vector("list", length(meta_files))
+  for (i in seq_along(meta_files)) {
+    bundle <- readRDS(file.path(assessed, meta_files[[i]]))
+    # Peel off timings before list_flatten so the phase names don't
+    # explode into per-column entries in the pkgs_df0 tibble.
+    tmap <- bundle[["timings"]]
+    bundle[["timings"]] <- NULL
+
+    x <- purrr::list_flatten(bundle)
+    x$depends  <- list(x$depends)
+    x$suggests <- list(x$suggests)
+    x$rev_deps <- list(x$rev_deps)
+    x$sys_info <- list(x$sys_info)
+    pkgs_df0_rows[[i]] <- dplyr::as_tibble(x)
+
+    if (!is.null(tmap) && length(tmap) > 0L) {
+      pkg_name <- bundle[["pkg"]]
+      ver_val  <- bundle[["ver"]]
+      if (is.null(ver_val)) ver_val <- NA_character_
+      timings_rows[[i]] <- purrr::imap(tmap, function(secs, phase) {
+        data.frame(
+          pkg     = pkg_name,
+          ver     = as.character(ver_val),
+          phase   = phase,
+          seconds = as.numeric(secs),
+          stringsAsFactors = FALSE
+        )
+      }) |> purrr::list_rbind()
+    }
+    rm(bundle)
+  }
+  pkgs_df0 <- dplyr::bind_rows(pkgs_df0_rows)
+  rm(pkgs_df0_rows)
   
   
   # Interim snapshot BEFORE dependency-based decision propagation runs.
@@ -630,27 +663,15 @@ val_build <- function(
   #
   # ---- Aggregate per-package timings ----
   #
-  # Every val_pkg() bundle carries a `$timings` list keyed by the
-  # val_time_block() labels (`download`, `untar`, `assess_initial`,
-  # `assess_final`, `decision`, `report`). Explode those into a long
-  # data.frame and write it as `timings.csv` under val_dir for
-  # later profiling analysis. Skipped pkgs (dep-skip pre-filter) have
-  # no timings; they contribute zero rows. See #87.
-  timings_df <- purrr::imap(pkg_bundles, function(bundle, pkg_name) {
-    tmap <- bundle[["timings"]]
-    if (is.null(tmap) || length(tmap) == 0L) return(NULL)
-    ver <- bundle[["ver"]]
-    if (is.null(ver)) ver <- NA_character_
-    purrr::imap(tmap, function(secs, phase) {
-      data.frame(
-        pkg     = pkg_name,
-        ver     = as.character(ver),
-        phase   = phase,
-        seconds = as.numeric(secs),
-        stringsAsFactors = FALSE
-      )
-    }) |> purrr::list_rbind()
-  }) |> purrr::list_rbind()
+  # Timings rows were built in the same disk-streaming pass that
+  # produced `pkgs_df0` (see the "Collate Pkg Meta into DF" block
+  # above). Here we simply flatten them into one long data.frame and
+  # write it as `timings.csv` under val_dir for later profiling
+  # analysis. Skipped pkgs (dep-skip pre-filter) contribute zero rows.
+  # See #87 for the timings feature and #91 for the disk-streaming
+  # collation that folded this into a single pass.
+  timings_df <- purrr::list_rbind(purrr::compact(timings_rows))
+  rm(timings_rows)
   
   if (nrow(timings_df) > 0L) {
     timings_file <- file.path(val_dir, "timings.csv")
