@@ -18,7 +18,8 @@ val_pipeline(
   prep = NULL,
   config_path = NULL,
   workers = 1L,
-  freeze_opt_repos = FALSE
+  freeze_opt_repos = FALSE,
+  propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE)
 )
 }
 \arguments{
@@ -92,6 +93,14 @@ folder (\verb{R_<ver>/<YYYYMMDD>/}) to reflect the date the analysis
 was actually executed. \code{val_date} still governs the output
 directory name and every \code{val_date} field written to metadata.
 See #89.}
+
+\item{propagate_libpaths}{Logical(1). Passed through to \code{\link[=val_build]{val_build()}};
+see there for the full rationale. In short: when \code{TRUE} (default),
+mirrors the current session's \code{.libPaths()} into \code{R_LIBS_SITE} so
+\code{rcmdcheck} / \code{covr} / any other riskmetric subprocess sees the
+same library search order as the parent — critical when the
+operator has pointed \code{.libPaths()} at an rv-provisioned library.
+See #99.}
 }
 \value{
 A list containing the validation directory and a data frame of

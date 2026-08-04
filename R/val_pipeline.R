@@ -68,6 +68,13 @@
 #'   was actually executed. `val_date` still governs the output
 #'   directory name and every `val_date` field written to metadata.
 #'   See #89.
+#' @param propagate_libpaths Logical(1). Passed through to [val_build()];
+#'   see there for the full rationale. In short: when `TRUE` (default),
+#'   mirrors the current session's `.libPaths()` into `R_LIBS_SITE` so
+#'   `rcmdcheck` / `covr` / any other riskmetric subprocess sees the
+#'   same library search order as the parent — critical when the
+#'   operator has pointed `.libPaths()` at an rv-provisioned library.
+#'   See #99.
 #' @return A list containing the validation directory and a data frame of
 #'   package assessments.
 #'
@@ -92,7 +99,8 @@ val_pipeline <- function(
   prep = NULL,
   config_path = NULL,
   workers = 1L,
-  freeze_opt_repos = FALSE
+  freeze_opt_repos = FALSE,
+  propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE)
   ){
 
   # Assess args
@@ -159,7 +167,8 @@ val_pipeline <- function(
     opt_repos       = prep$opt_repos,
     prep            = prep,
     config_path     = config_path,
-    workers         = workers
+    workers         = workers,
+    propagate_libpaths = propagate_libpaths
   )
   
   

@@ -18,7 +18,8 @@ val_build(
   verbose = NULL,
   prep = NULL,
   config_path = NULL,
-  workers = 1L
+  workers = 1L,
+  propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE)
 )
 }
 \arguments{
@@ -87,6 +88,24 @@ package-report accuracy is unaffected — the only tradeoff is that
 dependents of failed packages spend CPU time being assessed
 instead of being short-circuited. Requires the optional \code{{future}}
 and \code{{future.apply}} packages when \code{workers > 1}.}
+
+\item{propagate_libpaths}{Logical(1). When \code{TRUE} (default), mirrors
+the current session's \code{.libPaths()} into the \code{R_LIBS_SITE}
+environment variable for the duration of the assessment loop, so
+subprocesses spawned by \code{riskmetric} (e.g. \code{rcmdcheck::rcmdcheck()}
+for the \code{r_cmd_check} metric, \code{covr::package_coverage()} for
+\code{covr_coverage}) see the same library search order as the parent R
+session. Without this, an interactive \code{.libPaths()} call in the
+parent (e.g. to point at an rv-provisioned library like
+\verb{/data/pm/riskassessments/R_.../rv/library/.../}) does not reach
+any child R process, so R CMD check fails to locate dependencies
+and \code{r_cmd_check_errors} / \code{r_cmd_check_warnings} come back as
+\code{NA} for every package with a non-base dependency. Restored on
+function exit. Defaults to
+\code{getOption("val.pipeline.propagate_libpaths", TRUE)}; set that
+option to \code{FALSE} (or pass \code{propagate_libpaths = FALSE}) to opt
+out when an operator needs the child library search to stay
+isolated from the parent for some reason. See #99.}
 }
 \value{
 A list containing:
