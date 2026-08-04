@@ -15,5 +15,6 @@ utils::globalVariables(c(
   "primary_risk_category", "repo_name", "reverse_dependencies",
   "sug_failed", "suggests",
   "dec_id_df", "decisions", "secondary_risk_category", "rule_lst",
-  "Metric", "Type"
+  "Metric", "Type",
+  "phase", "seconds", "total_s", "ver"
 ))
