@@ -75,6 +75,18 @@ default:
   # blow up build_decisions_df() with `subscript out of bounds` when it
   # tries to read a non-existent `cond` element off a bare string.
   bioc_initial_ref: remote
+  # Repo sources for which Posit Package Manager does *not* support
+  # curated (allow-list) package lists, and therefore must be shipped
+  # as blocklists instead. For each source listed here,
+  # `write_qualified_pkg_lists()` writes `blocklist-<source>.txt`
+  # (containing every *assessed* package from that source whose
+  # `final_decision` is NOT the qualified decision) rather than
+  # `qualified-<source>.txt`. BioC is the current confirmed case
+  # (PPM only supports blocklists for Bioconductor mirrors); add
+  # `github` here too if/when the same restriction lands there. Set
+  # to `~` (YAML null) or an empty list to fall back to allow-list
+  # output for every source.
+  blocklist_sources: [BioC]
   # Whitelist of `riskmetric` assessment names to run when the initial
   # BioC assessment uses `pkg_bioc_remote` (i.e. `bioc_initial_ref:
   # remote`). Most `pkg_bioc_remote` metrics scrape bioconductor.org

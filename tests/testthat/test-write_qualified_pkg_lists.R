@@ -7,7 +7,8 @@ test_that("write_qualified_pkg_lists() writes one file per source with one pkg p
   )
 
   out_dir <- withr::local_tempdir()
-  paths <- write_qualified_pkg_lists(qm, out_dir, qualified_decision = "Low")
+  paths <- write_qualified_pkg_lists(qm, out_dir, qualified_decision = "Low",
+                                     blocklist_sources = character())
 
   expect_named(paths, c("BioC", "CRAN"))  # sorted
   expect_true(all(file.exists(paths)))
@@ -134,7 +135,8 @@ test_that("write_qualified_pkg_lists() reverse-engineers repo_name from 'repos' 
 
   out_dir <- withr::local_tempdir()
   expect_message(
-    paths <- write_qualified_pkg_lists(qm, out_dir, qualified_decision = "Low"),
+    paths <- write_qualified_pkg_lists(qm, out_dir, qualified_decision = "Low",
+                                       blocklist_sources = character()),
     "reverse-engineering.*from the 'repos' URL"
   )
   expect_named(paths, c("BioC", "CRAN"))
@@ -204,7 +206,8 @@ test_that("write_qualified_pkg_lists() prefers 'repo_name' over 'repos' when bot
 
   out_dir <- withr::local_tempdir()
   expect_no_message(
-    paths <- write_qualified_pkg_lists(qm, out_dir, qualified_decision = "Low"),
+    paths <- write_qualified_pkg_lists(qm, out_dir, qualified_decision = "Low",
+                                       blocklist_sources = character()),
     message = "reverse-engineering"
   )
   expect_named(paths, "BioC")
@@ -227,4 +230,123 @@ test_that("write_qualified_pkg_lists() writes files with no trailing header / qu
   expect_equal(raw, c("dplyr", "ggplot2"))
   expect_false(any(grepl("\"", raw)))
   expect_false(any(grepl("^\\s*$", raw)))
+})
+
+
+test_that("write_qualified_pkg_lists() emits blocklist-<src>.txt for blocklist_sources", {
+  # For a source in blocklist_sources, the file lists assessed pkgs
+  # whose final_decision != qualified_decision (or is NA). Qualified
+  # pkgs from that source are dropped -- PPM will mirror the whole
+  # upstream source and use the blocklist to exclude the rest.
+  qm <- data.frame(
+    pkg            = c("dplyr", "ggplot2", "limma",  "edgeR",  "GenomeInfoDb", "someBiocPkg"),
+    repo_name      = c("CRAN",  "CRAN",    "BioC",   "BioC",   "BioC",         "BioC"),
+    final_decision = c("Low",   "Low",     "Low",    "High",   "Medium",       NA_character_),
+    stringsAsFactors = FALSE
+  )
+
+  out_dir <- withr::local_tempdir()
+  paths <- write_qualified_pkg_lists(qm, out_dir,
+                                     qualified_decision = "Low",
+                                     blocklist_sources = "BioC")
+
+  expect_named(paths, c("BioC", "CRAN"))
+  # BioC file is a blocklist of non-qualified pkgs; qualified 'limma' excluded.
+  expect_equal(basename(paths[["BioC"]]), "blocklist-BioC.txt")
+  expect_equal(basename(paths[["CRAN"]]), "qualified-CRAN.txt")
+
+  expect_equal(readLines(paths[["BioC"]]),
+               c("GenomeInfoDb", "edgeR", "someBiocPkg"))
+  expect_equal(readLines(paths[["CRAN"]]),
+               c("dplyr", "ggplot2"))
+  # And the allow-list file for BioC must NOT have been written.
+  expect_false(file.exists(file.path(out_dir, "qualified-BioC.txt")))
+})
+
+
+test_that("write_qualified_pkg_lists() supports multiple blocklist sources", {
+  qm <- data.frame(
+    pkg            = c("dplyr",  "limma", "edgeR", "admiral", "shady"),
+    repo_name      = c("CRAN",   "BioC",  "BioC",  "github",  "github"),
+    final_decision = c("Low",    "Low",   "High",  "Low",     "High"),
+    stringsAsFactors = FALSE
+  )
+
+  out_dir <- withr::local_tempdir()
+  paths <- write_qualified_pkg_lists(qm, out_dir,
+                                     qualified_decision = "Low",
+                                     blocklist_sources = c("BioC", "github"))
+
+  expect_setequal(names(paths), c("BioC", "CRAN", "github"))
+  expect_equal(basename(paths[["BioC"]]),   "blocklist-BioC.txt")
+  expect_equal(basename(paths[["github"]]), "blocklist-github.txt")
+  expect_equal(basename(paths[["CRAN"]]),   "qualified-CRAN.txt")
+
+  expect_equal(readLines(paths[["BioC"]]),   "edgeR")
+  expect_equal(readLines(paths[["github"]]), "shady")
+  expect_equal(readLines(paths[["CRAN"]]),   "dplyr")
+})
+
+
+test_that("write_qualified_pkg_lists() writes an EMPTY blocklist file when every pkg from that source is qualified", {
+  # An empty blocklist is meaningful: it tells PPM 'mirror this whole
+  # source, block nothing'. We must still create the file so downstream
+  # provisioning has a stable filename to point at.
+  qm <- data.frame(
+    pkg            = c("dplyr", "limma", "edgeR"),
+    repo_name      = c("CRAN",  "BioC",  "BioC"),
+    final_decision = c("Low",   "Low",   "Low"),
+    stringsAsFactors = FALSE
+  )
+
+  out_dir <- withr::local_tempdir()
+  paths <- write_qualified_pkg_lists(qm, out_dir,
+                                     qualified_decision = "Low",
+                                     blocklist_sources = "BioC")
+
+  expect_true(file.exists(file.path(out_dir, "blocklist-BioC.txt")))
+  # File exists, but contains zero package names.
+  expect_length(readLines(file.path(out_dir, "blocklist-BioC.txt")), 0L)
+})
+
+
+test_that("write_qualified_pkg_lists() ignores blocklist_sources = 'NA' (unknown bucket is allow-list only)", {
+  # A source we couldn't identify can't be safely inverted into 'block
+  # everything except', so the NA bucket always emits a qualified-NA.txt
+  # even if the caller lists 'NA' in blocklist_sources.
+  qm <- data.frame(
+    pkg            = c("dplyr", "ghost1", "ghost2"),
+    repo_name      = c("CRAN",  "unknown", NA_character_),
+    final_decision = c("Low",   "Low",     "High"),
+    stringsAsFactors = FALSE
+  )
+
+  out_dir <- withr::local_tempdir()
+  suppressMessages(
+    paths <- write_qualified_pkg_lists(qm, out_dir,
+                                       qualified_decision = "Low",
+                                       blocklist_sources = c("BioC", "NA"))
+  )
+  expect_true(file.exists(file.path(out_dir, "qualified-NA.txt")))
+  expect_false(file.exists(file.path(out_dir, "blocklist-NA.txt")))
+  expect_equal(readLines(file.path(out_dir, "qualified-NA.txt")), "ghost1")
+})
+
+
+test_that("write_qualified_pkg_lists() blocklist_sources default comes from config.yml (BioC)", {
+  qm <- data.frame(
+    pkg            = c("dplyr", "limma",  "edgeR"),
+    repo_name      = c("CRAN",  "BioC",   "BioC"),
+    final_decision = c("Low",   "Low",    "High"),
+    stringsAsFactors = FALSE
+  )
+
+  out_dir <- withr::local_tempdir()
+  # No blocklist_sources argument -> pull_config() default should kick
+  # in and route BioC into blocklist-BioC.txt.
+  paths <- write_qualified_pkg_lists(qm, out_dir, qualified_decision = "Low")
+
+  expect_true(file.exists(file.path(out_dir, "blocklist-BioC.txt")))
+  expect_false(file.exists(file.path(out_dir, "qualified-BioC.txt")))
+  expect_equal(readLines(file.path(out_dir, "blocklist-BioC.txt")), "edgeR")
 })

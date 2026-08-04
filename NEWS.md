@@ -1,3 +1,22 @@
+# val.pipeline 0.1.17
+
+- Emit `blocklist-<source>.txt` files instead of `qualified-<source>.txt`
+  for repo sources that Posit Package Manager can only curate via a
+  blocklist (currently Bioconductor). The blocklist file lists every
+  assessed package from that source whose `final_decision` is NOT the
+  qualified decision (e.g. anything not `"Low"`), so PPM can mirror the
+  full upstream source and exclude the unqualified ones. Which sources
+  get blocklist treatment is configurable via the new
+  `blocklist_sources` key under `default:` in `inst/config.yml`
+  (defaults to `[BioC]`); listing `github` there gives the same
+  treatment to the github bucket. `write_qualified_pkg_lists()` gains a
+  matching `blocklist_sources` argument. Empty blocklist files are
+  still written on purpose so downstream PPM provisioning has a stable
+  filename to point at (an empty blocklist means "mirror this source,
+  block nothing"). Unknown-source rows always go to
+  `qualified-NA.txt` and are never inverted, even if `"NA"` is passed
+  in `blocklist_sources`. (#93)
+
 # val.pipeline 0.1.16
 
 - Stop accumulating per-package `meta_list` bundles in memory during
