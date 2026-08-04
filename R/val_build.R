@@ -176,7 +176,7 @@ val_build <- function(
     withr::local_envvar(c(R_LIBS_SITE = new_r_libs_site))
     val_msg(paste0("--> Mirrored .libPaths() into R_LIBS_SITE for ",
                    "subprocess visibility (r_cmd_check, covr_coverage, ...).\n"),
-            min_level = "verbose")
+            min_level = "normal")
   }
 
   # Route pull_config() at any depth to the user-supplied config, if any.
