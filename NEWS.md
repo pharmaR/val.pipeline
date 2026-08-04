@@ -1,3 +1,23 @@
+# val.pipeline 0.1.20
+
+- `val_build()` and `val_pipeline()` now mirror the parent R session's
+  `.libPaths()` into the `R_LIBS_SITE` environment variable for the
+  duration of the assessment loop, so subprocesses spawned by
+  riskmetric — `rcmdcheck::rcmdcheck()` (for the `r_cmd_check`
+  metric), `covr::package_coverage()` (for `covr_coverage`), etc. —
+  see the same library search order as the parent. A fresh R
+  subprocess does NOT inherit an interactive `.libPaths()` from the
+  parent, so before this fix, users who pointed `.libPaths()` at an
+  rv-provisioned library (the recommended flow after PR #67 introduced
+  `write_pipeline_toml()`) saw ~65% of packages come back with
+  `r_cmd_check_errors` and `r_cmd_check_warnings` as `NA` because
+  R CMD check couldn't find their deps. The mirror is restored on
+  function exit via `withr::local_envvar()`. Controlled by a new
+  `propagate_libpaths` argument on both `val_build()` and
+  `val_pipeline()` (default `TRUE`, sourced from
+  `getOption("val.pipeline.propagate_libpaths", TRUE)` so it can be
+  disabled session-wide). (#99)
+
 # val.pipeline 0.1.19
 
 - Add `val_timings_summary()`: exported standalone analysis helper for

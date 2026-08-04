@@ -86,6 +86,24 @@
 #'   instead of being short-circuited. Requires the optional `{future}`
 #'   and `{future.apply}` packages when `workers > 1`.
 #'
+#' @param propagate_libpaths Logical(1). When `TRUE` (default), mirrors
+#'   the current session's `.libPaths()` into the `R_LIBS_SITE`
+#'   environment variable for the duration of the assessment loop, so
+#'   subprocesses spawned by `riskmetric` (e.g. `rcmdcheck::rcmdcheck()`
+#'   for the `r_cmd_check` metric, `covr::package_coverage()` for
+#'   `covr_coverage`) see the same library search order as the parent R
+#'   session. Without this, an interactive `.libPaths()` call in the
+#'   parent (e.g. to point at an rv-provisioned library like
+#'   `/data/pm/riskassessments/R_.../rv/library/.../`) does not reach
+#'   any child R process, so R CMD check fails to locate dependencies
+#'   and `r_cmd_check_errors` / `r_cmd_check_warnings` come back as
+#'   `NA` for every package with a non-base dependency. Restored on
+#'   function exit. Defaults to
+#'   `getOption("val.pipeline.propagate_libpaths", TRUE)`; set that
+#'   option to `FALSE` (or pass `propagate_libpaths = FALSE`) to opt
+#'   out when an operator needs the child library search to stay
+#'   isolated from the parent for some reason. See #99.
+#'
 #' @export
 #' 
 val_build <- function(
@@ -103,7 +121,8 @@ val_build <- function(
     verbose = NULL,
     prep = NULL,
     config_path = NULL,
-    workers = 1L
+    workers = 1L,
+    propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE)
     ){
   
   #
@@ -140,6 +159,25 @@ val_build <- function(
   apply_verbose(verbose)
   configure_bioc_repositories_if_requested(quiet = TRUE)
   configure_riskmetric_offline_if_requested(quiet = TRUE)
+
+  # Mirror the parent session's .libPaths() into R_LIBS_SITE so every
+  # subprocess spawned by riskmetric (rcmdcheck::rcmdcheck for the
+  # r_cmd_check metric, covr::package_coverage for covr_coverage, ...)
+  # sees the same library search order. A fresh R subprocess does NOT
+  # inherit interactive .libPaths() from the parent — it rebuilds its
+  # search order from R_LIBS_SITE / R_LIBS_USER / R_LIBS + site
+  # defaults. Without this mirror, an operator who pointed .libPaths()
+  # at an rv-provisioned library (typical for the val.pipeline "install
+  # via rv" flow) sees ~65% of packages come back with r_cmd_check_
+  # errors/_warnings == NA because R CMD check can't find their deps.
+  # Restored on exit via withr::local_envvar. See #99.
+  if (isTRUE(propagate_libpaths)) {
+    new_r_libs_site <- paste(.libPaths(), collapse = .Platform$path.sep)
+    withr::local_envvar(c(R_LIBS_SITE = new_r_libs_site))
+    val_msg(paste0("--> Mirrored .libPaths() into R_LIBS_SITE for ",
+                   "subprocess visibility (r_cmd_check, covr_coverage, ...).\n"),
+            min_level = "normal")
+  }
 
   # Route pull_config() at any depth to the user-supplied config, if any.
   old_cfg <- options()["val.pipeline.config_path"]
