@@ -84,4 +84,3 @@ repo resolves to \code{"unknown"} and lands in \code{qualified-NA.txt}. If
 neither \code{repo_name} nor \code{repos} is present the helper errors -- the
 source of every qualified package can't be recovered from thin air.
 }
-\keyword{internal}

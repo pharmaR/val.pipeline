@@ -1854,7 +1854,7 @@ format_runtime_seconds <- function(secs) {
 #'   labels (e.g. `"CRAN"`, `"BioC"`), values are the absolute paths of
 #'   the text files written. Empty if there was nothing to write.
 #'
-#' @keywords internal
+#' @export
 write_qualified_pkg_lists <- function(
     qual_metadata,
     out_dir,

@@ -1,5 +1,10 @@
 # val.pipeline 0.1.17
 
+- Export `write_qualified_pkg_lists()` so operators can regenerate the
+  per-source `qualified-<src>.txt` / `blocklist-<src>.txt` files
+  ad-hoc from an existing `qual_metadata.rds` (e.g. after tweaking
+  `blocklist_sources` in the config), without re-running the pipeline.
+  (#93)
 - Emit `blocklist-<source>.txt` files instead of `qualified-<source>.txt`
   for repo sources that Posit Package Manager can only curate via a
   blocklist (currently Bioconductor). The blocklist file lists every
