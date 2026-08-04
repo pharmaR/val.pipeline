@@ -7,7 +7,8 @@
 write_qualified_pkg_lists(
   qual_metadata,
   out_dir,
-  qualified_decision = pull_config(val = "decisions_lst", rule_type = "default")[1]
+  qualified_decision = pull_config(val = "decisions_lst", rule_type = "default")[1],
+  blocklist_sources = pull_config(val = "blocklist_sources", rule_type = "default")
 )
 }
 \arguments{
@@ -22,11 +23,19 @@ Created (recursively) if it doesn't yet exist.}
 \item{qualified_decision}{Character(1). The \code{final_decision} value
 that marks a package as qualified for the validated repo. Defaults
 to the lowest-risk decision from the config (typically \code{"Low"}).}
+
+\item{blocklist_sources}{Character. Names of repo sources (matching
+values in the \code{repo_name} column) that should be emitted as
+\verb{blocklist-<source>.txt} files (assessed pkgs whose
+\code{final_decision} is NOT \code{qualified_decision}) instead of
+\verb{qualified-<source>.txt}. Defaults to the value of
+\code{blocklist_sources} in \code{inst/config.yml} (currently \code{c("BioC")}).
+Pass \code{character()} to force allow-list output for every source.}
 }
 \value{
 Invisibly, a named character vector: names are the source
 labels (e.g. \code{"CRAN"}, \code{"BioC"}), values are the absolute paths of
-the text files written. Empty if no qualified packages exist.
+the text files written. Empty if there was nothing to write.
 }
 \description{
 Given a \code{qual_metadata} data frame (typically the object saved by
@@ -40,6 +49,17 @@ column produced by \code{\link[=val_pkg]{val_pkg()}} -- typically \code{CRAN}, \
 a single \code{github} bucket by \code{\link[=get_repo_origin]{get_repo_origin()}}).
 }
 \details{
+Sources listed in \code{blocklist_sources} are inverted: instead of
+\verb{qualified-<source>.txt}, the helper writes
+\verb{blocklist-<source>.txt} containing every \emph{assessed} package from
+that source whose \code{final_decision} is NOT \code{qualified_decision} (or
+is missing). This is intended for repo sources where Posit Package
+Manager only supports blocklists (i.e. it mirrors the upstream
+source wholesale and lets the operator list packages to exclude),
+not curated allow-lists. Bioconductor is the current example;
+GitHub can be added the same way if PPM ever gains the same
+restriction there.
+
 These files are intended to be consumed as source configurations for
 the "validated" repository provisioned into a Posit Package Manager
 (PPM) instance in a GxP environment. Because PPM's source-file
@@ -51,6 +71,9 @@ Rows whose \code{repo_name} is \code{NA} or \code{"unknown"} are folded into a
 single \code{qualified-NA.txt} file so no qualified package ever silently
 drops out of provisioning. An informative message is emitted so an
 operator can investigate and re-route those packages if needed.
+(Unknown rows are never routed to a blocklist file even when
+\code{"NA"} appears in \code{blocklist_sources} — a source that couldn't be
+resolved can't be safely inverted into "block everything except".)
 
 If \code{qual_metadata} predates the \code{repo_name} column (i.e. was
 produced by an older \code{val_build()}), the helper will reverse-engineer
@@ -61,4 +84,3 @@ repo resolves to \code{"unknown"} and lands in \code{qualified-NA.txt}. If
 neither \code{repo_name} nor \code{repos} is present the helper errors -- the
 source of every qualified package can't be recovered from thin air.
 }
-\keyword{internal}

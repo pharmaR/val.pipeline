@@ -1798,6 +1798,17 @@ format_runtime_seconds <- function(secs) {
 #' `github` (every non-CRAN/BioC github-hosted source is normalised to
 #' a single `github` bucket by [get_repo_origin()]).
 #'
+#' Sources listed in `blocklist_sources` are inverted: instead of
+#' `qualified-<source>.txt`, the helper writes
+#' `blocklist-<source>.txt` containing every *assessed* package from
+#' that source whose `final_decision` is NOT `qualified_decision` (or
+#' is missing). This is intended for repo sources where Posit Package
+#' Manager only supports blocklists (i.e. it mirrors the upstream
+#' source wholesale and lets the operator list packages to exclude),
+#' not curated allow-lists. Bioconductor is the current example;
+#' GitHub can be added the same way if PPM ever gains the same
+#' restriction there.
+#'
 #' These files are intended to be consumed as source configurations for
 #' the "validated" repository provisioned into a Posit Package Manager
 #' (PPM) instance in a GxP environment. Because PPM's source-file
@@ -1809,6 +1820,9 @@ format_runtime_seconds <- function(secs) {
 #' single `qualified-NA.txt` file so no qualified package ever silently
 #' drops out of provisioning. An informative message is emitted so an
 #' operator can investigate and re-route those packages if needed.
+#' (Unknown rows are never routed to a blocklist file even when
+#' `"NA"` appears in `blocklist_sources` — a source that couldn't be
+#' resolved can't be safely inverted into "block everything except".)
 #'
 #' If `qual_metadata` predates the `repo_name` column (i.e. was
 #' produced by an older `val_build()`), the helper will reverse-engineer
@@ -1828,23 +1842,34 @@ format_runtime_seconds <- function(secs) {
 #' @param qualified_decision Character(1). The `final_decision` value
 #'   that marks a package as qualified for the validated repo. Defaults
 #'   to the lowest-risk decision from the config (typically `"Low"`).
+#' @param blocklist_sources Character. Names of repo sources (matching
+#'   values in the `repo_name` column) that should be emitted as
+#'   `blocklist-<source>.txt` files (assessed pkgs whose
+#'   `final_decision` is NOT `qualified_decision`) instead of
+#'   `qualified-<source>.txt`. Defaults to the value of
+#'   `blocklist_sources` in `inst/config.yml` (currently `c("BioC")`).
+#'   Pass `character()` to force allow-list output for every source.
 #'
 #' @return Invisibly, a named character vector: names are the source
 #'   labels (e.g. `"CRAN"`, `"BioC"`), values are the absolute paths of
-#'   the text files written. Empty if no qualified packages exist.
+#'   the text files written. Empty if there was nothing to write.
 #'
-#' @keywords internal
+#' @export
 write_qualified_pkg_lists <- function(
     qual_metadata,
     out_dir,
     qualified_decision = pull_config(val = "decisions_lst",
-                                     rule_type = "default")[1]
+                                     rule_type = "default")[1],
+    blocklist_sources = pull_config(val = "blocklist_sources",
+                                    rule_type = "default")
 ) {
   stopifnot(
     is.data.frame(qual_metadata),
     is.character(out_dir), length(out_dir) == 1L, nzchar(out_dir),
     is.character(qualified_decision), length(qualified_decision) == 1L
   )
+  if (is.null(blocklist_sources)) blocklist_sources <- character()
+  stopifnot(is.character(blocklist_sources))
 
   # Hard requirements -- no way to reverse-engineer these two.
   hard_required <- c("pkg", "final_decision")
@@ -1899,43 +1924,68 @@ write_qualified_pkg_lists <- function(
     dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
   }
 
-  qualified <- qual_metadata[
-    !is.na(qual_metadata$final_decision) &
-      qual_metadata$final_decision == qualified_decision,
-    , drop = FALSE
-  ]
+  # Normalize repo_name on the FULL frame up front so that both the
+  # qualified (allow-list) and blocklist paths see the same source
+  # labels. Unknown/NA rows are folded into a single "NA" bucket; they
+  # can only ever land in qualified-NA.txt — never in a blocklist file,
+  # because a source we couldn't identify can't be safely inverted
+  # into "block everything except".
+  unknown_rows <- is.na(qual_metadata$repo_name) |
+    tolower(qual_metadata$repo_name) == "unknown"
+  qual_metadata$repo_name[unknown_rows] <- "NA"
 
-  if (nrow(qualified) == 0L) {
-    message("No qualified packages found (final_decision == '",
-            qualified_decision, "'); no files written.")
-    return(invisible(character(0)))
-  }
+  is_qualified <- !is.na(qual_metadata$final_decision) &
+    qual_metadata$final_decision == qualified_decision
 
-  unknown_rows <- is.na(qualified$repo_name) |
-    tolower(qualified$repo_name) == "unknown"
-  if (any(unknown_rows)) {
-    unknown_pkgs <- qualified$pkg[unknown_rows]
+  qualified <- qual_metadata[is_qualified, , drop = FALSE]
+
+  # Report unknown-source rows the same way we did before: only the
+  # qualified ones need to be triaged manually (they'd otherwise be
+  # silently dropped from provisioning).
+  unknown_qualified <- qualified$repo_name == "NA"
+  if (any(unknown_qualified)) {
+    unknown_pkgs <- qualified$pkg[unknown_qualified]
     message(
       "Routing ", length(unknown_pkgs),
       " qualified pkg(s) with unknown repo_name to 'qualified-NA.txt': ",
       paste(unknown_pkgs, collapse = ", ")
     )
-    # Fold NA and 'unknown' into a single 'NA' bucket so nothing is
-    # dropped from provisioning -- the operator can then triage
-    # qualified-NA.txt manually.
-    qualified$repo_name[unknown_rows] <- "NA"
   }
 
+  # Every source that appears anywhere in qual_metadata is a candidate
+  # for output. Blocklist sources always write a file (even if empty of
+  # non-qualified pkgs, we still create it so downstream PPM
+  # provisioning has a stable filename to consume). Allow-list sources
+  # only write when there's at least one qualified pkg.
+  #
+  # Unknown-source rows never produce a blocklist file — the "NA"
+  # bucket is allow-list-only.
+  all_sources <- sort(unique(qual_metadata$repo_name))
   written <- character(0)
-  for (src in sort(unique(qualified$repo_name))) {
-    pkgs <- sort(unique(qualified$pkg[qualified$repo_name == src]))
-    out_file <- file.path(out_dir, paste0("qualified-", src, ".txt"))
+  for (src in all_sources) {
+    src_rows <- qual_metadata$repo_name == src
+    if (src %in% blocklist_sources && src != "NA") {
+      pkgs <- sort(unique(qual_metadata$pkg[src_rows & !is_qualified]))
+      out_file <- file.path(out_dir, paste0("blocklist-", src, ".txt"))
+      label <- "blocklisted"
+    } else {
+      pkgs <- sort(unique(qual_metadata$pkg[src_rows & is_qualified]))
+      out_file <- file.path(out_dir, paste0("qualified-", src, ".txt"))
+      label <- "qualified"
+    }
+    if (length(pkgs) == 0L && label == "qualified") next
     writeLines(pkgs, con = out_file)
     written[[src]] <- normalizePath(out_file, winslash = "/",
                                     mustWork = TRUE)
-    val_msg(paste0("--> Wrote ", length(pkgs), " qualified '", src,
+    val_msg(paste0("--> Wrote ", length(pkgs), " ", label, " '", src,
                    "' pkg(s) to ", out_file, "\n"),
             min_level = "normal")
+  }
+
+  if (length(written) == 0L) {
+    message("No qualified packages found (final_decision == '",
+            qualified_decision, "'); no files written.")
+    return(invisible(character(0)))
   }
 
   invisible(written)
