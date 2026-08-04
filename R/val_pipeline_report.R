@@ -318,11 +318,33 @@ val_pipeline_report <- function(
     pipeline_runtime = runtime_str
   )
 
-  quarto::quarto_render(
-    input = qmd_path,
-    output_format = quarto_formats,
-    execute_params = execute_params,
-    quiet = quiet
+  # Quarto spawns a child Rscript for the render. If that child sees an
+  # active renv project (via RENV_PROJECT, an activated renv/activate.R
+  # inherited from the parent session, or an .Rprofile it happens to
+  # walk into), it tries to `Bootstrapping renv 1.x.x` and then
+  # `Download renv` from every configured repo. On air-gapped PPM
+  # hosts, that download hits e.g.
+  # `https://bioconductor.org/packages/3.22/bioc/src/contrib/PACKAGES`,
+  # fails, and takes the whole render down with a confusing
+  # `unable to access index for repository` error that has nothing to
+  # do with the report itself.
+  #
+  # Fix: disable renv's autoloader and drop RENV_PROJECT for the child
+  # process. The Quarto child still inherits the parent's `.libPaths()`
+  # (Rscript honors R_LIBS_* etc.), so val.pipeline + all its imports
+  # remain visible from within the .qmd chunks -- we're just skipping
+  # the useless bootstrap step. See #95.
+  withr::with_envvar(
+    c(
+      RENV_CONFIG_AUTOLOADER_ENABLED = "FALSE",
+      RENV_PROJECT = NA
+    ),
+    quarto::quarto_render(
+      input = qmd_path,
+      output_format = quarto_formats,
+      execute_params = execute_params,
+      quiet = quiet
+    )
   )
 
   # Quarto writes outputs next to the .qmd. Collect and move them.

@@ -1,3 +1,21 @@
+# val.pipeline 0.1.18
+
+- Fix `val_pipeline_report()` failing on air-gapped PPM hosts with
+  `Error running quarto CLI from R. ... unable to access index for
+  repository https://bioconductor.org/packages/.../PACKAGES`. The
+  Quarto CLI spawns a child Rscript for the render, which was
+  inheriting the parent session's renv activation (`RENV_PROJECT`
+  and/or an activated `renv/activate.R`) and trying to
+  `Bootstrapping renv 1.x.x` -> `Download renv` from every configured
+  repo. On offline hosts the BioC repo download failed and took the
+  whole report render down. `val_pipeline_report()` now wraps the
+  `quarto::quarto_render()` call in `withr::with_envvar()` that sets
+  `RENV_CONFIG_AUTOLOADER_ENABLED=FALSE` and unsets `RENV_PROJECT`
+  for the child process. The Quarto child still inherits the
+  parent's `.libPaths()`, so val.pipeline + its imports remain
+  visible from inside the .qmd; we're just skipping the useless
+  bootstrap step. (#95)
+
 # val.pipeline 0.1.17
 
 - Export `write_qualified_pkg_lists()` so operators can regenerate the

@@ -583,3 +583,63 @@ test_that("val_pipeline_report includes Downloads (1yr) row from primary_risk_ca
   expect_true(grepl("Downloads (1yr)", html, fixed = TRUE))
   expect_false(grepl("primary_risk_category", html, fixed = TRUE))
 })
+
+
+test_that("val_pipeline_report disables renv autoloader for the quarto subprocess", {
+  # Regression for #95: the Quarto CLI spawns a child Rscript which,
+  # if it sees an active renv project (RENV_PROJECT env var or an
+  # inherited renv/activate.R), tries to Bootstrap+Download renv from
+  # every configured repo. On air-gapped PPM hosts that fails against
+  # https://bioconductor.org/... and takes the render down. We mask
+  # `quarto_render` in the val.pipeline namespace, capture the env
+  # vars visible from inside that call, and assert the guard is in
+  # place.
+  skip_if_no_quarto()
+
+  qm_path <- withr::local_tempfile(fileext = ".rds")
+  saveRDS(make_fake_qual_metadata(), qm_path)
+
+  # Pre-seed a fake RENV_PROJECT so we can prove it gets cleared.
+  withr::local_envvar(
+    c(RENV_PROJECT = "/fake/renv/project",
+      RENV_CONFIG_AUTOLOADER_ENABLED = NA)
+  )
+
+  captured <- new.env(parent = emptyenv())
+  captured$RENV_PROJECT <- "not-captured-yet"
+  captured$RENV_CONFIG_AUTOLOADER_ENABLED <- "not-captured-yet"
+
+  local_mocked_bindings(
+    quarto_render = function(input, output_format, execute_params, quiet) {
+      captured$RENV_PROJECT <- Sys.getenv("RENV_PROJECT", unset = NA)
+      captured$RENV_CONFIG_AUTOLOADER_ENABLED <-
+        Sys.getenv("RENV_CONFIG_AUTOLOADER_ENABLED", unset = NA)
+      # Fabricate the expected output artifact so the caller doesn't
+      # emit an "expected rendered ... output was not produced" warning.
+      out <- file.path(dirname(input), "summary_template.html")
+      writeLines("<html></html>", out)
+      invisible(NULL)
+    },
+    .package = "quarto"
+  )
+
+  suppressWarnings(
+    val_pipeline_report(
+      qual_metadata_path = qm_path,
+      qual_assessments_path = NA,
+      format = "html",
+      quiet = TRUE
+    )
+  )
+
+  # Inside the quarto_render call, RENV_PROJECT should be unset (NA)
+  # and RENV_CONFIG_AUTOLOADER_ENABLED should be FALSE, regardless of
+  # what the parent session had set.
+  expect_true(is.na(captured$RENV_PROJECT))
+  expect_identical(captured$RENV_CONFIG_AUTOLOADER_ENABLED, "FALSE")
+
+  # And withr should have restored the parent state after the call.
+  expect_identical(Sys.getenv("RENV_PROJECT"), "/fake/renv/project")
+  expect_identical(Sys.getenv("RENV_CONFIG_AUTOLOADER_ENABLED", unset = NA),
+                   NA_character_)
+})
