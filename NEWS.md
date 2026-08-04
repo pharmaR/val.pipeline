@@ -1,3 +1,16 @@
+# val.pipeline 0.1.19
+
+- Add `val_timings_summary()`: exported standalone analysis helper for
+  the `timings.csv` file that `val_build()` writes per run (#87).
+  Accepts a path to `timings.csv`, a run directory that contains one,
+  or a data frame already read into R, and returns a list of three
+  tibbles — `per_pkg` (total wall time per package), `per_phase`
+  (total / mean / median / p95 / n_pkgs across packages), and `wide`
+  (one row per package, one column per phase). Prints a compact
+  top-N summary at the console when called interactively. Independent
+  of `val_pipeline()` state: point it at any completed run's
+  artifacts and go. (#97)
+
 # val.pipeline 0.1.18
 
 - Fix `val_pipeline_report()` failing on air-gapped PPM hosts with
