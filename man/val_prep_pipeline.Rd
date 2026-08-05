@@ -9,6 +9,8 @@ val_prep_pipeline(
   metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
   deps = c("depends", "suggests")[1],
   deps_recursive = TRUE,
+  rev_deps = NULL,
+  rev_deps_recursive = FALSE,
   val_date = Sys.Date(),
   out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
   opt_repos = c(CRAN = "https://packagemanager.posit.co/cran/latest", BioC =
@@ -33,6 +35,21 @@ are "source" or "remote".}
 
 \item{deps_recursive}{Logical. Whether to consider dependencies recursively.
 Default is TRUE.}
+
+\item{rev_deps}{Character or NULL. Types of \strong{reverse} dependencies
+to fold into the seed set before forward-dep expansion runs.
+Same shorthand as \code{deps} (\code{"depends"} = Depends/Imports/LinkingTo,
+\code{"suggests"} = Suggests, \code{c("depends","suggests")} = both). \code{NULL}
+(default) preserves the pre-#105 behaviour of no rev-dep
+expansion. Use this when re-assessing a remediated package (e.g.
+\code{duckdb} flipped from High to Low) so every pkg that previously
+failed \emph{because} it depended on that pkg is re-assessed too.}
+
+\item{rev_deps_recursive}{Logical. Whether reverse-dep expansion
+walks the whole transitive tree. Default is \code{FALSE} because
+rev-dep trees explode fast (a foundational pkg like \code{Rcpp} has
+thousands of transitive dependents); flip to \code{TRUE} deliberately.
+Ignored when \code{rev_deps = NULL}.}
 
 \item{val_date}{Date. The date for validation. Default is the current date.}
 
