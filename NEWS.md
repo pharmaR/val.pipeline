@@ -1,3 +1,21 @@
+# val.pipeline 0.1.21
+
+- Fixed a latent scope bug in `val_build()`'s dep-driven decision
+  propagation loop that caused it to spin forever on any cohort
+  large enough to actually need >1 iteration of `reject_iteration()`.
+  The loop's body used `<<-` to update its `failed` and `pkgs_df`
+  locals, which — inside a top-level function — skipped the local
+  frame and assigned into the enclosing lexical scope, leaving both
+  locals stuck at their iter-1 values and the loop condition
+  perpetually `TRUE`. Latent because small dev cohorts converge on
+  iteration 1, so the bug never fired in tests; a 1422-package run
+  surfaced it via `val_finalize()`'s new propagation messaging.
+  Changed both to local `<-`; added a regression test that runs a
+  3-package dependency chain (X ← Y ← Z) requiring exactly 2
+  propagation passes and hard-caps the loop at 10 iterations so a
+  re-introduction of the bug fails testthat instead of hanging CI.
+  (#103)
+
 # val.pipeline 0.1.20
 
 - `val_build()` and `val_pipeline()` now mirror the parent R session's
