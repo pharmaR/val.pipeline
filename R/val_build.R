@@ -104,6 +104,24 @@
 #'   out when an operator needs the child library search to stay
 #'   isolated from the parent for some reason. See #99.
 #'
+#' @param finalize Logical(1). When `TRUE` (default), automatically
+#'   calls [val_finalize()] on the run directory once every package
+#'   has been assessed, so `qual_assessments.rds`, `qual_metadata.rds`,
+#'   `timings.csv`, and the per-package `_meta.rds` decision
+#'   propagation all land on disk before `val_build()` returns
+#'   (matches pre-0.1.21 behaviour). When `FALSE`, `val_build()`
+#'   returns as soon as the per-package assessment loop finishes and
+#'   the collated artifacts must be produced by a separate
+#'   `val_finalize(val_dir)` call. Use `FALSE` when the assessment
+#'   loop is expensive enough that you want an explicit checkpoint,
+#'   when you plan to iterate on decision logic against a fixed
+#'   assessment corpus, or when you're recovering from an environment
+#'   that hangs at the collation step (see #101). Note that the
+#'   Posit Package Manager provisioning files
+#'   (`qualified-<src>.txt` / `blocklist-<src>.txt`) and the summary
+#'   report are never produced by `val_build()` regardless of this
+#'   flag — those are always [val_pipeline()]-scope concerns.
+#'
 #' @export
 #' 
 val_build <- function(
@@ -122,7 +140,8 @@ val_build <- function(
     prep = NULL,
     config_path = NULL,
     workers = 1L,
-    propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE)
+    propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE),
+    finalize = TRUE
     ){
   
   #
@@ -156,6 +175,7 @@ val_build <- function(
   if (length(workers) != 1L || is.na(workers) || workers < 1L) {
     stop("`workers` must be a single positive integer.", call. = FALSE)
   }
+  stopifnot(is.logical(finalize), length(finalize) == 1L, !is.na(finalize))
   apply_verbose(verbose)
   configure_bioc_repositories_if_requested(quiet = TRUE)
   configure_riskmetric_offline_if_requested(quiet = TRUE)
@@ -551,217 +571,38 @@ val_build <- function(
           "of which were avoided due to a dependency failing it's risk assessment.\n",
           min_level = "minimal")
 
-  
-  
-  
   #
-  # ---- Collate Assessment files into DF ----
+  # ---- Collation ----
   #
-  
-  # # Start bundling rds files
-  record_files <- list.files(assessed, pattern = "_assess_record.rds$")
-  record_length <- record_files |> length() # assessment file count
-  # NB: pass the whole list to `dplyr::bind_rows()` in one call rather than
-  # `purrr::reduce(bind_rows)`. Reducing is O(n^2) (the growing accumulator is
-  # copied on every step) and dominates wall-clock on ~1000+ pkg runs; a single
-  # `bind_rows(list_of_frames)` is O(n). Empty-input guard preserves the prior
-  # behaviour where `purrr::reduce(list(), bind_rows)` errored: we now stop()
-  # with an actionable message instead of silently writing an empty RDS. #69.
-  if (record_length == 0L) {
-    stop("No `_assess_record.rds` files found under ", assessed,
-         " to collate into `qual_assessments.rds`.", call. = FALSE)
-  }
-  assessment_bundle <- purrr::map(record_files, function(file){
-    # file <- record_files[1] # for debugging
-    readRDS(file.path(assessed, file))
-  }) |>
-    dplyr::bind_rows()
-  qual_assessments_file <- file.path(val_dir, "qual_assessments.rds")
-  saveRDS(assessment_bundle, qual_assessments_file)
-  val_msg(paste0("\n--> Saved assessment records to ",
-                 qual_assessments_file, "\n"),
-          min_level = "minimal")
-  # Release the (multi-hundred-MB on large cohorts) assessment_bundle
-  # before we start reading _meta.rds files back into memory. Prior
-  # behaviour held this alongside pkg_bundles and pkgs_df0 for the
-  # remainder of val_build(), spiking peak RSS. See #91.
-  rm(assessment_bundle)
-  invisible(gc(verbose = FALSE))
-
-
-  #
-  # ---- Collate Pkg Meta into DF ----
-  #
-  # Stream `_meta.rds` files one at a time and derive both the
-  # `pkgs_df0` tibble rows AND the per-phase `timings_df` rows in a
-  # single disk pass. Peak memory during collation is O(1 bundle +
-  # accumulated 1-row tibbles) instead of O(all bundles), which cuts
-  # ~1-3 GB off the RSS ceiling on full CRAN+BioC runs. See #91.
-  meta_files <- list.files(assessed, pattern = "_meta.rds$")
-  if (length(meta_files) == 0L) {
-    stop("No `_meta.rds` files found under ", assessed,
-         " to collate into `qual_metadata0.rds`.", call. = FALSE)
+  # As of #101 the collation tail (assessment/meta bundling, dep-driven
+  # decision propagation via reject_iteration(), and timings.csv) lives in
+  # val_finalize() so callers can recover from a val_build() that hangs or
+  # is killed after the per-package assessment loop finishes but before
+  # collation completes. Default is TRUE to preserve pre-0.1.21 behaviour;
+  # ad-hoc / two-phase callers pass `finalize = FALSE` and run
+  # `val_finalize(val_dir)` themselves. Note we deliberately skip the
+  # PPM provisioning files + summary report here — those are always
+  # val_pipeline()-scope; val_build() only owns the collation half.
+  if (isTRUE(finalize)) {
+    val_finalize(
+      val_dir               = val_dir,
+      deps                  = deps,
+      val_start             = val_start,
+      write_qualified_lists = FALSE,
+      render_report         = FALSE,
+      verbose               = verbose,
+      config_path           = config_path
+    )
+  } else {
+    val_msg(paste0("\n--> Skipped collation (finalize = FALSE). Run ",
+                   "val_finalize(\"", val_dir,
+                   "\") to collate assessments and propagate decisions.\n"),
+            min_level = "normal")
   }
 
-  pkgs_df0_rows <- vector("list", length(meta_files))
-  timings_rows  <- vector("list", length(meta_files))
-  for (i in seq_along(meta_files)) {
-    bundle <- readRDS(file.path(assessed, meta_files[[i]]))
-    # Peel off timings before list_flatten so the phase names don't
-    # explode into per-column entries in the pkgs_df0 tibble.
-    tmap <- bundle[["timings"]]
-    bundle[["timings"]] <- NULL
-
-    x <- purrr::list_flatten(bundle)
-    x$depends  <- list(x$depends)
-    x$suggests <- list(x$suggests)
-    x$rev_deps <- list(x$rev_deps)
-    x$sys_info <- list(x$sys_info)
-    pkgs_df0_rows[[i]] <- dplyr::as_tibble(x)
-
-    if (!is.null(tmap) && length(tmap) > 0L) {
-      pkg_name <- bundle[["pkg"]]
-      ver_val  <- bundle[["ver"]]
-      if (is.null(ver_val)) ver_val <- NA_character_
-      timings_rows[[i]] <- purrr::imap(tmap, function(secs, phase) {
-        data.frame(
-          pkg     = pkg_name,
-          ver     = as.character(ver_val),
-          phase   = phase,
-          seconds = as.numeric(secs),
-          stringsAsFactors = FALSE
-        )
-      }) |> purrr::list_rbind()
-    }
-    rm(bundle)
-  }
-  pkgs_df0 <- dplyr::bind_rows(pkgs_df0_rows)
-  rm(pkgs_df0_rows)
-  
-  
-  # Interim snapshot BEFORE dependency-based decision propagation runs.
-  # Kept as a separate file (qual_metadata0.rds) so the pre-propagation state
-  # remains inspectable for debugging decision-graph issues. The final
-  # qual_metadata.rds is written after reject_iteration() converges (below).
-  qual_metadata0_file <- file.path(val_dir, "qual_metadata0.rds")
-  saveRDS(pkgs_df0, qual_metadata0_file)
-  val_msg(paste0("\n--> Saved interim pkg metadata to ",
-                 qual_metadata0_file, "\n"),
-          min_level = "minimal")
-  
-  
-  
-  val_msg("\n--> Collated pkg metadata.\n", min_level = "normal")
-  
-  #
-  # ---- Update final decisions ----
-  #
-  
-  # We need to be able to change 'final' decisions (recursively) if a package's
-  # dependency doesn't pass. That means, All the packages where decision is NOT
-  # marked "Low" need to have their decision matriculate up through their
-  # reverse dependencies (rev_deps).
-  
-  # Steps:
-  # 1. identify all packages that are NOT "Low Risk"
-  # 2. identify all packages that depend on those packages
-  # 3. change their decision the decision of their dependency
-  
-  # pkgs_df0$decision[1] <- "High" # for debugging
-  # reject_iteration() lives in R/utils.R so it is unit-testable in isolation.
-  # First iteration:
-  # Based off of 'decision', not 'final_decision'
-  dec_reject <- decisions[length(decisions)]
-  failed <- pkgs_df0$pkg[pkgs_df0$decision != decisions[1]] # start w/ 'decision'
-  pkgs_df <- reject_iteration(pkgs_df0, dec_reject, deps, decisions, failed)
-  
-  # All remaining iterations!
-  while(!identical(pkgs_df$pkg[pkgs_df$final_decision != decisions[1]], failed)) {
-    # if the list of failed pkgs has changed, then we need to iterate again
-    failed <<- pkgs_df$pkg[pkgs_df$final_decision != decisions[1]]
-    pkgs_df <<- reject_iteration(pkgs_df, dec_reject, deps, decisions, failed)
-  }
-  
-  val_msg("\n--> Assigned 'final' decisions.\n", min_level = "minimal")
-  
-  # Save the final qualification frame BEFORE the per-package meta RDS
-  # update walk below. Prior versions saved this at the very end of val_build(),
-  # which meant any error inside the walk would leave qual_metadata.rds as the
-  # interim pkgs_df0 snapshot (final_decision NA for every val_pkg()-assessed
-  # row). See #53.
-  saveRDS(pkgs_df, file.path(val_dir, "qual_metadata.rds"))
-  val_msg(paste0("\n--> Saved qualification evidence to ",
-                 file.path(val_dir, "qual_metadata.rds"), "\n"),
-          min_level = "minimal")
-  
-  
-  
-  
-  #
-  # ---- Update pkg_meta RDS file ----
-  #
-  # Which packges had a decision change?
-  changed_pkgs <-
-    pkgs_df |>
-    dplyr::filter(final_decision != decision)
-
-  purrr::pwalk(
-    list(changed_pkgs$pkg, changed_pkgs$ver, changed_pkgs$final_decision_reason_note),
-    function(pkg, ver, note){
-    # i <- 1 # for debugging
-    # pkg <- changed_pkgs$pkg[i] # for debugging
-    # ver <- changed_pkgs$ver[i] # for debugging
-    pkg_v <- paste(pkg, ver, sep = "_")
-    pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
-    pkg_meta_file <- pkg_meta_file[file.exists(pkg_meta_file)]
-    if(length(pkg_meta_file) > 0) {
-      # update the decision of each reverse dependency pkg
-      purrr::walk(pkg_meta_file, function(f){
-        dep_meta <- readRDS(f)
-        dep_meta$final_decision_reason <- "Dependency"
-        dep_meta$final_decision_reason_note <- note
-        dep_meta$final_decision <- decisions[length(decisions)]
-        saveRDS(dep_meta, f)
-        val_msg(paste0("\n\n--> Updated ", dep_meta$pkg, " v", dep_meta$ver," from '", dep_meta$decision,"' to '", dep_meta$final_decision,"' in meta bundle .rds.\n"),
-                min_level = "verbose")
-      })
-    }
-  })
-  
-  val_msg("\n--> Updated", nrow(changed_pkgs),"pkg metadata files.\n",
-          min_level = "normal")
-  
-  #
-  # ---- Aggregate per-package timings ----
-  #
-  # Timings rows were built in the same disk-streaming pass that
-  # produced `pkgs_df0` (see the "Collate Pkg Meta into DF" block
-  # above). Here we simply flatten them into one long data.frame and
-  # write it as `timings.csv` under val_dir for later profiling
-  # analysis. Skipped pkgs (dep-skip pre-filter) contribute zero rows.
-  # See #87 for the timings feature and #91 for the disk-streaming
-  # collation that folded this into a single pass.
-  timings_df <- purrr::list_rbind(purrr::compact(timings_rows))
-  rm(timings_rows)
-  
-  if (nrow(timings_df) > 0L) {
-    timings_file <- file.path(val_dir, "timings.csv")
-    utils::write.csv(timings_df, timings_file, row.names = FALSE)
-    val_msg(paste0("\n--> Wrote per-phase timings for ",
-                   length(unique(timings_df$pkg)), " pkg(s) to ",
-                   timings_file, "\n"),
-            min_level = "minimal")
-  }
-  
-  val_end <- Sys.time()
-  val_end_txt <- utils::capture.output(val_end - val_start)
-  val_msg("\n--> Build", val_end_txt,"\n", min_level = "minimal")
-  
-  # Return object 
+  # Return object
   return(list(
-    val_dir = val_dir#,
-    # pkg_meta = pkgs_df,
-    # pkg_assess = assessment_bundle
+    val_dir = val_dir
   ))
 }
 

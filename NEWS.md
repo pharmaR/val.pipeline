@@ -1,3 +1,23 @@
+# val.pipeline 0.1.21
+
+- Extracted the collation + wrap-up tail of `val_build()` into a new
+  exported [`val_finalize()`](R/val_finalize.R), so a run whose
+  per-package assessment loop finishes but whose collation step
+  hangs / OOMs / gets killed can now be recovered from a fresh R
+  session with `val_finalize("<val_dir>")` instead of re-running the
+  entire multi-hour assessment. `val_finalize()` bundles every
+  `_assess_record.rds` into `qual_assessments.rds`, streams every
+  `_meta.rds` into `qual_metadata0.rds` + `timings.csv`, runs
+  `reject_iteration()` to propagate dep-driven decisions, rewrites
+  the affected per-package `_meta.rds` files, and (optionally) emits
+  the Posit Package Manager provisioning files
+  (`qualified-<src>.txt` / `blocklist-<src>.txt`) plus the HTML +
+  PDF summary report. Both `val_build()` and `val_pipeline()` gained
+  a `finalize = TRUE` argument that controls whether the tail runs
+  inline (default; matches pre-0.1.21 behaviour) or whether the
+  caller wants to invoke `val_finalize()` themselves in a follow-up
+  step. (#101)
+
 # val.pipeline 0.1.20
 
 - `val_build()` and `val_pipeline()` now mirror the parent R session's

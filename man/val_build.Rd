@@ -19,7 +19,8 @@ val_build(
   prep = NULL,
   config_path = NULL,
   workers = 1L,
-  propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE)
+  propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE),
+  finalize = TRUE
 )
 }
 \arguments{
@@ -106,6 +107,24 @@ function exit. Defaults to
 option to \code{FALSE} (or pass \code{propagate_libpaths = FALSE}) to opt
 out when an operator needs the child library search to stay
 isolated from the parent for some reason. See #99.}
+
+\item{finalize}{Logical(1). When \code{TRUE} (default), automatically
+calls \code{\link[=val_finalize]{val_finalize()}} on the run directory once every package
+has been assessed, so \code{qual_assessments.rds}, \code{qual_metadata.rds},
+\code{timings.csv}, and the per-package \verb{_meta.rds} decision
+propagation all land on disk before \code{val_build()} returns
+(matches pre-0.1.21 behaviour). When \code{FALSE}, \code{val_build()}
+returns as soon as the per-package assessment loop finishes and
+the collated artifacts must be produced by a separate
+\code{val_finalize(val_dir)} call. Use \code{FALSE} when the assessment
+loop is expensive enough that you want an explicit checkpoint,
+when you plan to iterate on decision logic against a fixed
+assessment corpus, or when you're recovering from an environment
+that hangs at the collation step (see #101). Note that the
+Posit Package Manager provisioning files
+(\verb{qualified-<src>.txt} / \verb{blocklist-<src>.txt}) and the summary
+report are never produced by \code{val_build()} regardless of this
+flag — those are always \code{\link[=val_pipeline]{val_pipeline()}}-scope concerns.}
 }
 \value{
 A list containing:
