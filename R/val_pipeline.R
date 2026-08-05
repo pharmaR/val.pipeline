@@ -88,8 +88,26 @@
 #'   iterating on decision logic against a fixed assessment corpus,
 #'   or when recovering from an environment that hangs at the
 #'   collation step (see #101).
-#' @return A list containing the validation directory and a data frame of
-#'   package assessments.
+#' @return Invisibly, a named list carrying every argument a follow-up
+#'   [val_finalize()] call needs — `val_dir`, `deps`, `val_start`,
+#'   `n_candidates`, `config_path`, and `verbose`. When
+#'   `finalize = FALSE`, the caller drives finalization themselves in
+#'   a fresh session (or later in the same one) with either
+#'   `do.call(val_finalize, res)` or `val_finalize(res$val_dir, ...)`.
+#'   When `finalize = TRUE` (default) the same list is returned but the
+#'   finalized artifacts already live under `val_dir`.
+#'
+#' @examples
+#' \dontrun{
+#' # One-shot (pre-0.1.21 behaviour):
+#' val_pipeline()
+#'
+#' # Two-phase: run the assessment loop now, finalize later. Handy on
+#' # hosts where the collation step has been observed to hang (#101).
+#' res <- val_pipeline(finalize = FALSE)
+#' # ...in the same or a fresh R session:
+#' do.call(val_finalize, res)
+#' }
 #'
 #' @importFrom dplyr as_tibble filter pull select
 #' @importFrom tibble rownames_to_column
@@ -215,14 +233,34 @@ val_pipeline <- function(
       config_path  = config_path
     )
   } else {
-    val_msg(paste0("\n--> Skipped finalization (finalize = FALSE). Run ",
-                   "val_finalize(\"", outtie$val_dir,
-                   "\") to collate assessments, propagate decisions, ",
-                   "and render the summary report.\n"),
+    val_msg(paste0("\n--> Skipped finalization (finalize = FALSE). ",
+                   "Feed the return value straight into val_finalize():\n",
+                   "      res <- val_pipeline(..., finalize = FALSE)\n",
+                   "      do.call(val_finalize, res)\n",
+                   "    Or spell it out: val_finalize(\"",
+                   outtie$val_dir, "\", deps = \"", deps,
+                   "\", val_start = <POSIXct>, n_candidates = ",
+                   prep$n_candidates %||% "NULL", ").\n"),
             min_level = "normal")
   }
 
-  invisible(outtie)
+  # Return everything a follow-up val_finalize() call needs so that
+  # `do.call(val_finalize, val_pipeline(..., finalize = FALSE))` is a
+  # valid one-liner. val_start and n_candidates come from `prep`
+  # (whether we synthesised it via val_prep_pipeline() above or the
+  # caller supplied one) — no need to duplicate them onto val_pipeline()'s
+  # return surface, they're already the source of truth. Named to
+  # match val_finalize()'s formals so do.call() Just Works.
+  invisible(
+    list(
+      val_dir      = outtie$val_dir,
+      deps         = deps,
+      val_start    = val_start,
+      n_candidates = prep$n_candidates,
+      config_path  = config_path,
+      verbose      = verbose
+    )
+  )
 }
 
 

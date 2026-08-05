@@ -118,8 +118,14 @@ or when recovering from an environment that hangs at the
 collation step (see #101).}
 }
 \value{
-A list containing the validation directory and a data frame of
-package assessments.
+Invisibly, a named list carrying every argument a follow-up
+\code{\link[=val_finalize]{val_finalize()}} call needs — \code{val_dir}, \code{deps}, \code{val_start},
+\code{n_candidates}, \code{config_path}, and \code{verbose}. When
+\code{finalize = FALSE}, the caller drives finalization themselves in
+a fresh session (or later in the same one) with either
+\code{do.call(val_finalize, res)} or \code{val_finalize(res$val_dir, ...)}.
+When \code{finalize = TRUE} (default) the same list is returned but the
+finalized artifacts already live under \code{val_dir}.
 }
 \description{
 A pipeline to validate R packages using specific metrics and criteria,
@@ -129,4 +135,17 @@ reduction of a large set of packages delivered through various sources
 'exception' criteria. Then, it builds the assessment co-hort using
 val_build(), returning a qualified list of packages and all required evidence
 needed for provisioning to PPM.
+}
+\examples{
+\dontrun{
+# One-shot (pre-0.1.21 behaviour):
+val_pipeline()
+
+# Two-phase: run the assessment loop now, finalize later. Handy on
+# hosts where the collation step has been observed to hang (#101).
+res <- val_pipeline(finalize = FALSE)
+# ...in the same or a fresh R session:
+do.call(val_finalize, res)
+}
+
 }

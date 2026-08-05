@@ -127,14 +127,18 @@ report are never produced by \code{val_build()} regardless of this
 flag — those are always \code{\link[=val_pipeline]{val_pipeline()}}-scope concerns.}
 }
 \value{
-A list containing:
-\itemize{
-\item val_dir: The directory where the validation build results are stored.
-\item pkg_meta: A data frame summarizing the risk assessment results for all
-packages assessed, including their dependencies and final risk decisions.
-\item pkg_assess: A data frame containing detailed (\code{riskmetric}) assessment
-records for each package.
-}
+Invisibly, a named list carrying every argument a follow-up
+\code{\link[=val_finalize]{val_finalize()}} call needs — \code{val_dir}, \code{deps}, \code{val_start},
+\code{config_path}, and \code{verbose}. When \code{finalize = FALSE}, feed it
+into \code{do.call(val_finalize, res)} (or spell out
+\code{val_finalize(res$val_dir, ...)}) to complete the pipeline. When
+\code{finalize = TRUE} (default) the same list is returned but the
+collated artifacts already live under \code{val_dir}. Note the
+collated frames themselves (\code{qual_metadata.rds},
+\code{qual_assessments.rds}) are not carried on the return — read them
+off disk from \code{val_dir} when you need them; that keeps peak
+memory bounded and makes recovery from a fresh session identical
+to first-run behaviour.
 }
 \description{
 Build a risk assessment validation for a set of R packages from various

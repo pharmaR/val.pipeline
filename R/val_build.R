@@ -52,12 +52,18 @@
 #' @importFrom tools package_dependencies
 #' @importFrom utils available.packages capture.output
 #'
-#' @return A list containing:
-#' - val_dir: The directory where the validation build results are stored.
-#' - pkg_meta: A data frame summarizing the risk assessment results for all 
-#'   packages assessed, including their dependencies and final risk decisions.
-#' - pkg_assess: A data frame containing detailed (`riskmetric`) assessment
-#'   records for each package.
+#' @return Invisibly, a named list carrying every argument a follow-up
+#'   [val_finalize()] call needs — `val_dir`, `deps`, `val_start`,
+#'   `config_path`, and `verbose`. When `finalize = FALSE`, feed it
+#'   into `do.call(val_finalize, res)` (or spell out
+#'   `val_finalize(res$val_dir, ...)`) to complete the pipeline. When
+#'   `finalize = TRUE` (default) the same list is returned but the
+#'   collated artifacts already live under `val_dir`. Note the
+#'   collated frames themselves (`qual_metadata.rds`,
+#'   `qual_assessments.rds`) are not carried on the return — read them
+#'   off disk from `val_dir` when you need them; that keeps peak
+#'   memory bounded and makes recovery from a fresh session identical
+#'   to first-run behaviour.
 #'
 #' @param prep Optional `val_prep` object returned by
 #'   [val_prep_pipeline()]. When supplied, `val_build()` skips its own
@@ -600,9 +606,18 @@ val_build <- function(
             min_level = "normal")
   }
 
-  # Return object
+  # Return object. When `finalize = FALSE` the caller will drive
+  # val_finalize() themselves in a follow-up call, so surface every
+  # arg that val_finalize() needs — `val_start` for the wall-clock /
+  # pipeline_runtime, `deps` for dep-driven propagation — so that
+  # `do.call(val_finalize, val_build(..., finalize = FALSE))` is a
+  # valid one-liner. Names match val_finalize()'s formals.
   return(list(
-    val_dir = val_dir
+    val_dir     = val_dir,
+    deps        = deps,
+    val_start   = val_start,
+    config_path = config_path,
+    verbose     = verbose
   ))
 }
 
