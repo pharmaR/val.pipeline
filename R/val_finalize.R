@@ -210,6 +210,15 @@ val_finalize <- function(
 
   decisions <- pull_config(val = "decisions_lst", rule_type = "default")
 
+  # Top-level banner so an operator watching the log knows val_finalize()
+  # actually started and against which run directory.
+  val_msg(paste0("\n\n== val_finalize() @ ",
+                 format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"),
+                 " ==\n",
+                 "    val_dir: ", val_dir, "\n",
+                 "    deps:    ", (if (is.null(deps)) "<none>" else deps), "\n"),
+          min_level = "normal")
+
   #
   # ---- Collate Assessment files into DF ----
   #
@@ -218,14 +227,21 @@ val_finalize <- function(
     stop("No `_assess_record.rds` files found under ", assessed,
          " to collate into `qual_assessments.rds`.", call. = FALSE)
   }
+  val_msg(paste0("\n--> [1/5] Collating ", length(record_files),
+                 " `_assess_record.rds` file(s) into ",
+                 "qual_assessments.rds ...\n"),
+          min_level = "normal")
+  t_collate_assess <- Sys.time()
   assessment_bundle <- purrr::map(record_files, function(file){
     readRDS(file.path(assessed, file))
   }) |>
     dplyr::bind_rows()
   qual_assessments_file <- file.path(val_dir, "qual_assessments.rds")
   saveRDS(assessment_bundle, qual_assessments_file)
-  val_msg(paste0("\n--> Saved assessment records to ",
-                 qual_assessments_file, "\n"),
+  val_msg(paste0("    Saved ", nrow(assessment_bundle), " assessment record(s) to ",
+                 qual_assessments_file, " (",
+                 format(round(difftime(Sys.time(), t_collate_assess, units = "secs"), 1)),
+                 ").\n"),
           min_level = "minimal")
   rm(assessment_bundle)
   invisible(gc(verbose = FALSE))
@@ -238,6 +254,14 @@ val_finalize <- function(
     stop("No `_meta.rds` files found under ", assessed,
          " to collate into `qual_metadata0.rds`.", call. = FALSE)
   }
+  val_msg(paste0("\n--> [2/5] Streaming ", length(meta_files),
+                 " `_meta.rds` file(s) into qual_metadata0.rds ",
+                 "+ timings.csv ...\n"),
+          min_level = "normal")
+  t_collate_meta <- Sys.time()
+  # Progress crumbs every ~10% for large runs so a stalled read is
+  # obvious in the log. Bounded at 10 crumbs regardless of cohort size.
+  prog_every <- max(1L, floor(length(meta_files) / 10L))
 
   pkgs_df0_rows <- vector("list", length(meta_files))
   timings_rows  <- vector("list", length(meta_files))
@@ -267,6 +291,11 @@ val_finalize <- function(
         )
       }) |> purrr::list_rbind()
     }
+    if (i %% prog_every == 0L || i == length(meta_files)) {
+      val_msg(paste0("    read ", i, " / ", length(meta_files),
+                     " `_meta.rds` file(s)\n"),
+              min_level = "verbose")
+    }
     rm(bundle)
   }
   pkgs_df0 <- dplyr::bind_rows(pkgs_df0_rows)
@@ -274,28 +303,59 @@ val_finalize <- function(
 
   qual_metadata0_file <- file.path(val_dir, "qual_metadata0.rds")
   saveRDS(pkgs_df0, qual_metadata0_file)
-  val_msg(paste0("\n--> Saved interim pkg metadata to ",
-                 qual_metadata0_file, "\n"),
+  val_msg(paste0("    Saved interim pkg metadata (", nrow(pkgs_df0),
+                 " row(s)) to ", qual_metadata0_file, " (",
+                 format(round(difftime(Sys.time(), t_collate_meta, units = "secs"), 1)),
+                 ").\n"),
           min_level = "minimal")
-  val_msg("\n--> Collated pkg metadata.\n", min_level = "normal")
 
   #
   # ---- Update final decisions ----
   #
+  # reject_iteration() walks the dep graph propagating downgrades from
+  # every non-Low package to its reverse dependencies. Iterated until
+  # the failed-pkg set stops growing (fixed-point). Each iteration
+  # gets a crumb so a stalled propagation is obvious in the log.
+  val_msg("\n--> [3/5] Propagating dep-driven decisions ...\n",
+          min_level = "normal")
+  t_reject <- Sys.time()
+
   dec_reject <- decisions[length(decisions)]
-  failed <- pkgs_df0$pkg[pkgs_df0$decision != decisions[1]]
+  seed_failed <- pkgs_df0$pkg[pkgs_df0$decision != decisions[1]]
+  val_msg(paste0("    ", length(seed_failed), " pkg(s) start above '",
+                 decisions[1], "' (seed set for propagation).\n"),
+          min_level = "normal")
+
+  failed <- seed_failed
   pkgs_df <- reject_iteration(pkgs_df0, dec_reject, deps, decisions, failed)
+  iter <- 1L
+  n_after <- sum(pkgs_df$final_decision != decisions[1])
+  val_msg(paste0("    iter ", iter, ": ", n_after, " pkg(s) above '",
+                 decisions[1], "' after propagation (+",
+                 n_after - length(seed_failed), " vs. seed).\n"),
+          min_level = "normal")
 
   while (!identical(pkgs_df$pkg[pkgs_df$final_decision != decisions[1]],
                     failed)) {
     failed <<- pkgs_df$pkg[pkgs_df$final_decision != decisions[1]]
     pkgs_df <<- reject_iteration(pkgs_df, dec_reject, deps, decisions, failed)
+    iter <- iter + 1L
+    n_after <- sum(pkgs_df$final_decision != decisions[1])
+    val_msg(paste0("    iter ", iter, ": ", n_after, " pkg(s) above '",
+                   decisions[1], "' after propagation.\n"),
+            min_level = "normal")
   }
-  val_msg("\n--> Assigned 'final' decisions.\n", min_level = "minimal")
+  n_final <- sum(pkgs_df$final_decision != decisions[1])
+  val_msg(paste0("    Converged in ", iter, " iteration(s); final tally: ",
+                 nrow(pkgs_df) - n_final, " '", decisions[1], "', ",
+                 n_final, " non-'", decisions[1], "' (",
+                 format(round(difftime(Sys.time(), t_reject, units = "secs"), 1)),
+                 ").\n"),
+          min_level = "minimal")
 
   saveRDS(pkgs_df, file.path(val_dir, "qual_metadata.rds"))
-  val_msg(paste0("\n--> Saved qualification evidence to ",
-                 file.path(val_dir, "qual_metadata.rds"), "\n"),
+  val_msg(paste0("    Saved qualification evidence to ",
+                 file.path(val_dir, "qual_metadata.rds"), ".\n"),
           min_level = "minimal")
 
   #
@@ -303,6 +363,13 @@ val_finalize <- function(
   #
   changed_pkgs <- pkgs_df |>
     dplyr::filter(final_decision != decision)
+
+  val_msg(paste0("\n--> [4/5] Rewriting per-pkg `_meta.rds` for ",
+                 nrow(changed_pkgs), " pkg(s) whose decision changed ",
+                 "under dep propagation ...\n"),
+          min_level = "normal")
+  t_rewrite <- Sys.time()
+  n_rewritten <- 0L
 
   purrr::pwalk(
     list(changed_pkgs$pkg, changed_pkgs$ver,
@@ -318,28 +385,37 @@ val_finalize <- function(
           dep_meta$final_decision_reason_note <- note
           dep_meta$final_decision <- decisions[length(decisions)]
           saveRDS(dep_meta, f)
-          val_msg(paste0("\n\n--> Updated ", dep_meta$pkg, " v",
-                         dep_meta$ver, " from '", dep_meta$decision,
-                         "' to '", dep_meta$final_decision,
-                         "' in meta bundle .rds.\n"),
+          n_rewritten <<- n_rewritten + 1L
+          val_msg(paste0("    ", dep_meta$pkg, " v", dep_meta$ver,
+                         ": '", dep_meta$decision, "' -> '",
+                         dep_meta$final_decision, "'\n"),
                   min_level = "verbose")
         })
       }
     })
-  val_msg("\n--> Updated", nrow(changed_pkgs), "pkg metadata files.\n",
-          min_level = "normal")
+  val_msg(paste0("    Rewrote ", n_rewritten, " `_meta.rds` file(s) (",
+                 format(round(difftime(Sys.time(), t_rewrite, units = "secs"), 1)),
+                 ").\n"),
+          min_level = "minimal")
 
   #
   # ---- Aggregate per-package timings ----
   #
+  val_msg("\n--> [5/5] Aggregating per-phase timings ...\n",
+          min_level = "normal")
   timings_df <- purrr::list_rbind(purrr::compact(timings_rows))
   rm(timings_rows)
   if (nrow(timings_df) > 0L) {
     timings_file <- file.path(val_dir, "timings.csv")
     utils::write.csv(timings_df, timings_file, row.names = FALSE)
-    val_msg(paste0("\n--> Wrote per-phase timings for ",
-                   length(unique(timings_df$pkg)), " pkg(s) to ",
-                   timings_file, "\n"),
+    val_msg(paste0("    Wrote ", nrow(timings_df), " row(s) covering ",
+                   length(unique(timings_df$pkg)), " pkg(s) x ",
+                   length(unique(timings_df$phase)), " phase(s) to ",
+                   timings_file, ".\n"),
+            min_level = "minimal")
+  } else {
+    val_msg("    No timings data on `_meta.rds` bundles; skipping ",
+            "timings.csv.\n",
             min_level = "minimal")
   }
 
@@ -359,42 +435,72 @@ val_finalize <- function(
   qa_path <- file.path(val_dir, "qual_assessments.rds")
 
   if (isTRUE(write_qualified_lists) && file.exists(qm_path)) {
-    tryCatch(
+    val_msg("\n--> Writing PPM provisioning files ",
+            "(qualified-<src>.txt / blocklist-<src>.txt) ...\n",
+            min_level = "normal")
+    t_qual <- Sys.time()
+    tryCatch({
       write_qualified_pkg_lists(
         qual_metadata = readRDS(qm_path),
         out_dir = val_dir,
         qualified_decision = decisions[1]
-      ),
+      )
+      val_msg(paste0("    Done (",
+                     format(round(difftime(Sys.time(), t_qual, units = "secs"), 1)),
+                     ").\n"),
+              min_level = "minimal")
+    },
       error = function(e) {
         warning("write_qualified_pkg_lists() failed: ",
                 conditionMessage(e), call. = FALSE)
       }
     )
+  } else if (!isTRUE(write_qualified_lists)) {
+    val_msg("\n--> Skipping PPM provisioning files ",
+            "(write_qualified_lists = FALSE).\n",
+            min_level = "normal")
   }
 
   #
   # ---- Summary report ----
   #
   if (isTRUE(render_report) && file.exists(qm_path)) {
+    val_msg("\n--> Rendering summary report (HTML + PDF) ...\n",
+            min_level = "normal")
+    t_report <- Sys.time()
     pipeline_runtime <- if (!is.null(val_start)) {
       difftime(Sys.time(), val_start, units = "secs")
     } else {
       NA
     }
-    tryCatch(
+    tryCatch({
       val_pipeline_report(
         qual_metadata_path    = qm_path,
         qual_assessments_path = if (file.exists(qa_path)) qa_path else NA,
         out_dir               = val_dir,
         n_candidates          = n_candidates,
         pipeline_runtime      = pipeline_runtime
-      ),
+      )
+      val_msg(paste0("    Done (",
+                     format(round(difftime(Sys.time(), t_report, units = "secs"), 1)),
+                     ").\n"),
+              min_level = "minimal")
+    },
       error = function(e) {
         warning("val_pipeline_report() failed: ", conditionMessage(e),
                 call. = FALSE)
       }
     )
+  } else if (!isTRUE(render_report)) {
+    val_msg("\n--> Skipping summary report (render_report = FALSE).\n",
+            min_level = "normal")
   }
+
+  val_msg(paste0("\n== val_finalize() done @ ",
+                 format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"),
+                 " ==\n",
+                 "    Artifacts under: ", val_dir, "\n"),
+          min_level = "normal")
 
   invisible(list(val_dir = val_dir))
 }
