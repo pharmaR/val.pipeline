@@ -41,20 +41,24 @@ prep <- val_prep_pipeline(
   toml_local_repo = 'https://fake.test.com/local-r4.5-2026-07-21/', # new
   verbose         = 'normal'
 )
-
+names(prep)
+prep$val_start
 
 # Create qualified pkg data.frame
-qual <- val_pipeline(
-  workers         = workers,
-  ref             = ref,
-  metric_pkg      = metric_pkg,
-  deps            = deps,
-  deps_recursive  = deps_recursive,
-  val_date        = val_date,
-  out             = out,
-  opt_repos       = opt_repos,
-  verbose = 'minimal'
-)
+# qual <- val_pipeline(
+#   workers         = workers,
+#   ref             = ref,
+#   metric_pkg      = metric_pkg,
+#   deps            = deps,
+#   deps_recursive  = deps_recursive,
+#   val_date        = val_date,
+#   out             = out,
+#   opt_repos       = opt_repos,
+#   verbose = 'minimal'
+# )
+
+
+val_finalize(prep = prep)
 
 # 
 # Quick run

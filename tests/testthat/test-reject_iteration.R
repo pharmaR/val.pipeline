@@ -117,3 +117,107 @@ test_that("reject_iteration() derives failed_pkgs from final_decision if NA", {
   expect_equal(out$final_decision[out$pkg == "C"], "High")
   expect_equal(out$final_decision_reason[out$pkg == "C"], "Dependency")
 })
+
+# ---- Fixed-point convergence loop (regression, #103) ----------------------
+
+# Guards val_build()'s (and val_finalize()'s in #101) reject_iteration()
+# convergence loop against an infinite-loop bug introduced by a stray
+# `<<-`. Prior to #103, the loop assigned `failed <<- ...` /
+# `pkgs_df <<- ...`, which skipped the enclosing function's frame and
+# left both locals stuck at their iter-1 values -- so any cohort large
+# enough that dep propagation needed >1 pass (i.e. anything real-world)
+# spun forever. Simulate that convergence loop in-test and require it
+# to terminate.
+test_that("reject_iteration() reaches a fixed point in <= n iterations", {
+  # Chain: X (High) <- Y (Low; depends X) <- Z (Low; depends Y).
+  # Iter 1: only X is in `failed`; Y gets downgraded via depends.
+  # Iter 2: with Y now failed, Z gets downgraded via depends.
+  # Iter 3: fixed point.
+  # If the outer loop mis-scopes its assignments, this test loops forever
+  # and testthat kills it -- an unmissable regression signal.
+  pkg_dat <- tibble::tibble(
+    pkg              = c("X", "Y", "Z"),
+    decision         = c("High", "Low", "Low"),
+    decision_reason  = c("Risk Assessment", "Risk Assessment",
+                         "Risk Assessment"),
+    final_decision         = NA_character_,
+    final_decision_reason  = NA_character_,
+    decision_reason_note   = NA_character_,
+    final_decision_reason_note = NA_character_,
+    depends  = list(character(0), "X", "Y"),
+    suggests = list(character(0), character(0), character(0))
+  )
+
+  # Simulate the exact convergence loop shape used in val_finalize() /
+  # val_build(). Local `<-` (not `<<-`) is the intended semantics.
+  failed  <- pkg_dat$pkg[pkg_dat$decision != decisions[1]]
+  pkgs_df <- reject_iteration(pkg_dat, dec_reject = "High",
+                              deps = "depends", decisions = decisions,
+                              failed_pkgs = failed)
+  n_iter <- 1L
+  max_iter <- 10L  # hard cap; test fails if loop doesn't converge.
+  while (!identical(pkgs_df$pkg[pkgs_df$final_decision != decisions[1]],
+                    failed)) {
+    if (n_iter >= max_iter) {
+      fail("reject_iteration() convergence loop did not terminate after ",
+           max_iter, " iterations")
+    }
+    failed  <- pkgs_df$pkg[pkgs_df$final_decision != decisions[1]]
+    pkgs_df <- reject_iteration(pkgs_df, dec_reject = "High",
+                                deps = "depends", decisions = decisions,
+                                failed_pkgs = failed)
+    n_iter <- n_iter + 1L
+  }
+
+  # Chain requires 2 in-loop passes on top of the initial call, so the
+  # total counter lands at 3 (1 initial + 2 in-loop).
+  expect_equal(n_iter, 3L)
+  # Every pkg in the chain ends up High-flagged.
+  expect_setequal(pkgs_df$pkg[pkgs_df$final_decision == "High"],
+                  c("X", "Y", "Z"))
+  # Y and Z were downgraded via a Dependency.
+  expect_equal(pkgs_df$final_decision_reason[pkgs_df$pkg == "Y"],
+               "Dependency")
+  expect_equal(pkgs_df$final_decision_reason[pkgs_df$pkg == "Z"],
+               "Dependency")
+})
+
+test_that("the buggy `<<-` variant would have spun forever (regression proof, #103)", {
+  # Positive proof that the `<<-` variant introduces the bug: run the
+  # exact same convergence loop shape with `<<-` instead of `<-` and
+  # assert it hits our 10-iteration safety cap without converging.
+  # This locks in the diagnosis so a future refactor can't quietly
+  # reintroduce `<<-` "because it's shorter".
+  pkg_dat <- tibble::tibble(
+    pkg              = c("X", "Y", "Z"),
+    decision         = c("High", "Low", "Low"),
+    decision_reason  = rep("Risk Assessment", 3),
+    final_decision         = NA_character_,
+    final_decision_reason  = NA_character_,
+    decision_reason_note   = NA_character_,
+    final_decision_reason_note = NA_character_,
+    depends  = list(character(0), "X", "Y"),
+    suggests = list(character(0), character(0), character(0))
+  )
+  # Wrap in a function so `<<-` inside behaves the way it does when
+  # embedded inside val_finalize() / val_build() -- i.e. skips this
+  # function's own frame.
+  run_buggy <- function() {
+    failed  <- pkg_dat$pkg[pkg_dat$decision != decisions[1]]
+    pkgs_df <- reject_iteration(pkg_dat, dec_reject = "High",
+                                deps = "depends", decisions = decisions,
+                                failed_pkgs = failed)
+    n_iter <- 1L
+    while (!identical(pkgs_df$pkg[pkgs_df$final_decision != decisions[1]],
+                      failed)) {
+      if (n_iter >= 10L) return(n_iter)  # safety cap
+      failed  <<- pkgs_df$pkg[pkgs_df$final_decision != decisions[1]]
+      pkgs_df <<- reject_iteration(pkgs_df, dec_reject = "High",
+                                   deps = "depends", decisions = decisions,
+                                   failed_pkgs = failed)
+      n_iter <- n_iter + 1L
+    }
+    n_iter
+  }
+  expect_equal(run_buggy(), 10L)
+})

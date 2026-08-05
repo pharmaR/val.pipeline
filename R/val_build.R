@@ -676,10 +676,19 @@ val_build <- function(
   pkgs_df <- reject_iteration(pkgs_df0, dec_reject, deps, decisions, failed)
   
   # All remaining iterations!
+  # NB: use `<-` (not `<<-`) here. `<<-` inside a top-level function
+  # skips the function's own frame and searches the *enclosing*
+  # lexical scope (the package namespace, then globalenv) for an
+  # existing binding, leaving the local `failed` / `pkgs_df` bindings
+  # unchanged. That turns the fixed-point loop into an infinite loop
+  # whenever the seed set differs from the iter-1 result (i.e. any
+  # cohort large enough that dep propagation actually needs to run).
+  # Local `<-` is the intended semantics — reject_iteration() returns
+  # the updated frame we want to re-check on the next pass. See #103.
   while(!identical(pkgs_df$pkg[pkgs_df$final_decision != decisions[1]], failed)) {
     # if the list of failed pkgs has changed, then we need to iterate again
-    failed <<- pkgs_df$pkg[pkgs_df$final_decision != decisions[1]]
-    pkgs_df <<- reject_iteration(pkgs_df, dec_reject, deps, decisions, failed)
+    failed <- pkgs_df$pkg[pkgs_df$final_decision != decisions[1]]
+    pkgs_df <- reject_iteration(pkgs_df, dec_reject, deps, decisions, failed)
   }
   
   val_msg("\n--> Assigned 'final' decisions.\n", min_level = "minimal")
