@@ -201,3 +201,50 @@ test_that("val_finalize() returns val_dir invisibly", {
   expect_type(res, "list")
   expect_equal(res$val_dir, tmp)
 })
+
+# val_prep object plumbing ------------------------------------------------
+
+test_that("val_finalize(prep = prep) pulls defaults from a val_prep object", {
+  tmp <- withr::local_tempdir()
+  seed_val_dir(tmp)
+
+  # Mimic just the fields val_finalize() reads off a val_prep.
+  fake_prep <- structure(
+    list(
+      val_dir      = tmp,
+      val_start    = Sys.time() - 60,
+      n_candidates = 3L,
+      deps         = NULL,   # no dep propagation for this fixture
+      config_path  = NULL,
+      verbose      = "quiet"
+    ),
+    class = c("val_prep", "list")
+  )
+
+  suppressMessages(
+    withr::with_output_sink(tempfile(), {
+      val_finalize(
+        prep                  = fake_prep,
+        write_qualified_lists = FALSE,
+        render_report         = FALSE
+      )
+    })
+  )
+  expect_true(file.exists(file.path(tmp, "qual_assessments.rds")))
+  expect_true(file.exists(file.path(tmp, "qual_metadata.rds")))
+})
+
+test_that("val_finalize() rejects non-val_prep objects passed to `prep`", {
+  expect_error(
+    val_finalize(prep = list(val_dir = "/nope")),
+    "must be a `val_prep` object"
+  )
+})
+
+test_that("val_finalize() errors when neither val_dir nor prep is supplied", {
+  expect_error(
+    val_finalize(),
+    "`val_dir` must be supplied"
+  )
+})
+

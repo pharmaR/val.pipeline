@@ -88,25 +88,27 @@
 #'   iterating on decision logic against a fixed assessment corpus,
 #'   or when recovering from an environment that hangs at the
 #'   collation step (see #101).
-#' @return Invisibly, a named list carrying every argument a follow-up
-#'   [val_finalize()] call needs — `val_dir`, `deps`, `val_start`,
-#'   `n_candidates`, `config_path`, and `verbose`. When
-#'   `finalize = FALSE`, the caller drives finalization themselves in
-#'   a fresh session (or later in the same one) with either
-#'   `do.call(val_finalize, res)` or `val_finalize(res$val_dir, ...)`.
-#'   When `finalize = TRUE` (default) the same list is returned but the
-#'   finalized artifacts already live under `val_dir`.
+#' @return Invisibly, `NULL`. The recovery / two-phase workflow is
+#'   driven off the `val_prep` object returned by
+#'   [val_prep_pipeline()], not this return. In particular, when
+#'   `finalize = FALSE`, feed that `prep` object into
+#'   `val_finalize(prep = prep)` to complete the pipeline in a fresh
+#'   R session — every field it needs (`val_dir`, `val_start`,
+#'   `n_candidates`, `deps`, `config_path`, `verbose`) is already
+#'   there. The collated artifacts themselves (`qual_metadata.rds`,
+#'   `qual_assessments.rds`, etc.) live under `val_dir` on disk.
 #'
 #' @examples
 #' \dontrun{
 #' # One-shot (pre-0.1.21 behaviour):
 #' val_pipeline()
 #'
-#' # Two-phase: run the assessment loop now, finalize later. Handy on
-#' # hosts where the collation step has been observed to hang (#101).
-#' res <- val_pipeline(finalize = FALSE)
-#' # ...in the same or a fresh R session:
-#' do.call(val_finalize, res)
+#' # Two-phase, so you can recover from a fresh R session if the
+#' # collation step hangs on your host (#101):
+#' prep <- val_prep_pipeline()
+#' val_pipeline(prep = prep, finalize = FALSE)
+#' # ...later, in the same session or a fresh one:
+#' val_finalize(prep = prep)
 #' }
 #'
 #' @importFrom dplyr as_tibble filter pull select
@@ -234,33 +236,17 @@ val_pipeline <- function(
     )
   } else {
     val_msg(paste0("\n--> Skipped finalization (finalize = FALSE). ",
-                   "Feed the return value straight into val_finalize():\n",
-                   "      res <- val_pipeline(..., finalize = FALSE)\n",
-                   "      do.call(val_finalize, res)\n",
-                   "    Or spell it out: val_finalize(\"",
-                   outtie$val_dir, "\", deps = \"", deps,
-                   "\", val_start = <POSIXct>, n_candidates = ",
-                   prep$n_candidates %||% "NULL", ").\n"),
+                   "In this or a fresh R session, run\n",
+                   "      val_finalize(prep = prep)\n",
+                   "    to complete the pipeline (val_dir already on disk at\n",
+                   "    ", outtie$val_dir, ").\n"),
             min_level = "normal")
   }
 
-  # Return everything a follow-up val_finalize() call needs so that
-  # `do.call(val_finalize, val_pipeline(..., finalize = FALSE))` is a
-  # valid one-liner. val_start and n_candidates come from `prep`
-  # (whether we synthesised it via val_prep_pipeline() above or the
-  # caller supplied one) — no need to duplicate them onto val_pipeline()'s
-  # return surface, they're already the source of truth. Named to
-  # match val_finalize()'s formals so do.call() Just Works.
-  invisible(
-    list(
-      val_dir      = outtie$val_dir,
-      deps         = deps,
-      val_start    = val_start,
-      n_candidates = prep$n_candidates,
-      config_path  = config_path,
-      verbose      = verbose
-    )
-  )
+  # Return nothing. The recovery / two-phase workflow is driven off
+  # the `val_prep` object returned by val_prep_pipeline(), which is
+  # the sole source of truth for val_finalize()'s inputs.
+  invisible(NULL)
 }
 
 

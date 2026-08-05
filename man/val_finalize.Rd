@@ -5,14 +5,15 @@
 \title{Finalize a \code{val_build()} Run}
 \usage{
 val_finalize(
-  val_dir,
+  val_dir = NULL,
   deps = "depends",
   val_start = NULL,
   n_candidates = NULL,
   write_qualified_lists = TRUE,
   render_report = TRUE,
   verbose = NULL,
-  config_path = NULL
+  config_path = NULL,
+  prep = NULL
 )
 }
 \arguments{
@@ -63,6 +64,17 @@ uses the \code{config.yml} copy that \code{\link[=val_build]{val_build()}} snaps
 to \code{val_dir} (if present) — matching the config the assessment
 loop actually ran under. Falls back to the packaged config when
 neither is present.}
+
+\item{prep}{Optional \code{val_prep} object returned by
+\code{\link[=val_prep_pipeline]{val_prep_pipeline()}}. When supplied, its fields become the
+defaults for \code{val_dir}, \code{val_start}, \code{n_candidates}, \code{deps},
+\code{config_path}, and \code{verbose} — so
+\code{val_finalize(prep = prep)} is the recommended recovery
+one-liner after a two-phase run
+(\code{val_pipeline(prep = prep, finalize = FALSE)}). Any argument
+passed explicitly to \code{val_finalize()} overrides the corresponding
+\code{prep} field. When \code{NULL} (default), every argument comes from
+its usual place.}
 }
 \value{
 Invisibly, a list with element \code{val_dir} (character path).
@@ -116,7 +128,13 @@ motivated it.
 }
 \examples{
 \dontrun{
-# Recover from a val_build() hang: fresh R session, then:
+# Preferred recovery flow — one object drives both phases:
+prep <- val_prep_pipeline()
+val_pipeline(prep = prep, finalize = FALSE)
+# ...same or a fresh session, later:
+val_finalize(prep = prep)
+
+# Ad-hoc, when all you have is the run directory on disk:
 val_finalize("/data/pm/riskassessments/R_4.5.2/20260721")
 
 # Skip the PPM provisioning files + summary report for a quick

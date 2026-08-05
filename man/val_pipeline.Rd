@@ -118,14 +118,15 @@ or when recovering from an environment that hangs at the
 collation step (see #101).}
 }
 \value{
-Invisibly, a named list carrying every argument a follow-up
-\code{\link[=val_finalize]{val_finalize()}} call needs — \code{val_dir}, \code{deps}, \code{val_start},
-\code{n_candidates}, \code{config_path}, and \code{verbose}. When
-\code{finalize = FALSE}, the caller drives finalization themselves in
-a fresh session (or later in the same one) with either
-\code{do.call(val_finalize, res)} or \code{val_finalize(res$val_dir, ...)}.
-When \code{finalize = TRUE} (default) the same list is returned but the
-finalized artifacts already live under \code{val_dir}.
+Invisibly, \code{NULL}. The recovery / two-phase workflow is
+driven off the \code{val_prep} object returned by
+\code{\link[=val_prep_pipeline]{val_prep_pipeline()}}, not this return. In particular, when
+\code{finalize = FALSE}, feed that \code{prep} object into
+\code{val_finalize(prep = prep)} to complete the pipeline in a fresh
+R session — every field it needs (\code{val_dir}, \code{val_start},
+\code{n_candidates}, \code{deps}, \code{config_path}, \code{verbose}) is already
+there. The collated artifacts themselves (\code{qual_metadata.rds},
+\code{qual_assessments.rds}, etc.) live under \code{val_dir} on disk.
 }
 \description{
 A pipeline to validate R packages using specific metrics and criteria,
@@ -141,11 +142,12 @@ needed for provisioning to PPM.
 # One-shot (pre-0.1.21 behaviour):
 val_pipeline()
 
-# Two-phase: run the assessment loop now, finalize later. Handy on
-# hosts where the collation step has been observed to hang (#101).
-res <- val_pipeline(finalize = FALSE)
-# ...in the same or a fresh R session:
-do.call(val_finalize, res)
+# Two-phase, so you can recover from a fresh R session if the
+# collation step hangs on your host (#101):
+prep <- val_prep_pipeline()
+val_pipeline(prep = prep, finalize = FALSE)
+# ...later, in the same session or a fresh one:
+val_finalize(prep = prep)
 }
 
 }

@@ -127,18 +127,15 @@ report are never produced by \code{val_build()} regardless of this
 flag — those are always \code{\link[=val_pipeline]{val_pipeline()}}-scope concerns.}
 }
 \value{
-Invisibly, a named list carrying every argument a follow-up
-\code{\link[=val_finalize]{val_finalize()}} call needs — \code{val_dir}, \code{deps}, \code{val_start},
-\code{config_path}, and \code{verbose}. When \code{finalize = FALSE}, feed it
-into \code{do.call(val_finalize, res)} (or spell out
-\code{val_finalize(res$val_dir, ...)}) to complete the pipeline. When
-\code{finalize = TRUE} (default) the same list is returned but the
-collated artifacts already live under \code{val_dir}. Note the
-collated frames themselves (\code{qual_metadata.rds},
-\code{qual_assessments.rds}) are not carried on the return — read them
-off disk from \code{val_dir} when you need them; that keeps peak
-memory bounded and makes recovery from a fresh session identical
-to first-run behaviour.
+A list with a single element \code{val_dir} (character path to
+the run directory). The recovery / two-phase workflow is driven
+off the \code{val_prep} object returned by \code{\link[=val_prep_pipeline]{val_prep_pipeline()}} — not
+this return — so when \code{finalize = FALSE} you invoke
+\code{val_finalize(prep = prep)} rather than reconstructing args from
+\code{val_build()}'s return. The collated frames themselves
+(\code{qual_metadata.rds}, \code{qual_assessments.rds}) live under
+\code{val_dir} on disk once \code{val_finalize()} runs; read them off disk
+when you need them.
 }
 \description{
 Build a risk assessment validation for a set of R packages from various

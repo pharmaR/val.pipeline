@@ -52,18 +52,15 @@
 #' @importFrom tools package_dependencies
 #' @importFrom utils available.packages capture.output
 #'
-#' @return Invisibly, a named list carrying every argument a follow-up
-#'   [val_finalize()] call needs — `val_dir`, `deps`, `val_start`,
-#'   `config_path`, and `verbose`. When `finalize = FALSE`, feed it
-#'   into `do.call(val_finalize, res)` (or spell out
-#'   `val_finalize(res$val_dir, ...)`) to complete the pipeline. When
-#'   `finalize = TRUE` (default) the same list is returned but the
-#'   collated artifacts already live under `val_dir`. Note the
-#'   collated frames themselves (`qual_metadata.rds`,
-#'   `qual_assessments.rds`) are not carried on the return — read them
-#'   off disk from `val_dir` when you need them; that keeps peak
-#'   memory bounded and makes recovery from a fresh session identical
-#'   to first-run behaviour.
+#' @return A list with a single element `val_dir` (character path to
+#'   the run directory). The recovery / two-phase workflow is driven
+#'   off the `val_prep` object returned by [val_prep_pipeline()] — not
+#'   this return — so when `finalize = FALSE` you invoke
+#'   `val_finalize(prep = prep)` rather than reconstructing args from
+#'   `val_build()`'s return. The collated frames themselves
+#'   (`qual_metadata.rds`, `qual_assessments.rds`) live under
+#'   `val_dir` on disk once `val_finalize()` runs; read them off disk
+#'   when you need them.
 #'
 #' @param prep Optional `val_prep` object returned by
 #'   [val_prep_pipeline()]. When supplied, `val_build()` skips its own
@@ -606,18 +603,11 @@ val_build <- function(
             min_level = "normal")
   }
 
-  # Return object. When `finalize = FALSE` the caller will drive
-  # val_finalize() themselves in a follow-up call, so surface every
-  # arg that val_finalize() needs — `val_start` for the wall-clock /
-  # pipeline_runtime, `deps` for dep-driven propagation — so that
-  # `do.call(val_finalize, val_build(..., finalize = FALSE))` is a
-  # valid one-liner. Names match val_finalize()'s formals.
+  # Return object. Deliberately narrow — just `val_dir` — because the
+  # recovery / two-phase workflow is driven off the `val_prep` object
+  # returned by [val_prep_pipeline()], not this return. See #101.
   return(list(
-    val_dir     = val_dir,
-    deps        = deps,
-    val_start   = val_start,
-    config_path = config_path,
-    verbose     = verbose
+    val_dir = val_dir
   ))
 }
 

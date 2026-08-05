@@ -104,9 +104,8 @@ qual <- val_build(
 )
 
 # --- Phase 2: collate + propagate decisions ---
-# Run val_finalize() when you're ready — it can be invoked in a fresh
-# session too as long as you pass the val_dir printed above:
-#   val_finalize("<val_dir>")
+# When driven off val_build() directly (as here) rather than through
+# val_pipeline(prep = prep, ...), val_finalize() takes val_dir directly.
 # Skipping write_qualified_lists / render_report here to keep dev iteration
 # cheap; drop those args for the full val_pipeline()-equivalent output.
 val_finalize(

@@ -92,9 +92,26 @@
 #' @importFrom glue glue
 #' @importFrom utils capture.output write.csv
 #'
+#' @param prep Optional `val_prep` object returned by
+#'   [val_prep_pipeline()]. When supplied, its fields become the
+#'   defaults for `val_dir`, `val_start`, `n_candidates`, `deps`,
+#'   `config_path`, and `verbose` — so
+#'   `val_finalize(prep = prep)` is the recommended recovery
+#'   one-liner after a two-phase run
+#'   (`val_pipeline(prep = prep, finalize = FALSE)`). Any argument
+#'   passed explicitly to `val_finalize()` overrides the corresponding
+#'   `prep` field. When `NULL` (default), every argument comes from
+#'   its usual place.
+#'
 #' @examples
 #' \dontrun{
-#' # Recover from a val_build() hang: fresh R session, then:
+#' # Preferred recovery flow — one object drives both phases:
+#' prep <- val_prep_pipeline()
+#' val_pipeline(prep = prep, finalize = FALSE)
+#' # ...same or a fresh session, later:
+#' val_finalize(prep = prep)
+#'
+#' # Ad-hoc, when all you have is the run directory on disk:
 #' val_finalize("/data/pm/riskassessments/R_4.5.2/20260721")
 #'
 #' # Skip the PPM provisioning files + summary report for a quick
@@ -104,15 +121,41 @@
 #'
 #' @export
 val_finalize <- function(
-    val_dir,
+    val_dir = NULL,
     deps = "depends",
     val_start = NULL,
     n_candidates = NULL,
     write_qualified_lists = TRUE,
     render_report = TRUE,
     verbose = NULL,
-    config_path = NULL
+    config_path = NULL,
+    prep = NULL
 ) {
+  # Populate defaults from `prep` where the caller left them at the
+  # function-default sentinel. Explicit args always win. `deps`'s
+  # sentinel is the default "depends" — using missing() would be more
+  # rigorous but adds noise for a rare corner (caller passing
+  # deps = "depends" explicitly with a prep$deps = "suggests"). If
+  # that ever bites, switch to missing()-based detection.
+  if (!is.null(prep)) {
+    if (!inherits(prep, "val_prep")) {
+      stop("`prep` must be a `val_prep` object returned by ",
+           "val_prep_pipeline().", call. = FALSE)
+    }
+    if (is.null(val_dir))       val_dir      <- prep$val_dir
+    if (is.null(val_start))     val_start    <- prep$val_start
+    if (is.null(n_candidates))  n_candidates <- prep$n_candidates
+    if (is.null(config_path))   config_path  <- prep$config_path
+    if (is.null(verbose))       verbose      <- prep$verbose
+    if (identical(deps, "depends") && !is.null(prep$deps)) {
+      deps <- prep$deps
+    }
+  }
+
+  if (is.null(val_dir)) {
+    stop("`val_dir` must be supplied (either directly or via `prep`).",
+         call. = FALSE)
+  }
   stopifnot(
     is.character(val_dir), length(val_dir) == 1L, nzchar(val_dir)
   )
