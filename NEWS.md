@@ -1,5 +1,21 @@
 # val.pipeline 0.1.21
 
+- Extracted the collation + wrap-up tail of `val_build()` into a new
+  exported [`val_finalize()`](R/val_finalize.R), so a run whose
+  per-package assessment loop finishes but whose collation step
+  hangs / OOMs / gets killed can now be recovered from a fresh R
+  session with `val_finalize("<val_dir>")` — or, preferably, with a
+  `val_prep` object in hand, `val_finalize(prep = prep)`. Both
+  `val_build()` and `val_pipeline()` gained a `finalize = TRUE`
+  argument that controls whether the tail runs inline (default;
+  matches pre-0.1.21 behaviour) or whether the caller wants to
+  invoke `val_finalize()` themselves in a follow-up step. To keep
+  the source of truth for the recovery workflow in one place,
+  `val_prep_pipeline()`'s return was extended with the three
+  caller-facing args (`deps`, `config_path`, `verbose`) that
+  weren't already on it, so `val_finalize(prep = prep)` is a
+  one-liner and `val_pipeline()` itself returns invisibly `NULL`.
+  (#101)
 - Fixed a latent scope bug in `val_build()`'s dep-driven decision
   propagation loop that caused it to spin forever on any cohort
   large enough to actually need >1 iteration of `reject_iteration()`.

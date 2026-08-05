@@ -95,8 +95,23 @@ qual <- val_build(
   val_date = as.Date("2026-07-20"),
   replace = TRUE, 
   # use a env var for the out path
-  out = Sys.getenv("RISK_OUTPATH", unset = getwd())
+  out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
     # Sys.getenv("RISK_OUTPATH", unset = getwd())
+  # Two-phase demo: stop after the per-package assessment loop so we can
+  # inspect the assessed/ dir before collation runs. Flip to TRUE (or drop
+  # the arg — TRUE is the default) to run val_finalize() inline. See #101.
+  finalize = FALSE
+)
+
+# --- Phase 2: collate + propagate decisions ---
+# When driven off val_build() directly (as here) rather than through
+# val_pipeline(prep = prep, ...), val_finalize() takes val_dir directly.
+# Skipping write_qualified_lists / render_report here to keep dev iteration
+# cheap; drop those args for the full val_pipeline()-equivalent output.
+val_finalize(
+  qual$val_dir,
+  write_qualified_lists = FALSE,
+  render_report         = FALSE
 )
 
 qual_df <- qual$pkgs_df

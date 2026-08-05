@@ -75,8 +75,41 @@
 #'   same library search order as the parent — critical when the
 #'   operator has pointed `.libPaths()` at an rv-provisioned library.
 #'   See #99.
-#' @return A list containing the validation directory and a data frame of
-#'   package assessments.
+#' @param finalize Logical(1). When `TRUE` (default), automatically
+#'   calls [val_finalize()] after [val_build()] returns to collate
+#'   assessments, propagate dep-driven decisions, and produce the
+#'   PPM provisioning files (`qualified-<src>.txt` /
+#'   `blocklist-<src>.txt`) plus the HTML + PDF summary report — the
+#'   pre-0.1.21 behaviour. When `FALSE`, `val_pipeline()` returns as
+#'   soon as the per-package assessment loop finishes; the caller
+#'   must run `val_finalize(val_dir)` themselves to produce every
+#'   downstream artifact. Useful when the assessment loop is
+#'   expensive enough that you want an explicit checkpoint, when
+#'   iterating on decision logic against a fixed assessment corpus,
+#'   or when recovering from an environment that hangs at the
+#'   collation step (see #101).
+#' @return Invisibly, `NULL`. The recovery / two-phase workflow is
+#'   driven off the `val_prep` object returned by
+#'   [val_prep_pipeline()], not this return. In particular, when
+#'   `finalize = FALSE`, feed that `prep` object into
+#'   `val_finalize(prep = prep)` to complete the pipeline in a fresh
+#'   R session — every field it needs (`val_dir`, `val_start`,
+#'   `n_candidates`, `deps`, `config_path`, `verbose`) is already
+#'   there. The collated artifacts themselves (`qual_metadata.rds`,
+#'   `qual_assessments.rds`, etc.) live under `val_dir` on disk.
+#'
+#' @examples
+#' \dontrun{
+#' # One-shot (pre-0.1.21 behaviour):
+#' val_pipeline()
+#'
+#' # Two-phase, so you can recover from a fresh R session if the
+#' # collation step hangs on your host (#101):
+#' prep <- val_prep_pipeline()
+#' val_pipeline(prep = prep, finalize = FALSE)
+#' # ...later, in the same session or a fresh one:
+#' val_finalize(prep = prep)
+#' }
 #'
 #' @importFrom dplyr as_tibble filter pull select
 #' @importFrom tibble rownames_to_column
@@ -100,7 +133,8 @@ val_pipeline <- function(
   config_path = NULL,
   workers = 1L,
   freeze_opt_repos = FALSE,
-  propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE)
+  propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE),
+  finalize = TRUE
   ){
 
   # Assess args
@@ -109,6 +143,7 @@ val_pipeline <- function(
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
   stopifnot(is.logical(freeze_opt_repos), length(freeze_opt_repos) == 1L,
             !is.na(freeze_opt_repos))
+  stopifnot(is.logical(finalize), length(finalize) == 1L, !is.na(finalize))
   if (!is.null(prep) && !inherits(prep, "val_prep")) {
     stop("`prep` must be a `val_prep` object returned by val_prep_pipeline().",
          call. = FALSE)
@@ -155,6 +190,12 @@ val_pipeline <- function(
   #
   # ---- val_build() ----
   #
+  # We always pass `finalize = FALSE` here because val_pipeline() owns
+  # the full finalization scope (collation + PPM provisioning files +
+  # summary report), whereas val_build(finalize = TRUE) only owns the
+  # collation half. Delegating everything to val_finalize() below
+  # keeps the two-phase (build → finalize) semantics identical whether
+  # a caller uses val_pipeline() or drives val_build() themselves.
   outtie <- val_build(
     pkg_names       = prep$pkgs,
     ref             = ref,
@@ -168,77 +209,44 @@ val_pipeline <- function(
     prep            = prep,
     config_path     = config_path,
     workers         = workers,
-    propagate_libpaths = propagate_libpaths
+    propagate_libpaths = propagate_libpaths,
+    finalize        = FALSE
   )
-  
-  
-  
-  #
-  # ---- Inspect outputs ----
-  #
-  
-  # old - removed for return()
-  # qual <- outtie$pkg_meta
-  # pkg_assess <- outtie$pkg_assess
-  
-  # Instead, load metadata
-  # qual <- readRDS(file.path(outtie$val_dir, paste0("qual_metadata.rds")))
-  # qual_asses <- readRDS(file.path(outtie$val_dir, paste0("qual_assessments.rds")))
-  
-  
-  
-  #
-  # ---- Wrap up ----
-  #
-  # Write per-source lists of qualified packages (one pkg name per line)
-  # to `qualified-<source>.txt` files alongside qual_metadata.rds. These
-  # feed the Posit Package Manager source configuration for the
-  # "validated" repo provisioned into the GxP environment. Failure here
-  # should not fail the whole pipeline — the qualification evidence is
-  # already on disk.
-  qa_path <- file.path(outtie$val_dir, "qual_assessments.rds")
-  qm_path <- file.path(outtie$val_dir, "qual_metadata.rds")
-  qual_meta = readRDS(qm_path)
 
-  if (file.exists(qm_path)) {
-    tryCatch(
-      write_qualified_pkg_lists(
-        qual_metadata = qual_meta,
-        out_dir = outtie$val_dir,
-        qualified_decision = decisions[1]
-      ),
-      error = function(e) {
-        warning("write_qualified_pkg_lists() failed: ",
-                conditionMessage(e), call. = FALSE)
-      }
+  #
+  # ---- Finalize ----
+  #
+  # val_finalize() runs the collation tail (assessment/meta bundling,
+  # reject_iteration() dep-driven decision propagation, timings.csv)
+  # AND the PPM provisioning files + summary report. When the caller
+  # opts out with `finalize = FALSE`, val_pipeline() returns as soon
+  # as the per-package assessment loop finishes so the operator can
+  # run val_finalize(val_dir) themselves later — useful for two-phase
+  # runs on hosts where the collation step has been observed to hang
+  # (see #101), or for iterating on decision logic against a fixed
+  # assessment corpus.
+  if (isTRUE(finalize)) {
+    val_finalize(
+      val_dir      = outtie$val_dir,
+      deps         = deps,
+      val_start    = val_start,
+      n_candidates = prep$n_candidates,
+      verbose      = verbose,
+      config_path  = config_path
     )
+  } else {
+    val_msg(paste0("\n--> Skipped finalization (finalize = FALSE). ",
+                   "In this or a fresh R session, run\n",
+                   "      val_finalize(prep = prep)\n",
+                   "    to complete the pipeline (val_dir already on disk at\n",
+                   "    ", outtie$val_dir, ").\n"),
+            min_level = "normal")
   }
 
-  # Generate a high-level HTML + PDF summary report of the run, saved next to
-  # qual_metadata.rds in the val_build() output directory. Suitable for GxP /
-  # QMS archival. Failure to render should not fail the whole pipeline. The
-  # pre-filter candidate set was already persisted eagerly above (right after
-  # it was created) so an interrupted val_build() still leaves it on disk.
-  if (file.exists(qm_path)) {
-    tryCatch(
-      val_pipeline_report(
-        qual_metadata_path = qm_path,
-        qual_assessments_path = if (file.exists(qa_path)) qa_path else NA,
-        out_dir = outtie$val_dir,
-        n_candidates = prep$n_candidates %||%
-          (available.packages()[,1] |> length()),
-        pipeline_runtime = difftime(Sys.time(), val_start, units = "secs")
-      ),
-      error = function(e) {
-        warning("val_pipeline_report() failed: ", conditionMessage(e),
-                call. = FALSE)
-      }
-    )
-  }
-
-  # Return the val_build() results (val_dir points to all evidence, incl. the
-  # newly rendered summary report).
-  # return(qual_meta)
+  # Return nothing. The recovery / two-phase workflow is driven off
+  # the `val_prep` object returned by val_prep_pipeline(), which is
+  # the sole source of truth for val_finalize()'s inputs.
+  invisible(NULL)
 }
 
 

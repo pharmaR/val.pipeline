@@ -19,7 +19,8 @@ val_pipeline(
   config_path = NULL,
   workers = 1L,
   freeze_opt_repos = FALSE,
-  propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE)
+  propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE),
+  finalize = TRUE
 )
 }
 \arguments{
@@ -101,10 +102,31 @@ mirrors the current session's \code{.libPaths()} into \code{R_LIBS_SITE} so
 same library search order as the parent — critical when the
 operator has pointed \code{.libPaths()} at an rv-provisioned library.
 See #99.}
+
+\item{finalize}{Logical(1). When \code{TRUE} (default), automatically
+calls \code{\link[=val_finalize]{val_finalize()}} after \code{\link[=val_build]{val_build()}} returns to collate
+assessments, propagate dep-driven decisions, and produce the
+PPM provisioning files (\verb{qualified-<src>.txt} /
+\verb{blocklist-<src>.txt}) plus the HTML + PDF summary report — the
+pre-0.1.21 behaviour. When \code{FALSE}, \code{val_pipeline()} returns as
+soon as the per-package assessment loop finishes; the caller
+must run \code{val_finalize(val_dir)} themselves to produce every
+downstream artifact. Useful when the assessment loop is
+expensive enough that you want an explicit checkpoint, when
+iterating on decision logic against a fixed assessment corpus,
+or when recovering from an environment that hangs at the
+collation step (see #101).}
 }
 \value{
-A list containing the validation directory and a data frame of
-package assessments.
+Invisibly, \code{NULL}. The recovery / two-phase workflow is
+driven off the \code{val_prep} object returned by
+\code{\link[=val_prep_pipeline]{val_prep_pipeline()}}, not this return. In particular, when
+\code{finalize = FALSE}, feed that \code{prep} object into
+\code{val_finalize(prep = prep)} to complete the pipeline in a fresh
+R session — every field it needs (\code{val_dir}, \code{val_start},
+\code{n_candidates}, \code{deps}, \code{config_path}, \code{verbose}) is already
+there. The collated artifacts themselves (\code{qual_metadata.rds},
+\code{qual_assessments.rds}, etc.) live under \code{val_dir} on disk.
 }
 \description{
 A pipeline to validate R packages using specific metrics and criteria,
@@ -114,4 +136,18 @@ reduction of a large set of packages delivered through various sources
 'exception' criteria. Then, it builds the assessment co-hort using
 val_build(), returning a qualified list of packages and all required evidence
 needed for provisioning to PPM.
+}
+\examples{
+\dontrun{
+# One-shot (pre-0.1.21 behaviour):
+val_pipeline()
+
+# Two-phase, so you can recover from a fresh R session if the
+# collation step hangs on your host (#101):
+prep <- val_prep_pipeline()
+val_pipeline(prep = prep, finalize = FALSE)
+# ...later, in the same session or a fresh one:
+val_finalize(prep = prep)
+}
+
 }

@@ -50,6 +50,10 @@
 #'   \item{n_candidates}{Number of rows in `pre_filtered_pkg_metrics`
 #'     (used later by the summary report).}
 #'   \item{toml_path}{Path to the written `pipeline.toml`.}
+#'   \item{deps, config_path, verbose}{Caller-facing args echoed onto
+#'     the return so [val_finalize()] can be driven with a single
+#'     `val_finalize(prep = prep)` call after [val_pipeline()] finishes
+#'     — no need to reconstruct them by hand from a fresh R session.}
 #' }
 #'
 #' @seealso [val_pipeline()] for the one-shot wrapper that composes the
@@ -258,7 +262,15 @@ val_prep_pipeline <- function(
       viable_metrics           = viable_metrics,
       pre_filtered_pkg_metrics = pre_filtered_pkg_metrics,
       n_candidates             = nrow(pre_filtered_pkg_metrics),
-      toml_path                = toml_path
+      toml_path                = toml_path,
+      # Also carry the caller-facing args needed by val_finalize() so
+      # `val_finalize(prep = prep)` is a valid one-liner and the source
+      # of truth for the recovery workflow lives in exactly one place
+      # (this return, not the ephemeral val_pipeline() call site). See
+      # #101.
+      deps                     = deps,
+      config_path              = config_path,
+      verbose                  = verbose
     ),
     class = c("val_prep", "list")
   )

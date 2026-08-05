@@ -105,6 +105,10 @@ repositories.}
 \item{n_candidates}{Number of rows in \code{pre_filtered_pkg_metrics}
 (used later by the summary report).}
 \item{toml_path}{Path to the written \code{pipeline.toml}.}
+\item{deps, config_path, verbose}{Caller-facing args echoed onto
+the return so \code{\link[=val_finalize]{val_finalize()}} can be driven with a single
+\code{val_finalize(prep = prep)} call after \code{\link[=val_pipeline]{val_pipeline()}} finishes
+— no need to reconstruct them by hand from a fresh R session.}
 }
 }
 \description{
