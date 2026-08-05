@@ -70,6 +70,8 @@ val_prep_pipeline <- function(
   metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
   deps = c("depends", "suggests")[1],
   deps_recursive = TRUE,
+  rev_deps = NULL,
+  rev_deps_recursive = FALSE,
   val_date = Sys.Date(),
   out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
   opt_repos =
@@ -217,9 +219,11 @@ val_prep_pipeline <- function(
   # dep-frequency-sorted `pkgs` / `vers` / `avail_pkgs` triple lands
   # here as in val_build()'s no-prep path.
   tree       <- resolve_pkg_tree(
-    pkg_names      = build_pkgs,
-    deps           = deps,
-    deps_recursive = deps_recursive
+    pkg_names          = build_pkgs,
+    deps               = deps,
+    deps_recursive     = deps_recursive,
+    rev_deps           = rev_deps,
+    rev_deps_recursive = rev_deps_recursive
   )
   pkgs       <- tree$pkgs
   vers       <- tree$vers
