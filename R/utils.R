@@ -1100,39 +1100,44 @@ rip_cats_by_pkg <- function(
   # These are typically lower download pkgs that derserve their day in court
   bypass_primary  <- pull_config(val = "pass_primary", rule_type = "default")
 
-  # Lowest boundary of the `downloads_1yr` primary rule, derived directly
-  # from dec_df so we stay in sync with whatever the config says (rather
-  # than hard-coding it here and drifting out of date). Combining
-  # to_the_limit(low = TRUE) and to_the_limit(low = FALSE) across every
-  # `downloads_1yr` row picks up boundaries expressed as `< X`, `> X`,
-  # `<= X`, `>= X`, and `dplyr::between(., a, b)` alike. Compound
-  # conditions like `is.na(.x) | .x < X` return NA from to_the_limit()
-  # and are silently ignored — as long as one of the other rows for the
-  # same metric names the boundary (e.g. Medium's `between(80000, ...)`
-  # or Low's `> 240000`), we'll pick up the 80k floor. If nothing is
-  # parseable, we fall back to Inf so the bypass behaves as it did
-  # before this guard was added (applies to any `pass_primary` member).
+  # Highest finite boundary of the `downloads_1yr` primary rule, derived
+  # directly from dec_df so we stay in sync with whatever the config
+  # says (rather than hard-coding it here and drifting out of date).
+  # Combining to_the_limit(low = TRUE) and to_the_limit(low = FALSE)
+  # across every `downloads_1yr` row picks up boundaries expressed as
+  # `< X`, `> X`, `<= X`, `>= X`, and `dplyr::between(., a, b)` alike.
+  # Compound conditions like `is.na(.x) | .x < X` return NA from
+  # to_the_limit() and are silently ignored -- as long as one of the
+  # other rows for the same metric names an upper boundary (e.g. Low's
+  # `> 200000` or Medium's `between(80000, 200000)`), we'll pick up the
+  # 200k ceiling. The bypass fires for any `pass_primary` member whose
+  # downloads_1yr sits below that ceiling, because they'd otherwise
+  # land in Medium/High on downloads alone and fail `accept_cats: Low`
+  # -- the whole point of the bypass is to give them their day in
+  # court. If nothing is parseable, we fall back to Inf so the bypass
+  # behaves as it did before this guard was added (applies to any
+  # `pass_primary` member). See #112.
   dwnld_conds  <- dec_df$condition[tolower(dec_df$metric) == "downloads_1yr"]
   dwnld_bounds <- c(
     to_the_limit(dwnld_conds, low = TRUE),
     to_the_limit(dwnld_conds, low = FALSE)
   )
   dwnld_bounds <- dwnld_bounds[is.finite(dwnld_bounds) & dwnld_bounds > 0]
-  min_dwnld_bound <- if (length(dwnld_bounds)) min(dwnld_bounds) else Inf
+  low_tier_min <- if (length(dwnld_bounds)) max(dwnld_bounds) else Inf
 
   subset_metrics <- dec_df |>
     dplyr::filter(tolower(metric_type) == tolower(label)) %>%
 
     # if this is not a CRAN pkg OR if it's a pkg that has been granted "pass-primary" status
     # (usually pkgs with lower downloads, but need a fair shake) AND its
-    # downloads_1yr is still below the lowest primary bound
-    # (min_dwnld_bound; see above)...
+    # downloads_1yr is still below the Low tier's floor
+    # (low_tier_min; see above)...
     # then do not use downloads_1yr as the cornerstone primary metric
     {if("downloads_1yr" %in% all_mets &&
         (toupper(repo_name) != "CRAN" ||
          (pkgs_df$package %in% bypass_primary &
           (is.na(pkgs_df$downloads_1yr) |
-           pkgs_df$downloads_1yr < min_dwnld_bound)))
+           pkgs_df$downloads_1yr < low_tier_min)))
          ) {
       dplyr::filter(., !(tolower(metric) %in% c("downloads_1yr")))
     } else .} |>
