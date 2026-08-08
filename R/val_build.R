@@ -430,11 +430,15 @@ val_build <- function(
 
       # Name the direct DESCRIPTION-level dep(s) that failed, not the
       # recursive Suggests closure (which would list hundreds of
-      # transitive pkgs). See #107.
-      dep_note <- identify_failed_deps(
-        c(depends_direct, suggests_direct),
-        failed_snapshot
-      )
+      # transitive pkgs). Scope by `deps` so failing suggests are only
+      # named when the caller propagates them (matches the same
+      # `"Suggests" %in% deps` gate used in reject_iteration()). See #107.
+      note_deps <- if ("Suggests" %in% deps) {
+        c(depends_direct, suggests_direct)
+      } else {
+        depends_direct
+      }
+      dep_note <- identify_failed_deps(note_deps, failed_snapshot)
 
       pkg_meta <- list(
         pkg = pkg,
