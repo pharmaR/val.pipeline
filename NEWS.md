@@ -22,6 +22,13 @@
   `reject_iteration()` populate the note from the direct set. Legacy
   meta bundles without the new fields fall back to the recursive fields.
   (#107)
+- Widened `rip_cats_by_pkg()`'s `pass_primary` bypass so a package on the
+  `pass_primary` allow-list is exempted from the `downloads_1yr` primary
+  metric when its downloads sit below the *Low* tier's floor (upper
+  `downloads_1yr` bound, e.g. 200k under the default config), not just
+  below the *High* tier's ceiling (lower bound, e.g. 80k). Packages in
+  the Medium tier would still land in Medium on `downloads_1yr` alone
+  and fail `accept_cats: Low`, defeating the point of the bypass. (#112)
 
 # val.pipeline 0.1.21
 
