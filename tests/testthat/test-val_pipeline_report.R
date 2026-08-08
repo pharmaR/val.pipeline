@@ -406,6 +406,28 @@ test_that("val_pipeline_report renders Pre-Filter Summary when RDS present", {
   expect_true(grepl("pf_pkg02", html, fixed = TRUE))
 })
 
+test_that("summary_template includes Pre-Approved (dep failed) section (#110)", {
+  # Source-level guard: the small operator-facing table that lists every
+  # pkg with final_decision_reason == "Pre-Approved (dep failed)" (see
+  # #110) should live in the summary template so an operator can see at a
+  # glance which pre-approved pkgs need upstream attention.
+  qmd <- system.file(
+    "report", "summary", "summary_template.qmd",
+    package = "val.pipeline"
+  )
+  if (!nzchar(qmd) || !file.exists(qmd)) {
+    qmd <- file.path("..", "..", "inst", "report", "summary",
+                     "summary_template.qmd")
+  }
+  skip_if_not(file.exists(qmd), "summary_template.qmd not found")
+  src <- paste(readLines(qmd, warn = FALSE), collapse = "\n")
+  expect_true(grepl("Pre-Approved packages that failed dependency propagation",
+                    src, fixed = TRUE))
+  expect_true(grepl("Pre-Approved \\(dep failed\\)", src))
+  # Table chunk is present and filters on the reason string.
+  expect_match(src, "preapp_bad\\s*<-")
+})
+
 test_that("summary_template gates dropped-packages table on HTML output", {
   # Source-level guard: the per-package dropped table is intentionally
   # omitted from PDF renders because a full CRAN-scale run can produce a

@@ -1486,9 +1486,13 @@ split_join_cats <- function(
 #' compute the `final_decision` and `final_decision_reason` for every row by
 #' marking any package whose dependencies (or Suggests, when `"Suggests"` is
 #' in `deps`) appear in `failed_pkgs` as `dec_reject`. Pre-approved packages
-#' are never downgraded. Packages with no failing dep carry their original
-#' `decision` / `decision_reason` through to `final_decision` /
-#' `final_decision_reason`.
+#' whose deps are all clean carry their original decision through untouched;
+#' pre-approved packages whose deps DID fail are downgraded to `dec_reject`
+#' with `final_decision_reason = "Pre-Approved (dep failed)"` so an operator
+#' can distinguish them from ordinary dep-driven downgrades (they can't be
+#' served by PPM because their install closure is broken; see #110).
+#' Packages with no failing dep carry their original `decision` /
+#' `decision_reason` through to `final_decision` / `final_decision_reason`.
 #'
 #' The function is designed to be called iteratively from `val_build()` until
 #' the set of failing packages stabilizes (a package can become "failed"
@@ -1557,16 +1561,29 @@ reject_iteration <- function(pkg_dat, dec_reject, deps, decisions,
       sug_failed_matches = purrr::map_chr(suggests_direct, identify_failed_deps, failed_pkgs = aug_failed)
     ) |>
     dplyr::mutate(
+      # A pre-approved pkg whose runtime dep failed CAN'T be served by
+      # PPM (the install closure is broken), so downgrade it like any
+      # other dep-failed pkg but flag the reason as
+      # `"Pre-Approved (dep failed)"` so an operator can either fix
+      # the upstream dep or drop the pkg from `approved_pkgs`.
+      # Pre-approved pkgs with all deps clean are still protected.
+      # See #110.
+      is_preapproved  = decision_reason == "Pre-Approved package",
+      sug_in_scope    = sug_failed & ("Suggests" %in% deps),
+      preapp_dep_bad  = is_preapproved & (dep_failed | sug_in_scope),
+      preapp_dep_ok   = is_preapproved & !dep_failed & !sug_in_scope,
       final_decision = dplyr::case_when(
-        decision_reason == "Pre-Approved package" ~ decision,
-        dep_failed ~ dec_reject,
-        sug_failed & ("Suggests" %in% deps) ~ dec_reject,
+        preapp_dep_ok  ~ decision,
+        preapp_dep_bad ~ dec_reject,
+        dep_failed     ~ dec_reject,
+        sug_in_scope   ~ dec_reject,
         .default = decision
       ),
       final_decision_reason = dplyr::case_when(
-        decision_reason == "Pre-Approved package" ~ decision_reason,
-        dep_failed ~ "Dependency",
-        sug_failed & ("Suggests" %in% deps) ~ "Dependency",
+        preapp_dep_ok  ~ decision_reason,
+        preapp_dep_bad ~ "Pre-Approved (dep failed)",
+        dep_failed     ~ "Dependency",
+        sug_in_scope   ~ "Dependency",
         .default = decision_reason
       ),
       # When a pkg is downgraded because a dep (or suggest, if deps includes
@@ -1575,13 +1592,16 @@ reject_iteration <- function(pkg_dat, dec_reject, deps, decisions,
       # if a chain of failures wasn't fully captured in `aug_failed` at this
       # iteration (see issue #37).
       final_decision_reason_note = dplyr::case_when(
-        decision_reason == "Pre-Approved package" ~ decision_reason_note,
-        dep_failed ~ dep_failed_matches,
-        sug_failed & ("Suggests" %in% deps) ~ sug_failed_matches,
+        preapp_dep_ok  ~ decision_reason_note,
+        preapp_dep_bad & dep_failed ~ dep_failed_matches,
+        preapp_dep_bad & sug_in_scope ~ sug_failed_matches,
+        dep_failed     ~ dep_failed_matches,
+        sug_in_scope   ~ sug_failed_matches,
         .default = decision_reason_note
       )
     ) |>
-    dplyr::select(-dep_failed, -sug_failed, -dep_failed_matches, -sug_failed_matches)
+    dplyr::select(-dep_failed, -sug_failed, -dep_failed_matches, -sug_failed_matches,
+                  -is_preapproved, -sug_in_scope, -preapp_dep_bad, -preapp_dep_ok)
 }
 
 

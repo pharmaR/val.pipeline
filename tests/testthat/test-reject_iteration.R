@@ -90,15 +90,86 @@ test_that("reject_iteration() only downgrades on Suggests when deps has it", {
   expect_equal(out_sug$final_decision_reason_note[out_sug$pkg == "D"], "B")
 })
 
-test_that("reject_iteration() never downgrades Pre-Approved packages", {
+test_that("reject_iteration() protects Pre-Approved packages with no failing dep (#110)", {
+  # Chain: A (Low, seed), B (High, seed), C (Pre-Approved, no failing dep),
+  #        D (Pre-Approved, depends on failed B) -- see next test.
+  # C's only dep is A (Low). No dep failed => Pre-Approved carve-out fires
+  # and C stays Low / "Pre-Approved package".
   pkg_dat <- make_pkg_dat()
-  # Mark C (which depends on failed B) as Pre-Approved
   pkg_dat$decision_reason[pkg_dat$pkg == "C"] <- "Pre-Approved package"
+  # Rewrite C's deps so it does NOT depend on failing B (only on A).
+  pkg_dat$depends[[which(pkg_dat$pkg == "C")]] <- "A"
   failed <- pkg_dat$pkg[pkg_dat$decision != decisions[1]]
   out <- reject_iteration(pkg_dat, dec_reject = "High",
                           deps = "depends", decisions = decisions,
                           failed_pkgs = failed)
-  # Even though C's dep failed, pre-approval protects it
+  expect_equal(out$final_decision[out$pkg == "C"], "Low")
+  expect_equal(
+    out$final_decision_reason[out$pkg == "C"],
+    "Pre-Approved package"
+  )
+})
+
+test_that("reject_iteration() downgrades Pre-Approved pkgs with failed deps (#110)", {
+  # Pre-Approved pkg C depends on failing B. Under #110's narrowed
+  # carve-out, C should be downgraded to High with reason
+  # "Pre-Approved (dep failed)" so an operator can distinguish it from
+  # an ordinary dep-driven downgrade. Note names the failing dep.
+  pkg_dat <- make_pkg_dat()
+  pkg_dat$decision_reason[pkg_dat$pkg == "C"] <- "Pre-Approved package"
+  failed <- pkg_dat$pkg[pkg_dat$decision != decisions[1]]  # "B"
+  out <- reject_iteration(pkg_dat, dec_reject = "High",
+                          deps = "depends", decisions = decisions,
+                          failed_pkgs = failed)
+  expect_equal(out$final_decision[out$pkg == "C"], "High")
+  expect_equal(
+    out$final_decision_reason[out$pkg == "C"],
+    "Pre-Approved (dep failed)"
+  )
+  expect_equal(out$final_decision_reason_note[out$pkg == "C"], "B")
+})
+
+test_that("reject_iteration() downgrades Pre-Approved pkgs with failing Suggests (when in scope) (#110)", {
+  # Pre-Approved pkg D suggests failing B. When deps includes
+  # "Suggests", D should be downgraded to "Pre-Approved (dep failed)".
+  # When deps = "depends" only, D is protected.
+  pkg_dat <- make_pkg_dat()
+  pkg_dat$decision_reason[pkg_dat$pkg == "D"] <- "Pre-Approved package"
+  failed <- pkg_dat$pkg[pkg_dat$decision != decisions[1]]  # "B"
+
+  out_dep <- reject_iteration(pkg_dat, dec_reject = "High",
+                              deps = "depends", decisions = decisions,
+                              failed_pkgs = failed)
+  expect_equal(out_dep$final_decision[out_dep$pkg == "D"], "Low")
+  expect_equal(
+    out_dep$final_decision_reason[out_dep$pkg == "D"],
+    "Pre-Approved package"
+  )
+
+  out_sug <- reject_iteration(pkg_dat, dec_reject = "High",
+                              deps = c("depends", "Suggests"),
+                              decisions = decisions, failed_pkgs = failed)
+  expect_equal(out_sug$final_decision[out_sug$pkg == "D"], "High")
+  expect_equal(
+    out_sug$final_decision_reason[out_sug$pkg == "D"],
+    "Pre-Approved (dep failed)"
+  )
+  expect_equal(out_sug$final_decision_reason_note[out_sug$pkg == "D"], "B")
+})
+
+test_that("reject_iteration() never downgrades Pre-Approved packages", {
+  # #110 narrowed this: Pre-Approved is protected only when NO dep
+  # failed. Since C's dep B is failing in `make_pkg_dat()`, we point C
+  # at a non-failing dep for this test so the carve-out fires.
+  pkg_dat <- make_pkg_dat()
+  # Mark C as Pre-Approved and rewire its dep to A (Low, not failing).
+  pkg_dat$decision_reason[pkg_dat$pkg == "C"] <- "Pre-Approved package"
+  pkg_dat$depends[[which(pkg_dat$pkg == "C")]] <- "A"
+  failed <- pkg_dat$pkg[pkg_dat$decision != decisions[1]]
+  out <- reject_iteration(pkg_dat, dec_reject = "High",
+                          deps = "depends", decisions = decisions,
+                          failed_pkgs = failed)
+  # No dep of C failed => pre-approval protects it
   expect_equal(out$final_decision[out$pkg == "C"], "Low")
   expect_equal(
     out$final_decision_reason[out$pkg == "C"],

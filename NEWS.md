@@ -1,8 +1,18 @@
 # val.pipeline (development version)
 
-- Retired the `ac-dev` local-superset branch workflow from
-  `.github/copilot-instructions.md`. Agent-directed PRs now cut from
-  `main`, PR to `main`, and stop there; no local ac-dev merge step.
+- Narrowed `reject_iteration()`'s Pre-Approved carve-out so a package on
+  the config `approved_pkgs` list is protected from dep-driven downgrade
+  only when none of its runtime deps actually failed. When a Pre-Approved
+  pkg's dep DID fail (PPM can no longer serve it because its install
+  closure is broken) the pkg is downgraded to the reject category with
+  `final_decision_reason = "Pre-Approved (dep failed)"` so an operator
+  can distinguish it from an ordinary dep-driven downgrade and either
+  fix the upstream dep or drop the pkg from `approved_pkgs`.
+  `val_build()`'s pre-skip branch was updated to emit the same reason
+  string when the pre-skipped pkg is on `approved_pkgs`, and
+  `val_pipeline_report()`'s summary gained a small section listing every
+  Pre-Approved-with-failed-dep pkg + the failing direct dep(s), so the
+  actionable list surfaces at the top of the report. (#110)
 - Fixed `decision_reason_note` listing the recursive Suggests closure
   intersected with all failed packages (~100 unrelated transitive pkgs)
   instead of the actual DESCRIPTION-level dep(s) that triggered the

@@ -40,9 +40,13 @@ with \code{decision}, \code{decision_reason}, \code{depends}, \code{suggests} li
 compute the \code{final_decision} and \code{final_decision_reason} for every row by
 marking any package whose dependencies (or Suggests, when \code{"Suggests"} is
 in \code{deps}) appear in \code{failed_pkgs} as \code{dec_reject}. Pre-approved packages
-are never downgraded. Packages with no failing dep carry their original
-\code{decision} / \code{decision_reason} through to \code{final_decision} /
-\code{final_decision_reason}.
+whose deps are all clean carry their original decision through untouched;
+pre-approved packages whose deps DID fail are downgraded to \code{dec_reject}
+with \code{final_decision_reason = "Pre-Approved (dep failed)"} so an operator
+can distinguish them from ordinary dep-driven downgrades (they can't be
+served by PPM because their install closure is broken; see #110).
+Packages with no failing dep carry their original \code{decision} /
+\code{decision_reason} through to \code{final_decision} / \code{final_decision_reason}.
 }
 \details{
 The function is designed to be called iteratively from \code{val_build()} until
