@@ -440,6 +440,18 @@ val_build <- function(
       }
       dep_note <- identify_failed_deps(note_deps, failed_snapshot)
 
+      # If the pkg is on the config `approved_pkgs` list, distinguish it
+      # from an ordinary dep-driven downgrade so an operator can chase
+      # the upstream dep (or drop the pkg from `approved_pkgs`). Keeps
+      # this pre-skip branch consistent with reject_iteration()'s
+      # narrowed Pre-Approved carve-out (#110).
+      approved_pkgs <- pull_config(val = "approved_pkgs", rule_type = "default")
+      dep_reason <- if (pkg %in% approved_pkgs) {
+        "Pre-Approved (dep failed)"
+      } else {
+        "Dependency"
+      }
+
       pkg_meta <- list(
         pkg = pkg,
         ver = ver,
@@ -450,10 +462,10 @@ val_build <- function(
         ref = NA_character_,
         metric_pkg = NA_character_,
         decision = decisions[length(decisions)],
-        decision_reason = "Dependency",
+        decision_reason = dep_reason,
         decision_reason_note = dep_note,
         final_decision = decisions[length(decisions)],
-        final_decision_reason = "Dependency",
+        final_decision_reason = dep_reason,
         final_decision_reason_note = dep_note,
         depends = if(identical(depends, character(0))) NA_character_ else depends,
         suggests = if(identical(suggests, character(0))) NA_character_ else suggests,

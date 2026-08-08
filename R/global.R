@@ -5,6 +5,7 @@ utils::globalVariables(c(
   "condition",
   "decision", "decision_reason", "decision_reason_note", "dep_failed",
   "dep_failed_matches", "sug_failed_matches",
+  "is_preapproved", "sug_in_scope", "preapp_dep_bad", "preapp_dep_ok",
   "dep_freq", "depends", "depends_direct", "deps",
   "derived_col", "downloads_1yr", "ends_with", "exception_risk_category",
   "final_decision", "final_decision_reason_note", "final_risk",

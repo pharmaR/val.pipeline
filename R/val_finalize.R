@@ -380,15 +380,18 @@ val_finalize <- function(
 
   purrr::pwalk(
     list(changed_pkgs$pkg, changed_pkgs$ver,
+         changed_pkgs$final_decision_reason,
          changed_pkgs$final_decision_reason_note),
-    function(pkg, ver, note){
+    function(pkg, ver, reason, note){
       pkg_v <- paste(pkg, ver, sep = "_")
       pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
       pkg_meta_file <- pkg_meta_file[file.exists(pkg_meta_file)]
       if (length(pkg_meta_file) > 0) {
         purrr::walk(pkg_meta_file, function(f){
           dep_meta <- readRDS(f)
-          dep_meta$final_decision_reason <- "Dependency"
+          # `reason` may be "Dependency" or "Pre-Approved (dep failed)"
+          # (#110), whichever reject_iteration() emitted.
+          dep_meta$final_decision_reason <- reason
           dep_meta$final_decision_reason_note <- note
           dep_meta$final_decision <- decisions[length(decisions)]
           saveRDS(dep_meta, f)
