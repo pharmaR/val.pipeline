@@ -27,8 +27,12 @@ on this iteration. If \code{NULL}, derived from \code{pkg_dat$final_decision != 
 \value{
 \code{pkg_dat} with \code{final_decision}, \code{final_decision_reason}, and
 \code{final_decision_reason_note} populated for every row. For dependency-
-driven downgrades the note lists the failing dep pkg name(s), comma-
-separated (see \code{\link[=identify_failed_deps]{identify_failed_deps()}} and issue #37).
+driven downgrades the note lists the failing \strong{direct} dep pkg
+name(s) (from \code{depends_direct} / \code{suggests_direct} if present in
+\code{pkg_dat}, else falling back to \code{depends} / \code{suggests}), comma-
+separated. To keep transitive-chain rows meaningful the failed set is
+augmented with pkgs downgraded within this call before notes are
+computed (see \code{\link[=identify_failed_deps]{identify_failed_deps()}} and issues #37, #107).
 }
 \description{
 Given a data.frame of per-package risk assessments (one row per package,
