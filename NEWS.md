@@ -1,3 +1,15 @@
+# val.pipeline (development version)
+
+- Fixed `decision_reason_note` listing the recursive Suggests closure
+  intersected with all failed packages (~100 unrelated transitive pkgs)
+  instead of the actual DESCRIPTION-level dep(s) that triggered the
+  downgrade. `val_pkg()` and `val_build()`'s dep-skip branch now capture
+  direct (non-recursive) `depends_direct` / `suggests_direct` alongside
+  the existing recursive fields; both the dep-skip branch and
+  `reject_iteration()` populate the note from the direct set. Legacy
+  meta bundles without the new fields fall back to the recursive fields.
+  (#107)
+
 # val.pipeline 0.1.21
 
 - Extracted the collation + wrap-up tail of `val_build()` into a new

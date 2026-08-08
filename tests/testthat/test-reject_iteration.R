@@ -118,7 +118,80 @@ test_that("reject_iteration() derives failed_pkgs from final_decision if NA", {
   expect_equal(out$final_decision_reason[out$pkg == "C"], "Dependency")
 })
 
-# ---- Fixed-point convergence loop (regression, #103) ----------------------
+test_that("reject_iteration() note names DIRECT deps, not recursive closure (#107)", {
+  # Chain: A (High, seed) <- B (depends A directly) <- C (depends B directly).
+  # Recursive-depends of C includes both A and B; direct-depends of C is
+  # only B. Pre-#107, C's note would have listed "A, B" (recursive closure
+  # intersected with failed). Post-#107, C's note names only "B" -- its
+  # actual DESCRIPTION-level dep.
+  pkg_dat <- tibble::tibble(
+    pkg              = c("A", "B", "C"),
+    decision         = c("High", "Low", "Low"),
+    decision_reason  = rep("Risk Assessment", 3),
+    final_decision         = NA_character_,
+    final_decision_reason  = NA_character_,
+    decision_reason_note   = NA_character_,
+    final_decision_reason_note = NA_character_,
+    depends         = list(character(0), "A",           c("A", "B")),
+    suggests        = list(character(0), character(0),  character(0)),
+    depends_direct  = list(character(0), "A",           "B"),
+    suggests_direct = list(character(0), character(0),  character(0))
+  )
+  out <- reject_iteration(pkg_dat, dec_reject = "High",
+                          deps = "depends", decisions = decisions,
+                          failed_pkgs = "A")
+  expect_equal(out$final_decision, c("High", "High", "High"))
+  expect_equal(out$final_decision_reason_note[out$pkg == "B"], "A")
+  # C's note must be "B" (its direct dep), not "A, B" (recursive closure).
+  expect_equal(out$final_decision_reason_note[out$pkg == "C"], "B")
+})
+
+test_that("reject_iteration() falls back to recursive deps when direct cols absent", {
+  # Legacy pkg_dat (pre-#107) has no depends_direct / suggests_direct
+  # list-cols. reject_iteration() must still work and populate the note
+  # by falling back to the recursive `depends` / `suggests` list-cols.
+  pkg_dat <- make_pkg_dat()
+  expect_false("depends_direct" %in% names(pkg_dat))
+  failed  <- pkg_dat$pkg[pkg_dat$decision != decisions[1]]
+  out <- reject_iteration(pkg_dat, dec_reject = "High",
+                          deps = "depends", decisions = decisions,
+                          failed_pkgs = failed)
+  expect_equal(out$final_decision[out$pkg == "C"], "High")
+  expect_equal(out$final_decision_reason_note[out$pkg == "C"], "B")
+})
+
+test_that("reject_iteration() note does NOT include recursive-Suggests noise (#107)", {
+  # Regression: pak/lintr were pre-approved and dep-skipped; their
+  # decision_reason_note was populated with intersect(recursive Suggests
+  # closure, failed_pkgs) yielding ~100 unrelated transitive pkg names.
+  # In the reject_iteration path the same bug leaked into propagated
+  # notes. Guard against reintroduction: given a pkg whose recursive
+  # Suggests closure includes many failed pkgs but whose direct
+  # deps/suggests do NOT, the note stays NA (pkg isn't downgraded).
+  pkg_dat <- tibble::tibble(
+    pkg              = c("X", "Y", "Z"),
+    decision         = c("High", "High", "Low"),
+    decision_reason  = rep("Risk Assessment", 3),
+    final_decision         = NA_character_,
+    final_decision_reason  = NA_character_,
+    decision_reason_note   = NA_character_,
+    final_decision_reason_note = NA_character_,
+    # Z's RECURSIVE suggests includes both failed pkgs (X, Y), but its
+    # DIRECT deps / suggests are empty -- so Z should NOT be downgraded
+    # under deps = "depends" and its note should remain NA.
+    depends         = list(character(0), character(0), character(0)),
+    suggests        = list(character(0), character(0), c("X", "Y")),
+    depends_direct  = list(character(0), character(0), character(0)),
+    suggests_direct = list(character(0), character(0), character(0))
+  )
+  out <- reject_iteration(pkg_dat, dec_reject = "High",
+                          deps = "depends", decisions = decisions,
+                          failed_pkgs = c("X", "Y"))
+  expect_equal(out$final_decision[out$pkg == "Z"], "Low")
+  expect_true(is.na(out$final_decision_reason_note[out$pkg == "Z"]))
+})
+
+
 
 # Guards val_build()'s (and val_finalize()'s in #101) reject_iteration()
 # convergence loop against an infinite-loop bug introduced by a stray

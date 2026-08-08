@@ -1510,8 +1510,12 @@ split_join_cats <- function(
 #'
 #' @return `pkg_dat` with `final_decision`, `final_decision_reason`, and
 #'   `final_decision_reason_note` populated for every row. For dependency-
-#'   driven downgrades the note lists the failing dep pkg name(s), comma-
-#'   separated (see [identify_failed_deps()] and issue #37).
+#'   driven downgrades the note lists the failing **direct** dep pkg
+#'   name(s) (from `depends_direct` / `suggests_direct` if present in
+#'   `pkg_dat`, else falling back to `depends` / `suggests`), comma-
+#'   separated. To keep transitive-chain rows meaningful the failed set is
+#'   augmented with pkgs downgraded within this call before notes are
+#'   computed (see [identify_failed_deps()] and issues #37, #107).
 #'
 #' @importFrom dplyr mutate case_when select
 #' @importFrom purrr map_chr
@@ -1523,12 +1527,34 @@ reject_iteration <- function(pkg_dat, dec_reject, deps, decisions,
     failed_pkgs <- pkg_dat$pkg[pkg_dat$final_decision != decisions[1]]
   }
 
+  # Backwards compat: legacy pkg_dat frames (pre-#107) lack direct-dep
+  # list-cols. Fall back to the recursive fields so callers built
+  # against the older shape (and existing tests) keep working.
+  if (!"depends_direct" %in% names(pkg_dat))  pkg_dat$depends_direct  <- pkg_dat$depends
+  if (!"suggests_direct" %in% names(pkg_dat)) pkg_dat$suggests_direct <- pkg_dat$suggests
+
+  # First pass: which rows are downgrade candidates? Uses the RECURSIVE
+  # depends/suggests list-cols so a transitive failure still trips the
+  # downgrade in a single call (matches pre-#107 propagation semantics).
+  pkg_dat <- pkg_dat |>
+    dplyr::mutate(
+      dep_failed = purrr::map_lgl(depends,  function(x) any(x %in% failed_pkgs)),
+      sug_failed = purrr::map_lgl(suggests, function(x) any(x %in% failed_pkgs))
+    )
+
+  # Augment the failed set with pkgs about to be downgraded in this
+  # call. Ensures that when Z's direct dep Y (not yet in `failed_pkgs`)
+  # gets downgraded because Y's own recursive dep X failed, Z's note
+  # can still name Y as the direct-dep culprit instead of collapsing
+  # to NA.
+  in_scope_sug <- pkg_dat$sug_failed & ("Suggests" %in% deps)
+  new_failed   <- pkg_dat$pkg[pkg_dat$dep_failed | in_scope_sug]
+  aug_failed   <- unique(c(failed_pkgs, new_failed))
+
   pkg_dat |>
     dplyr::mutate(
-      dep_failed_matches = purrr::map_chr(depends,  identify_failed_deps, failed_pkgs = failed_pkgs),
-      sug_failed_matches = purrr::map_chr(suggests, identify_failed_deps, failed_pkgs = failed_pkgs),
-      dep_failed = !is.na(dep_failed_matches),
-      sug_failed = !is.na(sug_failed_matches)
+      dep_failed_matches = purrr::map_chr(depends_direct,  identify_failed_deps, failed_pkgs = aug_failed),
+      sug_failed_matches = purrr::map_chr(suggests_direct, identify_failed_deps, failed_pkgs = aug_failed)
     ) |>
     dplyr::mutate(
       final_decision = dplyr::case_when(
@@ -1544,9 +1570,10 @@ reject_iteration <- function(pkg_dat, dec_reject, deps, decisions,
         .default = decision_reason
       ),
       # When a pkg is downgraded because a dep (or suggest, if deps includes
-      # "Suggests") failed, list the failing dep pkg name(s) in the note.
-      # Best-effort -- may under-report if a chain of failures wasn't fully
-      # captured in `failed_pkgs` at this iteration (see issue #37).
+      # "Suggests") failed, list the failing DIRECT dep pkg name(s) in the
+      # note (see #107 for why direct-only). Best-effort -- may under-report
+      # if a chain of failures wasn't fully captured in `aug_failed` at this
+      # iteration (see issue #37).
       final_decision_reason_note = dplyr::case_when(
         decision_reason == "Pre-Approved package" ~ decision_reason_note,
         dep_failed ~ dep_failed_matches,

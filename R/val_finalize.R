@@ -273,6 +273,13 @@ val_finalize <- function(
     x <- purrr::list_flatten(bundle)
     x$depends  <- list(x$depends)
     x$suggests <- list(x$suggests)
+    # Backwards-compat with legacy meta bundles (pre-#107): direct-dep
+    # fields may be absent -- fall back to the recursive fields so
+    # reject_iteration() still has something to intersect with.
+    if (is.null(x$depends_direct))  x$depends_direct  <- x$depends[[1]]
+    if (is.null(x$suggests_direct)) x$suggests_direct <- x$suggests[[1]]
+    x$depends_direct  <- list(x$depends_direct)
+    x$suggests_direct <- list(x$suggests_direct)
     x$rev_deps <- list(x$rev_deps)
     x$sys_info <- list(x$sys_info)
     pkgs_df0_rows[[i]] <- dplyr::as_tibble(x)
