@@ -1,3 +1,9 @@
+# val.pipeline (development version)
+
+- Retired the `ac-dev` local-superset branch workflow from
+  `.github/copilot-instructions.md`. Agent-directed PRs now cut from
+  `main`, PR to `main`, and stop there; no local ac-dev merge step.
+
 # val.pipeline 0.1.21
 
 - Extracted the collation + wrap-up tail of `val_build()` into a new

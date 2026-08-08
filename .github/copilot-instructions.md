@@ -142,37 +142,15 @@ macos/windows/ubuntu on push to `main`/`master` and every PR. Keep it green.
   reference for history but is no longer part of the workflow. If you
   see it referenced in older PRs or commits, that's legacy.
 - **`ac-<n>-slug`** — one branch per issue, cut from `main`, PR'd back
-  to `main`. **Clean** — no agent files. `<n>` is the GitHub issue
-  number.
+  to `main`. `<n>` is the GitHub issue number.
 - **`jt-*`** — Jeff's feature branches, same shape as `ac-<n>-slug`.
   Don't touch these unless coordinating.
-- **`ac-dev`** — Aaron's **local-only** testing superset branch that
-  carries the remaining agent-loop files not shipped on `main`
-  (`.github/agent-plan.md`, `.github/ISSUE_TEMPLATE/agent-loop.md`).
-  `.github/copilot-instructions.md` now lives on `main` and is shared by
-  all branches. `ac-dev` is never pushed to `origin` and never merged
-  outward. After opening a PR from `ac-<n>-slug`, merge that branch
-  **into** `ac-dev` so local iteration runs the newest code:
-  ```
-  git checkout ac-dev
-  git merge --no-ff ac-<n>-slug
-  ```
-  When a PR merges to `main`, fast-forward `ac-dev` from `origin/main`:
-  ```
-  git fetch origin
-  git checkout ac-dev
-  git merge --ff-only origin/main   # keeps agent-loop files on top
-  ```
 
-**Cross-branch hygiene**: `agent-plan.md` and the `agent-loop.md` issue
-template are tracked on `ac-dev` only. On any `ac-<n>-slug` / `jt-*` /
-`main` checkout they simply won't exist in the working tree (git leaves
-untracked-elsewhere files alone on checkout, so if they persist locally,
-that's fine — just don't add them). **Never `git add` those two files
-on a non-`ac-dev` branch.** If a stray copy shows up on a fix branch,
-`git rm --cached` it before committing. `copilot-instructions.md` is
-the exception: it is intentionally tracked on `main` so every branch
-inherits it.
+**Retired**: the `ac-dev` local superset workflow (merging PR branches
+into a local-only `ac-dev` to carry `.github/agent-plan.md` +
+`.github/ISSUE_TEMPLATE/agent-loop.md` on top of `main`) is no longer in
+use. Do not check out, sync, or merge into `ac-dev`. If a stale local
+`ac-dev` exists, ignore it.
 
 ## Version + NEWS bump per PR
 
@@ -245,9 +223,10 @@ frozen. A confident wrong assumption about how `val_decision()` reads a
 rule block silently miscategorizes packages downstream.
 
 ## Agent plan
-Read `.github/agent-plan.md` at the start of every session. It contains the
-issue-by-issue loop workflow and the Familiarity log. Update it (and the
-"Repo facts learned" section below) after each completed issue.
+The `.github/agent-plan.md` and `.github/ISSUE_TEMPLATE/agent-loop.md`
+files (if they existed on your local `ac-dev` checkout) are no longer
+part of the workflow. Just work directly from the GitHub issue text and
+this file.
 
 ## Repo facts learned (append-only, agent self-updates here)
 
