@@ -9,6 +9,7 @@ params:
   assessment_path: "assessments/dplyr.rds"
   hide_reverse_deps: true
   source: "pkg_install"
+  repo_url: NULL
   val_date: NULL
   val_dir: NULL
 format:
@@ -58,6 +59,7 @@ risk_path <- params$assessment_path
 image <- params$image
 val_date <- params$val_date
 val_dir <- params$val_dir
+repo_url <- params$repo_url
 
 d_riskmetric <- readRDS(risk_path)
 
@@ -86,6 +88,14 @@ cat("> - **Validation directory (`val_dir`):** ",
 cat("> - **Origin (`source`):** ",
     riskreports:::get_pkg_origin(params$source),
     "\n", sep = "")
+# Source repo URL. This is the actual URL the package tarball was
+# pulled from during the run (e.g. a date-pinned PPM snapshot). Its
+# basename is the snapshot repo name in Posit Package Manager, so
+# reviewers can trace a rendered report back to a specific PPM
+# snapshot without cross-referencing `qual_metadata.rds`. (#114)
+if (!is.null(repo_url) && length(repo_url) == 1L && nzchar(repo_url)) {
+  cat("> - **Source repo URL (`repo_url`):** ", repo_url, "\n", sep = "")
+}
 ```
 
 
