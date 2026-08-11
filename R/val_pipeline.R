@@ -18,6 +18,19 @@
 #'   "depends". Options include "depends", "suggests", or NULL.
 #' @param deps_recursive Logical. Whether to consider dependencies recursively.
 #'   Default is TRUE.
+#' @param rev_deps Character or NULL. Types of **reverse** dependencies
+#'   to fold into the seed set before forward-dep expansion runs.
+#'   Same shorthand as `deps` (`"depends"` = Depends/Imports/LinkingTo,
+#'   `"suggests"` = Suggests, `c("depends","suggests")` = both). `NULL`
+#'   (default) preserves the pre-#105 behaviour of no rev-dep
+#'   expansion. Use this when re-assessing a remediated package (e.g.
+#'   `duckdb` flipped from High to Low) so every pkg that previously
+#'   failed *because* it depended on that pkg is re-assessed too.
+#' @param rev_deps_recursive Logical. Whether reverse-dep expansion
+#'   walks the whole transitive tree. Default is `FALSE` because
+#'   rev-dep trees explode fast (a foundational pkg like `Rcpp` has
+#'   thousands of transitive dependents); flip to `TRUE` deliberately.
+#'   Ignored when `rev_deps = NULL`.
 #' @param val_date Date. The date for validation. Default is the current date.
 #' @param replace Logical. Whether to replace existing assessments. Default is
 #'   FALSE.
@@ -122,6 +135,8 @@ val_pipeline <- function(
   # Note: "depends" this means --> c("Depends", "Imports", "LinkingTo")
   deps = c("depends", "suggests")[1], 
   deps_recursive = TRUE,
+  rev_deps = NULL,
+  rev_deps_recursive = FALSE,
   val_date = Sys.Date(),
   replace = FALSE, 
   out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
@@ -169,6 +184,8 @@ val_pipeline <- function(
       metric_pkg      = metric_pkg,
       deps            = deps,
       deps_recursive  = deps_recursive,
+      rev_deps        = rev_deps,
+      rev_deps_recursive = rev_deps_recursive,
       val_date        = val_date,
       out             = out,
       opt_repos       = opt_repos,

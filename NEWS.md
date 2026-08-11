@@ -1,4 +1,18 @@
-# val.pipeline (development version)
+
+# val.pipeline 0.1.24
+
+- Added optional reverse-dependency expansion to `resolve_pkg_tree()`,
+  surfaced via new `rev_deps` / `rev_deps_recursive` args on
+  `val_pipeline()`, `val_prep_pipeline()`, and `val_build()`. When
+  set, the seed set is first expanded with the reverse deps of the
+  supplied packages (via `tools::package_dependencies(reverse = TRUE)`)
+  before forward-dep expansion runs, so re-assessing a remediated
+  package (e.g. `duckdb` flipped from High to Low) can also re-run
+  everything that previously failed *because* it depended on that
+  package. Defaults preserve pre-existing behaviour (`rev_deps = NULL`,
+  `rev_deps_recursive = FALSE`). (#105)
+
+# val.pipeline 0.1.23
 
 - Narrowed `reject_iteration()`'s Pre-Approved carve-out so a package on
   the config `approved_pkgs` list is protected from dep-driven downgrade

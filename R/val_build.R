@@ -30,6 +30,16 @@
 #'   assessed without their dependencies.
 #' @param deps_recursive Logical indicating whether to include dependencies
 #'   recursively. Default is TRUE.
+#' @param rev_deps Character or NULL. Types of **reverse** dependencies
+#'   to fold into the seed set before forward-dep expansion runs.
+#'   Same shorthand as `deps` (`"depends"`, `"suggests"`, or both).
+#'   `NULL` (default) means no rev-dep expansion. Only consulted when
+#'   `prep = NULL`; a supplied `prep` already carries a resolved
+#'   package tree.
+#' @param rev_deps_recursive Logical. Whether reverse-dep expansion
+#'   walks the transitive tree. Default is `FALSE` because rev-dep
+#'   trees can explode (foundational pkgs like `Rcpp` have thousands
+#'   of transitive dependents). Ignored when `rev_deps = NULL`.
 #' @param val_date Date object or character string representing the date of the
 #'   validation build. Default is the current date (Sys.Date()).
 #' @param out Character string specifying the output directory for the
@@ -133,6 +143,8 @@ val_build <- function(
     metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
     deps = c("depends", "suggests")[1], # deps = c("depends"), deps = NULL
     deps_recursive = TRUE,
+    rev_deps = NULL,
+    rev_deps_recursive = FALSE,
     val_date = Sys.Date(),
     out = 'riskassessment',
     replace = FALSE,
@@ -256,9 +268,11 @@ val_build <- function(
     if (!is.null(prep$opt_repos)) opt_repos <- prep$opt_repos
   } else {
     tree       <- resolve_pkg_tree(
-      pkg_names      = pkg_names,
-      deps           = deps,
-      deps_recursive = deps_recursive
+      pkg_names          = pkg_names,
+      deps               = deps,
+      deps_recursive     = deps_recursive,
+      rev_deps           = rev_deps,
+      rev_deps_recursive = rev_deps_recursive
     )
     pkgs       <- tree$pkgs
     vers       <- tree$vers

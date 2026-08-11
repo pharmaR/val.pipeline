@@ -8,6 +8,8 @@ resolve_pkg_tree(
   pkg_names,
   deps = c("depends", "suggests")[1],
   deps_recursive = TRUE,
+  rev_deps = NULL,
+  rev_deps_recursive = FALSE,
   avail_pkgs = NULL
 )
 }
@@ -24,6 +26,22 @@ or \code{NULL}. Passed through to the \code{which} argument of
 
 \item{deps_recursive}{Logical. Whether dependency expansion is
 recursive. Passed straight through.}
+
+\item{rev_deps}{One of \code{"depends"}, \code{"suggests"},
+\code{c("depends","suggests")}, or \code{NULL} (default). When non-\code{NULL},
+the seed set is first expanded with its \strong{reverse} dependencies
+(via \code{tools::package_dependencies(reverse = TRUE, which = ...)})
+before forward-dep expansion runs. Use this when re-assessing a
+remediated package (e.g. \code{duckdb} flipped from High to Low) and
+you want everything that previously failed \emph{because} it depended
+on that pkg to be re-assessed too. \code{NULL} (default) preserves the
+pre-#105 behaviour of forward-only expansion.}
+
+\item{rev_deps_recursive}{Logical, default \code{FALSE}. Whether
+reverse-dep expansion walks the whole transitive tree. Default is
+\code{FALSE} because rev-dep trees explode fast (a foundational pkg
+like \code{Rcpp} has thousands of transitive dependents); flip to
+\code{TRUE} deliberately.}
 
 \item{avail_pkgs}{Optional data frame from
 \code{as.data.frame(available.packages())}. When \code{NULL}, one is

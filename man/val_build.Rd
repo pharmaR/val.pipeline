@@ -10,6 +10,8 @@ val_build(
   metric_pkg = c("riskmetric", "val.meter", "risk.assessr"),
   deps = c("depends", "suggests")[1],
   deps_recursive = TRUE,
+  rev_deps = NULL,
+  rev_deps_recursive = FALSE,
   val_date = Sys.Date(),
   out = "riskassessment",
   replace = FALSE,
@@ -42,6 +44,18 @@ assessed without their dependencies.}
 
 \item{deps_recursive}{Logical indicating whether to include dependencies
 recursively. Default is TRUE.}
+
+\item{rev_deps}{Character or NULL. Types of \strong{reverse} dependencies
+to fold into the seed set before forward-dep expansion runs.
+Same shorthand as \code{deps} (\code{"depends"}, \code{"suggests"}, or both).
+\code{NULL} (default) means no rev-dep expansion. Only consulted when
+\code{prep = NULL}; a supplied \code{prep} already carries a resolved
+package tree.}
+
+\item{rev_deps_recursive}{Logical. Whether reverse-dep expansion
+walks the transitive tree. Default is \code{FALSE} because rev-dep
+trees can explode (foundational pkgs like \code{Rcpp} have thousands
+of transitive dependents). Ignored when \code{rev_deps = NULL}.}
 
 \item{val_date}{Date object or character string representing the date of the
 validation build. Default is the current date (Sys.Date()).}

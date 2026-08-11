@@ -87,3 +87,98 @@ test_that("resolve_pkg_tree(): invalid `deps` value is caught with the stopcheck
     "which_deps"
   )
 })
+
+
+test_that("resolve_pkg_tree(): rev_deps=NULL (default) skips reverse expansion", {
+  ap <- local_avail()
+  called <- FALSE
+  res <- with_mocked_bindings(
+    package_dependencies = function(packages, which, recursive, reverse = FALSE) {
+      if (isTRUE(reverse)) called <<- TRUE
+      setNames(rep(list(character()), length(packages)), packages)
+    },
+    .package = "tools",
+    {
+      resolve_pkg_tree(
+        pkg_names      = c("A"),
+        deps           = "depends",
+        deps_recursive = TRUE,
+        avail_pkgs     = ap
+      )
+    }
+  )
+  expect_false(called)
+  expect_true("A" %in% res$pkgs)
+})
+
+
+test_that("resolve_pkg_tree(): rev_deps folds reverse-dep pkgs into the seed set", {
+  ap <- local_avail()
+  # Reverse-dep tree: rev(A) = {C, D}. Forward-dep tree of {A,C,D}: no deps.
+  fake_rev  <- list(A = c("C", "D"))
+  fake_fwd  <- list(A = character(), C = character(), D = character())
+
+  res <- with_mocked_bindings(
+    package_dependencies = function(packages, which, recursive, reverse = FALSE) {
+      if (isTRUE(reverse)) fake_rev else fake_fwd
+    },
+    .package = "tools",
+    {
+      resolve_pkg_tree(
+        pkg_names          = "A",
+        deps               = "depends",
+        deps_recursive     = TRUE,
+        rev_deps           = "depends",
+        rev_deps_recursive = FALSE,
+        avail_pkgs         = ap
+      )
+    }
+  )
+  expect_setequal(res$pkgs, c("A", "C", "D"))
+})
+
+
+test_that("resolve_pkg_tree(): rev_deps_recursive is forwarded to package_dependencies", {
+  ap <- local_avail()
+  seen_recursive <- NA
+  with_mocked_bindings(
+    package_dependencies = function(packages, which, recursive, reverse = FALSE) {
+      if (isTRUE(reverse)) seen_recursive <<- recursive
+      setNames(rep(list(character()), length(packages)), packages)
+    },
+    .package = "tools",
+    {
+      resolve_pkg_tree(
+        pkg_names          = "A",
+        deps               = "depends",
+        rev_deps           = "depends",
+        rev_deps_recursive = TRUE,
+        avail_pkgs         = ap
+      )
+    }
+  )
+  expect_true(seen_recursive)
+})
+
+
+test_that("resolve_pkg_tree(): rev_deps ignored when pkg_names is NULL", {
+  ap <- local_avail()
+  rev_called <- FALSE
+  res <- with_mocked_bindings(
+    package_dependencies = function(packages, which, recursive, reverse = FALSE) {
+      if (isTRUE(reverse)) rev_called <<- TRUE
+      setNames(rep(list(character()), length(packages)), packages)
+    },
+    .package = "tools",
+    {
+      resolve_pkg_tree(
+        pkg_names  = NULL,
+        deps       = NULL,
+        rev_deps   = "depends",
+        avail_pkgs = ap
+      )
+    }
+  )
+  expect_false(rev_called)
+  expect_setequal(res$pkgs, ap$Package)
+})
