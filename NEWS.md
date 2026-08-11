@@ -1,4 +1,5 @@
-# val.pipeline 0.1.22
+
+# val.pipeline 0.1.24
 
 - Added optional reverse-dependency expansion to `resolve_pkg_tree()`,
   surfaced via new `rev_deps` / `rev_deps_recursive` args on
@@ -10,6 +11,43 @@
   everything that previously failed *because* it depended on that
   package. Defaults preserve pre-existing behaviour (`rev_deps = NULL`,
   `rev_deps_recursive = FALSE`). (#105)
+
+# val.pipeline 0.1.23
+
+- Narrowed `reject_iteration()`'s Pre-Approved carve-out so a package on
+  the config `approved_pkgs` list is protected from dep-driven downgrade
+  only when none of its runtime deps actually failed. When a Pre-Approved
+  pkg's dep DID fail (PPM can no longer serve it because its install
+  closure is broken) the pkg is downgraded to the reject category with
+  `final_decision_reason = "Pre-Approved (dep failed)"` so an operator
+  can distinguish it from an ordinary dep-driven downgrade and either
+  fix the upstream dep or drop the pkg from `approved_pkgs`.
+  `val_build()`'s pre-skip branch was updated to emit the same reason
+  string when the pre-skipped pkg is on `approved_pkgs`, and
+  `val_pipeline_report()`'s summary gained a small section listing every
+  Pre-Approved-with-failed-dep pkg + the failing direct dep(s), so the
+  actionable list surfaces at the top of the report. (#110)
+- Fixed `decision_reason_note` listing the recursive Suggests closure
+  intersected with all failed packages (~100 unrelated transitive pkgs)
+  instead of the actual DESCRIPTION-level dep(s) that triggered the
+  downgrade. `val_pkg()` and `val_build()`'s dep-skip branch now capture
+  direct (non-recursive) `depends_direct` / `suggests_direct` alongside
+  the existing recursive fields; both the dep-skip branch and
+  `reject_iteration()` populate the note from the direct set. Legacy
+  meta bundles without the new fields fall back to the recursive fields.
+  (#107)
+- Widened `rip_cats_by_pkg()`'s `pass_primary` bypass so a package on the
+  `pass_primary` allow-list is exempted from the `downloads_1yr` primary
+  metric when its downloads sit below the *Low* tier's floor (upper
+  `downloads_1yr` bound, e.g. 200k under the default config), not just
+  below the *High* tier's ceiling (lower bound, e.g. 80k). Packages in
+  the Medium tier would still land in Medium on `downloads_1yr` alone
+  and fail `accept_cats: Low`, defeating the point of the bypass. (#112)
+- Added the package's source repo URL as a bullet in the Context section
+  of the per-package report (`inst/report/package/pkg_template.qmd`).
+  The URL's basename is the snapshot repo name in Posit Package Manager,
+  so reviewers can trace a rendered report back to a specific PPM
+  snapshot without cross-referencing `qual_metadata.rds`. (#114)
 
 # val.pipeline 0.1.21
 

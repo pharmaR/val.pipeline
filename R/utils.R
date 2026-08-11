@@ -1100,39 +1100,44 @@ rip_cats_by_pkg <- function(
   # These are typically lower download pkgs that derserve their day in court
   bypass_primary  <- pull_config(val = "pass_primary", rule_type = "default")
 
-  # Lowest boundary of the `downloads_1yr` primary rule, derived directly
-  # from dec_df so we stay in sync with whatever the config says (rather
-  # than hard-coding it here and drifting out of date). Combining
-  # to_the_limit(low = TRUE) and to_the_limit(low = FALSE) across every
-  # `downloads_1yr` row picks up boundaries expressed as `< X`, `> X`,
-  # `<= X`, `>= X`, and `dplyr::between(., a, b)` alike. Compound
-  # conditions like `is.na(.x) | .x < X` return NA from to_the_limit()
-  # and are silently ignored — as long as one of the other rows for the
-  # same metric names the boundary (e.g. Medium's `between(80000, ...)`
-  # or Low's `> 240000`), we'll pick up the 80k floor. If nothing is
-  # parseable, we fall back to Inf so the bypass behaves as it did
-  # before this guard was added (applies to any `pass_primary` member).
+  # Highest finite boundary of the `downloads_1yr` primary rule, derived
+  # directly from dec_df so we stay in sync with whatever the config
+  # says (rather than hard-coding it here and drifting out of date).
+  # Combining to_the_limit(low = TRUE) and to_the_limit(low = FALSE)
+  # across every `downloads_1yr` row picks up boundaries expressed as
+  # `< X`, `> X`, `<= X`, `>= X`, and `dplyr::between(., a, b)` alike.
+  # Compound conditions like `is.na(.x) | .x < X` return NA from
+  # to_the_limit() and are silently ignored -- as long as one of the
+  # other rows for the same metric names an upper boundary (e.g. Low's
+  # `> 200000` or Medium's `between(80000, 200000)`), we'll pick up the
+  # 200k ceiling. The bypass fires for any `pass_primary` member whose
+  # downloads_1yr sits below that ceiling, because they'd otherwise
+  # land in Medium/High on downloads alone and fail `accept_cats: Low`
+  # -- the whole point of the bypass is to give them their day in
+  # court. If nothing is parseable, we fall back to Inf so the bypass
+  # behaves as it did before this guard was added (applies to any
+  # `pass_primary` member). See #112.
   dwnld_conds  <- dec_df$condition[tolower(dec_df$metric) == "downloads_1yr"]
   dwnld_bounds <- c(
     to_the_limit(dwnld_conds, low = TRUE),
     to_the_limit(dwnld_conds, low = FALSE)
   )
   dwnld_bounds <- dwnld_bounds[is.finite(dwnld_bounds) & dwnld_bounds > 0]
-  min_dwnld_bound <- if (length(dwnld_bounds)) min(dwnld_bounds) else Inf
+  low_tier_min <- if (length(dwnld_bounds)) max(dwnld_bounds) else Inf
 
   subset_metrics <- dec_df |>
     dplyr::filter(tolower(metric_type) == tolower(label)) %>%
 
     # if this is not a CRAN pkg OR if it's a pkg that has been granted "pass-primary" status
     # (usually pkgs with lower downloads, but need a fair shake) AND its
-    # downloads_1yr is still below the lowest primary bound
-    # (min_dwnld_bound; see above)...
+    # downloads_1yr is still below the Low tier's floor
+    # (low_tier_min; see above)...
     # then do not use downloads_1yr as the cornerstone primary metric
     {if("downloads_1yr" %in% all_mets &&
         (toupper(repo_name) != "CRAN" ||
          (pkgs_df$package %in% bypass_primary &
           (is.na(pkgs_df$downloads_1yr) |
-           pkgs_df$downloads_1yr < min_dwnld_bound)))
+           pkgs_df$downloads_1yr < low_tier_min)))
          ) {
       dplyr::filter(., !(tolower(metric) %in% c("downloads_1yr")))
     } else .} |>
@@ -1486,9 +1491,13 @@ split_join_cats <- function(
 #' compute the `final_decision` and `final_decision_reason` for every row by
 #' marking any package whose dependencies (or Suggests, when `"Suggests"` is
 #' in `deps`) appear in `failed_pkgs` as `dec_reject`. Pre-approved packages
-#' are never downgraded. Packages with no failing dep carry their original
-#' `decision` / `decision_reason` through to `final_decision` /
-#' `final_decision_reason`.
+#' whose deps are all clean carry their original decision through untouched;
+#' pre-approved packages whose deps DID fail are downgraded to `dec_reject`
+#' with `final_decision_reason = "Pre-Approved (dep failed)"` so an operator
+#' can distinguish them from ordinary dep-driven downgrades (they can't be
+#' served by PPM because their install closure is broken; see #110).
+#' Packages with no failing dep carry their original `decision` /
+#' `decision_reason` through to `final_decision` / `final_decision_reason`.
 #'
 #' The function is designed to be called iteratively from `val_build()` until
 #' the set of failing packages stabilizes (a package can become "failed"
@@ -1510,8 +1519,12 @@ split_join_cats <- function(
 #'
 #' @return `pkg_dat` with `final_decision`, `final_decision_reason`, and
 #'   `final_decision_reason_note` populated for every row. For dependency-
-#'   driven downgrades the note lists the failing dep pkg name(s), comma-
-#'   separated (see [identify_failed_deps()] and issue #37).
+#'   driven downgrades the note lists the failing **direct** dep pkg
+#'   name(s) (from `depends_direct` / `suggests_direct` if present in
+#'   `pkg_dat`, else falling back to `depends` / `suggests`), comma-
+#'   separated. To keep transitive-chain rows meaningful the failed set is
+#'   augmented with pkgs downgraded within this call before notes are
+#'   computed (see [identify_failed_deps()] and issues #37, #107).
 #'
 #' @importFrom dplyr mutate case_when select
 #' @importFrom purrr map_chr
@@ -1523,38 +1536,77 @@ reject_iteration <- function(pkg_dat, dec_reject, deps, decisions,
     failed_pkgs <- pkg_dat$pkg[pkg_dat$final_decision != decisions[1]]
   }
 
+  # Backwards compat: legacy pkg_dat frames (pre-#107) lack direct-dep
+  # list-cols. Fall back to the recursive fields so callers built
+  # against the older shape (and existing tests) keep working.
+  if (!"depends_direct" %in% names(pkg_dat))  pkg_dat$depends_direct  <- pkg_dat$depends
+  if (!"suggests_direct" %in% names(pkg_dat)) pkg_dat$suggests_direct <- pkg_dat$suggests
+
+  # First pass: which rows are downgrade candidates? Uses the RECURSIVE
+  # depends/suggests list-cols so a transitive failure still trips the
+  # downgrade in a single call (matches pre-#107 propagation semantics).
+  pkg_dat <- pkg_dat |>
+    dplyr::mutate(
+      dep_failed = purrr::map_lgl(depends,  function(x) any(x %in% failed_pkgs)),
+      sug_failed = purrr::map_lgl(suggests, function(x) any(x %in% failed_pkgs))
+    )
+
+  # Augment the failed set with pkgs about to be downgraded in this
+  # call. Ensures that when Z's direct dep Y (not yet in `failed_pkgs`)
+  # gets downgraded because Y's own recursive dep X failed, Z's note
+  # can still name Y as the direct-dep culprit instead of collapsing
+  # to NA.
+  in_scope_sug <- pkg_dat$sug_failed & ("Suggests" %in% deps)
+  new_failed   <- pkg_dat$pkg[pkg_dat$dep_failed | in_scope_sug]
+  aug_failed   <- unique(c(failed_pkgs, new_failed))
+
   pkg_dat |>
     dplyr::mutate(
-      dep_failed_matches = purrr::map_chr(depends,  identify_failed_deps, failed_pkgs = failed_pkgs),
-      sug_failed_matches = purrr::map_chr(suggests, identify_failed_deps, failed_pkgs = failed_pkgs),
-      dep_failed = !is.na(dep_failed_matches),
-      sug_failed = !is.na(sug_failed_matches)
+      dep_failed_matches = purrr::map_chr(depends_direct,  identify_failed_deps, failed_pkgs = aug_failed),
+      sug_failed_matches = purrr::map_chr(suggests_direct, identify_failed_deps, failed_pkgs = aug_failed)
     ) |>
     dplyr::mutate(
+      # A pre-approved pkg whose runtime dep failed CAN'T be served by
+      # PPM (the install closure is broken), so downgrade it like any
+      # other dep-failed pkg but flag the reason as
+      # `"Pre-Approved (dep failed)"` so an operator can either fix
+      # the upstream dep or drop the pkg from `approved_pkgs`.
+      # Pre-approved pkgs with all deps clean are still protected.
+      # See #110.
+      is_preapproved  = decision_reason == "Pre-Approved package",
+      sug_in_scope    = sug_failed & ("Suggests" %in% deps),
+      preapp_dep_bad  = is_preapproved & (dep_failed | sug_in_scope),
+      preapp_dep_ok   = is_preapproved & !dep_failed & !sug_in_scope,
       final_decision = dplyr::case_when(
-        decision_reason == "Pre-Approved package" ~ decision,
-        dep_failed ~ dec_reject,
-        sug_failed & ("Suggests" %in% deps) ~ dec_reject,
+        preapp_dep_ok  ~ decision,
+        preapp_dep_bad ~ dec_reject,
+        dep_failed     ~ dec_reject,
+        sug_in_scope   ~ dec_reject,
         .default = decision
       ),
       final_decision_reason = dplyr::case_when(
-        decision_reason == "Pre-Approved package" ~ decision_reason,
-        dep_failed ~ "Dependency",
-        sug_failed & ("Suggests" %in% deps) ~ "Dependency",
+        preapp_dep_ok  ~ decision_reason,
+        preapp_dep_bad ~ "Pre-Approved (dep failed)",
+        dep_failed     ~ "Dependency",
+        sug_in_scope   ~ "Dependency",
         .default = decision_reason
       ),
       # When a pkg is downgraded because a dep (or suggest, if deps includes
-      # "Suggests") failed, list the failing dep pkg name(s) in the note.
-      # Best-effort -- may under-report if a chain of failures wasn't fully
-      # captured in `failed_pkgs` at this iteration (see issue #37).
+      # "Suggests") failed, list the failing DIRECT dep pkg name(s) in the
+      # note (see #107 for why direct-only). Best-effort -- may under-report
+      # if a chain of failures wasn't fully captured in `aug_failed` at this
+      # iteration (see issue #37).
       final_decision_reason_note = dplyr::case_when(
-        decision_reason == "Pre-Approved package" ~ decision_reason_note,
-        dep_failed ~ dep_failed_matches,
-        sug_failed & ("Suggests" %in% deps) ~ sug_failed_matches,
+        preapp_dep_ok  ~ decision_reason_note,
+        preapp_dep_bad & dep_failed ~ dep_failed_matches,
+        preapp_dep_bad & sug_in_scope ~ sug_failed_matches,
+        dep_failed     ~ dep_failed_matches,
+        sug_in_scope   ~ sug_failed_matches,
         .default = decision_reason_note
       )
     ) |>
-    dplyr::select(-dep_failed, -sug_failed, -dep_failed_matches, -sug_failed_matches)
+    dplyr::select(-dep_failed, -sug_failed, -dep_failed_matches, -sug_failed_matches,
+                  -is_preapproved, -sug_in_scope, -preapp_dep_bad, -preapp_dep_ok)
 }
 
 

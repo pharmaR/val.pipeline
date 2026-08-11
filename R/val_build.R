@@ -417,13 +417,54 @@ val_build <- function(
         ) |>
         unlist(use.names = FALSE)
 
+      # Direct (non-recursive) deps for `decision_reason_note`. See #107.
+      depends_direct <-
+        tools::package_dependencies(
+          packages = pkg,
+          db = available.packages(),
+          which = c("Depends", "Imports", "LinkingTo"),
+          recursive = FALSE
+        ) |>
+        unlist(use.names = FALSE)
+
+      suggests_direct <-
+        tools::package_dependencies(
+          packages = pkg,
+          db = available.packages(),
+          which = "Suggests",
+          recursive = FALSE
+        ) |>
+        unlist(use.names = FALSE)
+
       repo_src <- avail_pkgs |>
         dplyr::filter(Package %in% pkg) |>
         dplyr::pull(Repository) |>
         dirname() |> dirname()
       repo_name <- get_repo_origin(repo_src = repo_src, pkg_name = pkg)
 
-      dep_note <- identify_failed_deps(c(depends, suggests), failed_snapshot)
+      # Name the direct DESCRIPTION-level dep(s) that failed, not the
+      # recursive Suggests closure (which would list hundreds of
+      # transitive pkgs). Scope by `deps` so failing suggests are only
+      # named when the caller propagates them (matches the same
+      # `"Suggests" %in% deps` gate used in reject_iteration()). See #107.
+      note_deps <- if ("Suggests" %in% deps) {
+        c(depends_direct, suggests_direct)
+      } else {
+        depends_direct
+      }
+      dep_note <- identify_failed_deps(note_deps, failed_snapshot)
+
+      # If the pkg is on the config `approved_pkgs` list, distinguish it
+      # from an ordinary dep-driven downgrade so an operator can chase
+      # the upstream dep (or drop the pkg from `approved_pkgs`). Keeps
+      # this pre-skip branch consistent with reject_iteration()'s
+      # narrowed Pre-Approved carve-out (#110).
+      approved_pkgs <- pull_config(val = "approved_pkgs", rule_type = "default")
+      dep_reason <- if (pkg %in% approved_pkgs) {
+        "Pre-Approved (dep failed)"
+      } else {
+        "Dependency"
+      }
 
       pkg_meta <- list(
         pkg = pkg,
@@ -435,13 +476,15 @@ val_build <- function(
         ref = NA_character_,
         metric_pkg = NA_character_,
         decision = decisions[length(decisions)],
-        decision_reason = "Dependency",
+        decision_reason = dep_reason,
         decision_reason_note = dep_note,
         final_decision = decisions[length(decisions)],
-        final_decision_reason = "Dependency",
+        final_decision_reason = dep_reason,
         final_decision_reason_note = dep_note,
         depends = if(identical(depends, character(0))) NA_character_ else depends,
         suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
+        depends_direct  = if(identical(depends_direct,  character(0))) NA_character_ else depends_direct,
+        suggests_direct = if(identical(suggests_direct, character(0))) NA_character_ else suggests_direct,
         rev_deps = NA_character_,
         assessment_runtime = list(txt = NA_character_, mins = NA)
       )

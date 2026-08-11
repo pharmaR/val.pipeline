@@ -114,6 +114,99 @@ test_that("rip_cats_by_pkg() processes data with matching metric types", {
 })
 
 
+test_that("rip_cats_by_pkg() bypass fires for pass_primary members below the Low tier's floor (#112)", {
+  # Config-shaped downloads_1yr rule with bounds at 80k (High/Medium
+  # boundary) and 200k (Medium/Low boundary). Under #112 the bypass
+  # fires when a pass_primary member's downloads sit below the *Low*
+  # tier's floor (200k), not just below the High tier's ceiling (80k),
+  # because a pkg between 80k and 200k still lands in Medium and fails
+  # `accept_cats: Low` on its own -- the whole point of the bypass is
+  # to save those pkgs from the primary-metric axe.
+  mock_dec_df <- data.frame(
+    metric = "downloads_1yr",
+    metric_type = "primary",
+    decision = factor(c("High", "Medium", "Low"),
+                      levels = c("Low", "Medium", "High")),
+    decision_id = c(3, 2, 1),
+    condition = c("~ is.na(.x) | .x < 80000",
+                  "~ dplyr::between(.x, 80000, 200000)",
+                  "~ .x > 200000"),
+    auto_accept = c(NA_character_, NA_character_, "~ .x > 1000000"),
+    stringsAsFactors = FALSE
+  )
+
+  # `bypass_pkg` is on the pass_primary list with 100k downloads (mid-
+  # tier: Medium under the config). Pre-#112 it would NOT be bypassed
+  # (100k >= 80k). Post-#112 it IS bypassed (100k < 200k), so
+  # downloads_1yr should be dropped from the primary metric set.
+  mock_pkgs <- data.frame(
+    package = "bypass_pkg",
+    downloads_1yr = 100000L,
+    stringsAsFactors = FALSE
+  )
+
+  testthat::local_mocked_bindings(
+    pull_config = function(val = NULL, rule_type = NULL, config_path = NULL) {
+      if (identical(val, "pass_primary")) "bypass_pkg" else NULL
+    }
+  )
+
+  expect_output(
+    result <- rip_cats_by_pkg(
+      label = "primary",
+      repo_name = "CRAN",
+      dec_df = mock_dec_df,
+      pkgs_df = mock_pkgs,
+      decisions = c("Low", "Medium", "High"),
+      else_cat = "High"
+    )
+  )
+  # Bypass fired: downloads_1yr should no longer appear in the primary
+  # categorisation output.
+  expect_false("downloads_1yr_cat" %in% names(result))
+})
+
+test_that("rip_cats_by_pkg() bypass does NOT fire when pass_primary member exceeds Low tier's floor (#112)", {
+  # Same config, but pkg has 250k downloads -- already in Low tier
+  # under downloads_1yr alone. Bypass should NOT fire, so
+  # downloads_1yr stays in the primary set.
+  mock_dec_df <- data.frame(
+    metric = "downloads_1yr",
+    metric_type = "primary",
+    decision = factor(c("High", "Medium", "Low"),
+                      levels = c("Low", "Medium", "High")),
+    decision_id = c(3, 2, 1),
+    condition = c("~ is.na(.x) | .x < 80000",
+                  "~ dplyr::between(.x, 80000, 200000)",
+                  "~ .x > 200000"),
+    auto_accept = c(NA_character_, NA_character_, "~ .x > 1000000"),
+    stringsAsFactors = FALSE
+  )
+  mock_pkgs <- data.frame(
+    package = "popular_pkg",
+    downloads_1yr = 250000L,
+    stringsAsFactors = FALSE
+  )
+  testthat::local_mocked_bindings(
+    pull_config = function(val = NULL, rule_type = NULL, config_path = NULL) {
+      if (identical(val, "pass_primary")) "popular_pkg" else NULL
+    }
+  )
+  expect_output(
+    result <- rip_cats_by_pkg(
+      label = "primary",
+      repo_name = "CRAN",
+      dec_df = mock_dec_df,
+      pkgs_df = mock_pkgs,
+      decisions = c("Low", "Medium", "High"),
+      else_cat = "High"
+    )
+  )
+  # Bypass did NOT fire: downloads_1yr should still appear.
+  expect_true("downloads_1yr_cat" %in% names(result))
+})
+
+
 test_that("rip_cats_by_pkg() filters 'downloads_1yr' for non-CRAN repos", {
   
   metric_name = "other_metric"

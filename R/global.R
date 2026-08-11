@@ -5,7 +5,8 @@ utils::globalVariables(c(
   "condition",
   "decision", "decision_reason", "decision_reason_note", "dep_failed",
   "dep_failed_matches", "sug_failed_matches",
-  "dep_freq", "depends", "deps",
+  "is_preapproved", "sug_in_scope", "preapp_dep_bad", "preapp_dep_ok",
+  "dep_freq", "depends", "depends_direct", "deps",
   "derived_col", "downloads_1yr", "ends_with", "exception_risk_category",
   "final_decision", "final_decision_reason_note", "final_risk",
   "final_risk_cat", "final_risk_catid",
@@ -13,7 +14,7 @@ utils::globalVariables(c(
   "met_dec_id", "metric", "metric_type", "news_curr", "news_current",
   "package", "pretty",
   "primary_risk_category", "repo_name", "reverse_dependencies",
-  "sug_failed", "suggests",
+  "sug_failed", "suggests", "suggests_direct",
   "dec_id_df", "decisions", "secondary_risk_category", "rule_lst",
   "Metric", "Type",
   "phase", "seconds", "total_s", "ver"

@@ -395,6 +395,36 @@ reason_counts <- qual_metadata |>
 itable(reason_counts, default_page_size = 10)
 ```
 
+## Pre-Approved packages that failed dependency propagation
+
+Packages on the config `approved_pkgs` list that had to be downgraded
+because at least one runtime dependency failed its assessment. PPM can't
+serve these packages until either the failing upstream dep is fixed or the
+package is removed from `approved_pkgs`. The note column names the direct
+DESCRIPTION-level dep(s) that failed. See #110.
+
+```{r preapproved-dep-failed}
+preapp_bad <- qual_metadata |>
+  dplyr::filter(final_decision_reason == "Pre-Approved (dep failed)") |>
+  dplyr::arrange(pkg) |>
+  dplyr::transmute(
+    Package = pkg,
+    Version = ver,
+    `Failing dep(s)` = ifelse(is.na(final_decision_reason_note) |
+                                final_decision_reason_note == "",
+                              "(unrecorded)", final_decision_reason_note)
+  )
+```
+
+**`r nrow(preapp_bad)`** Pre-Approved package(s) could not be qualified in
+this run.
+
+```{r preapproved-dep-failed-tbl}
+if (nrow(preapp_bad) > 0L) {
+  itable(preapp_bad, default_page_size = 25)
+}
+```
+
 # Packages by Risk Category
 
 The tables below list every package in each risk tier, with the reason and

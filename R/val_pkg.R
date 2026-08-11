@@ -159,8 +159,31 @@ val_pkg <- function(
       recursive = TRUE # this really blows up for almost any pkg
     ) |>
     unlist(use.names = FALSE) 
-  
-  
+
+  # Direct (non-recursive) deps: what's declared in this package's own
+  # DESCRIPTION. Used to populate `decision_reason_note` so a
+  # dep-driven downgrade names a real DESCRIPTION-level dep instead of
+  # a transitive package pulled from the recursive Suggests closure
+  # (which for most packages is 1000-2000 pkgs long). See #107.
+  depends_direct <-
+    tools::package_dependencies(
+      packages = pkg,
+      db = avail_pkgs |> as.matrix(),
+      which = c("Depends", "Imports", "LinkingTo"),
+      recursive = FALSE
+    ) |>
+    unlist(use.names = FALSE)
+
+  suggests_direct <-
+    tools::package_dependencies(
+      packages = pkg,
+      db = avail_pkgs |> as.matrix(),
+      which = "Suggests",
+      recursive = FALSE
+    ) |>
+    unlist(use.names = FALSE)
+
+
   #
   # ---- Assess ---- 
   #
@@ -673,6 +696,7 @@ val_pkg <- function(
         assessment_path = assessment_file,
         hide_reverse_deps = 'false',
         source = src_ref, # defined above
+        repo_url = repo_src,
         val_date = as.character(val_date),
         val_dir = out_dir
       ),
@@ -721,6 +745,8 @@ val_pkg <- function(
     final_decision_reason_note = NA_character_, # Will be set later
     depends = if(identical(depends, character(0))) NA_character_ else depends,
     suggests = if(identical(suggests, character(0))) NA_character_ else suggests,
+    depends_direct  = if(identical(depends_direct,  character(0))) NA_character_ else depends_direct,
+    suggests_direct = if(identical(suggests_direct, character(0))) NA_character_ else suggests_direct,
     rev_deps = if(is.null(pkg_assessment$reverse_dependencies)) NA_character_ else pkg_assessment$reverse_dependencies |> as.vector(),
     assessment_runtime = list(txt = ass_mins_txt, mins = ass_mins),
     # Per-phase elapsed seconds captured via val_time_block() around
