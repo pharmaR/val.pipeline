@@ -29,6 +29,11 @@
   below the *High* tier's ceiling (lower bound, e.g. 80k). Packages in
   the Medium tier would still land in Medium on `downloads_1yr` alone
   and fail `accept_cats: Low`, defeating the point of the bypass. (#112)
+- Added the package's source repo URL as a bullet in the Context section
+  of the per-package report (`inst/report/package/pkg_template.qmd`).
+  The URL's basename is the snapshot repo name in Posit Package Manager,
+  so reviewers can trace a rendered report back to a specific PPM
+  snapshot without cross-referencing `qual_metadata.rds`. (#114)
 
 # val.pipeline 0.1.21
 
