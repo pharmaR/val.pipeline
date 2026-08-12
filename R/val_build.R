@@ -647,8 +647,45 @@ val_build <- function(
         pkg_cnt = todo,
         SIMPLIFY  = FALSE,
         USE.NAMES = FALSE,
-        future.seed = TRUE
+        future.seed = TRUE,
+        # Tight per-element scheduling: dispatch one pkg per future
+        # rather than pre-partitioning `todo` into ~`workers`-many
+        # chunks. A worker segfaulting or OOM-killed mid-chunk under
+        # the default chunk-size drops every remaining pkg in that
+        # chunk on the floor -- sometimes silently, sometimes with a
+        # FutureError depending on the future version -- and the
+        # parent's mapply return-value structure doesn't surface the
+        # loss to val_build(). With one-pkg-per-future, a worker
+        # death only loses the single pkg it was actively assessing;
+        # any others reassigned to a healthy worker still run. See
+        # #120.
+        future.scheduling = 1L
       )
+      # Disk-state guard. Even with `future.scheduling = 1L`, a mass
+      # worker die-off (e.g. OOM-killer sweeping all sessions) can
+      # leave `future_mapply` returning "successfully" (or absorbing
+      # the FutureErrors into its results structure) while the parent
+      # never realizes only a fraction of `todo` finished. Recount
+      # `_meta.rds` files on disk against what we dispatched; if the
+      # gap is non-zero raise so val_finalize() doesn't collate a
+      # truncated qual_metadata.rds silently. See #120.
+      post_meta <- file.path(assessed,
+                             paste0(paste(pkgs[todo], vers[todo],
+                                          sep = "_"), "_meta.rds"))
+      landed <- sum(file.exists(post_meta))
+      if (landed < length(todo)) {
+        missing_n <- length(todo) - landed
+        stop("val_build(workers = ", workers, "): future_mapply returned ",
+             "but only ", landed, " of ", length(todo),
+             " dispatched package(s) have a `_meta.rds` on disk. ",
+             missing_n, " package(s) never completed -- ",
+             "typically a worker was OOM-killed or the parent process ",
+             "hit a walltime mid-run. Re-run val_pipeline() (or ",
+             "val_build()) with the same args and `replace = FALSE` to ",
+             "pick up where this run left off; the already-assessed ",
+             "packages will be skipped. See #120.",
+             call. = FALSE)
+      }
     } else {
       val_msg(paste0("\n--> All ", pkgs_length,
                      " package(s) already assessed on disk; ",

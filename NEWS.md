@@ -14,6 +14,29 @@
   new "Packages that errored during assessment" section listing every
   such package + its captured error text. (#116)
 
+# val.pipeline 0.1.25
+
+- Hardened `val_build()`'s parallel branch (`workers > 1`) against
+  silent early exits. `future.apply::future_mapply()` used the
+  default `future.scheduling`, which pre-partitions all pending
+  packages into ~`workers`-many chunks; a single worker's R
+  subprocess dying mid-chunk (OOM-killed, segfault, walltime hit,
+  etc.) dropped every remaining package in that chunk on the floor
+  and, depending on the future version, either raised a
+  `FutureError` that never surfaced to `val_build()` or was absorbed
+  silently, leaving the parent to hand a truncated on-disk set to
+  `val_finalize()` and produce a partial `qual_metadata.rds` with
+  the Workbench job showing success. Two fixes:
+  1. Pin `future.scheduling = 1L` so a worker death loses at most
+     the single package it was actively assessing; healthy workers
+     pick up the rest.
+  2. After `future_mapply` returns, recount `_meta.rds` files on
+     disk against what was dispatched; if fewer landed than
+     expected, stop with a clear error so `val_finalize()` doesn't
+     collate a truncated cohort silently. Re-run with `replace =
+     FALSE` to resume.
+  (#120)
+
 # val.pipeline 0.1.24
 
 - Added optional reverse-dependency expansion to `resolve_pkg_tree()`,
