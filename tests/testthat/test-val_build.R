@@ -141,3 +141,31 @@ test_that("val_build() creates directory structure", {
     })
   )
 })
+
+test_that("val_build() wraps val_pkg() in tryCatch so one pkg's error doesn't cancel the run (#116)", {
+  # Source-level guard. The behaviour (catch val_pkg() errors,
+  # synthesize a High-tier meta with decision_reason = 'Error', save
+  # to disk, keep going) can't be exercised in-process without
+  # standing up a full val_prep + mocked assess pipeline, so pin the
+  # invariant against the source: the tryCatch has to wrap the
+  # val_pkg() call and the error handler has to set 'Error' as the
+  # decision_reason and put the error message in the note.
+  vb <- system.file("R", "val_build.R", package = "val.pipeline")
+  if (!nzchar(vb) || !file.exists(vb)) {
+    vb <- file.path("..", "..", "R", "val_build.R")
+  }
+  skip_if_not(file.exists(vb), "val_build.R not found")
+  src <- paste(readLines(vb, warn = FALSE), collapse = "\n")
+
+  # tryCatch wraps val_pkg() with an error handler.
+  expect_match(src, "tryCatch\\([^)]*val_pkg\\(", perl = TRUE)
+  # Error handler surfaces decision_reason = 'Error' and stashes the
+  # error text in decision_reason_note.
+  expect_true(grepl('decision_reason = "Error"', src, fixed = TRUE))
+  expect_true(grepl('final_decision_reason = "Error"', src, fixed = TRUE))
+  expect_match(src, "conditionMessage\\(e\\)")
+  # (error) suffix on the summary line so it visually stands out.
+  expect_true(grepl('suffix = "(error)"', src, fixed = TRUE))
+  # Log line goes out at minimal so `verbose = "minimal"` still sees it.
+  expect_true(grepl("ERROR while assessing", src, fixed = TRUE))
+})

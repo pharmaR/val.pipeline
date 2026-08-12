@@ -425,6 +425,36 @@ if (nrow(preapp_bad) > 0L) {
 }
 ```
 
+## Packages that errored during assessment
+
+Packages whose per-package assessment (`val_pkg()`) threw an error mid-run
+(e.g. an internal helper collapsing on an unexpected metric shape, a
+corrupt tarball, a covr crash). Rather than cancelling the whole build,
+`val_build()` catches the error, assigns the highest risk tier, records
+the error message as the decision reason note, and continues with the
+next package. See #116.
+
+```{r errored-pkgs}
+errored <- qual_metadata |>
+  dplyr::filter(final_decision_reason == "Error") |>
+  dplyr::arrange(pkg) |>
+  dplyr::transmute(
+    Package = pkg,
+    Version = ver,
+    Error = ifelse(is.na(final_decision_reason_note) |
+                     final_decision_reason_note == "",
+                   "(unrecorded)", final_decision_reason_note)
+  )
+```
+
+**`r nrow(errored)`** package(s) errored during assessment in this run.
+
+```{r errored-pkgs-tbl}
+if (nrow(errored) > 0L) {
+  itable(errored, default_page_size = 25)
+}
+```
+
 # Packages by Risk Category
 
 The tables below list every package in each risk tier, with the reason and

@@ -428,6 +428,28 @@ test_that("summary_template includes Pre-Approved (dep failed) section (#110)", 
   expect_match(src, "preapp_bad\\s*<-")
 })
 
+test_that("summary_template includes errored-packages section (#116)", {
+  # Source-level guard mirroring the Pre-Approved guard above. When
+  # val_pkg() throws mid-run val_build() now catches the error and
+  # records `final_decision_reason = "Error"` with the error message in
+  # the note; the summary template surfaces those pkgs in a dedicated
+  # section so operators can see the failures at a glance.
+  qmd <- system.file(
+    "report", "summary", "summary_template.qmd",
+    package = "val.pipeline"
+  )
+  if (!nzchar(qmd) || !file.exists(qmd)) {
+    qmd <- file.path("..", "..", "inst", "report", "summary",
+                     "summary_template.qmd")
+  }
+  skip_if_not(file.exists(qmd), "summary_template.qmd not found")
+  src <- paste(readLines(qmd, warn = FALSE), collapse = "\n")
+  expect_true(grepl("Packages that errored during assessment",
+                    src, fixed = TRUE))
+  expect_match(src, "errored\\s*<-")
+  expect_true(grepl("final_decision_reason == \"Error\"", src, fixed = TRUE))
+})
+
 test_that("summary_template gates dropped-packages table on HTML output", {
   # Source-level guard: the per-package dropped table is intentionally
   # omitted from PDF renders because a full CRAN-scale run can produce a
