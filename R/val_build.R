@@ -372,16 +372,76 @@ val_build <- function(
 
     if (!is_dep_skip) {
       if (!file.exists(pkg_meta_file) | replace) {
-        pkg_meta <- val_pkg(
-          pkg = pkg,
-          ver = ver,
-          avail_pkgs = avail_pkgs,
-          ref = if(pkg %in% remote_pkgs) 'remote' else ref,
-          metric_pkg = metric_pkg,
-          out_dir = val_dir,
-          val_date = val_date,
-          pkg_idx = pkg_cnt,
-          pkg_total = pkgs_length)
+        pkg_meta <- tryCatch(
+          val_pkg(
+            pkg = pkg,
+            ver = ver,
+            avail_pkgs = avail_pkgs,
+            ref = if(pkg %in% remote_pkgs) 'remote' else ref,
+            metric_pkg = metric_pkg,
+            out_dir = val_dir,
+            val_date = val_date,
+            pkg_idx = pkg_cnt,
+            pkg_total = pkgs_length),
+          error = function(e) {
+            # Don't cancel the whole run just because one pkg blew up
+            # somewhere deep in val_pkg() (build_decisions_df() with a
+            # collapsed viable-metric set, a covr crash, a corrupt
+            # tarball, etc.). Synthesize a High-tier `pkg_meta`
+            # bundle keyed on `decision_reason = "Error"` with the
+            # captured error message in `decision_reason_note`, save it
+            # to disk so downstream collation still sees this pkg, and
+            # log the failure at `minimal` so it surfaces even when the
+            # caller has muted normal-tier output. Dependents of the
+            # erroring pkg get downgraded via reject_iteration() in
+            # val_finalize() thanks to the pkg landing in `failed_pkgs`
+            # below. See #116.
+            err_msg <- conditionMessage(e)
+            val_msg(paste0("\n\n--> ERROR while assessing ", pkg, " v", ver,
+                           ": ", err_msg,
+                           "\n     Marking risk as '",
+                           decisions[length(decisions)],
+                           "' and continuing with the next package.\n\n"),
+                    min_level = "minimal")
+            repo_src <- avail_pkgs |>
+              dplyr::filter(Package %in% pkg) |>
+              dplyr::pull(Repository) |>
+              dirname() |> dirname()
+            repo_name <- tryCatch(
+              get_repo_origin(repo_src = repo_src, pkg_name = pkg),
+              error = function(e2) NA_character_
+            )
+            err_meta <- list(
+              pkg = pkg,
+              ver = ver,
+              r_ver = getRversion(),
+              sys_info = list(R.Version()),
+              repos = repo_name,
+              val_date = val_date,
+              ref = NA_character_,
+              metric_pkg = NA_character_,
+              decision = decisions[length(decisions)],
+              decision_reason = "Error",
+              decision_reason_note = err_msg,
+              final_decision = decisions[length(decisions)],
+              final_decision_reason = "Error",
+              final_decision_reason_note = err_msg,
+              depends = NA_character_,
+              suggests = NA_character_,
+              depends_direct  = NA_character_,
+              suggests_direct = NA_character_,
+              rev_deps = NA_character_,
+              assessment_runtime = list(txt = NA_character_, mins = NA)
+            )
+            tryCatch(saveRDS(err_meta, pkg_meta_file),
+                     error = function(e3) invisible(NULL))
+            val_pkg_summary_line(pkg, ver, err_meta$decision,
+                                 suffix = "(error)",
+                                 pkg_idx = pkg_cnt,
+                                 pkg_total = pkgs_length)
+            err_meta
+          }
+        )
       } else {
         val_msg(paste0("\nAttempted New Package: ", pkg, " v", ver,", but already assessed.\n\n"),
                 min_level = "normal")

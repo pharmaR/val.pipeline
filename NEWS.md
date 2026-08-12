@@ -1,4 +1,19 @@
 
+# val.pipeline 0.1.25
+
+- Caught errors thrown by `val_pkg()` inside `val_build()`'s per-package
+  assessment loop so a single package blowing up (e.g. a
+  `build_decisions_df()` "None of the metrics in 'rule_lst' are viable"
+  error when a package's viable-metric set collapses) no longer cancels
+  the whole multi-hour run. The erroring package is marked with the
+  highest risk tier, `decision_reason = "Error"`, and the error message
+  goes into `decision_reason_note`; the failure is also logged at
+  `minimal` verbosity so it surfaces regardless of `verbose` setting.
+  Downstream `reject_iteration()` propagates the failure to dependents
+  as it would for any other failed package. The summary report gained a
+  new "Packages that errored during assessment" section listing every
+  such package + its captured error text. (#116)
+
 # val.pipeline 0.1.24
 
 - Added optional reverse-dependency expansion to `resolve_pkg_tree()`,
