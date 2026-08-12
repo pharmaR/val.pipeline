@@ -34,6 +34,10 @@
 #' @param val_date Date. The date for validation. Default is the current date.
 #' @param replace Logical. Whether to replace existing assessments. Default is
 #'   FALSE.
+#' @param retry_errors Logical(1). Forwarded to [val_build()]. When
+#'   `TRUE` (default), previously-errored packages (cached
+#'   `_meta.rds` with `errored = TRUE`) are re-assessed on the next
+#'   run even when `replace = FALSE`. See #116.
 #' @param out Character. Output directory for assessments. Default is
 #'   Sys.getenv("RISK_OUTPATH", unset = getwd()).
 #' @param opt_repos Named character vector. Repositories to use. Default is
@@ -138,7 +142,8 @@ val_pipeline <- function(
   rev_deps = NULL,
   rev_deps_recursive = FALSE,
   val_date = Sys.Date(),
-  replace = FALSE, 
+  replace = FALSE,
+  retry_errors = TRUE,
   out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
   opt_repos = 
     c(CRAN = "https://packagemanager.posit.co/cran/latest",
@@ -221,6 +226,7 @@ val_pipeline <- function(
     deps_recursive  = deps_recursive,
     val_date        = prep$val_date,
     replace         = replace,
+    retry_errors    = retry_errors,
     out             = out,
     opt_repos       = prep$opt_repos,
     prep            = prep,

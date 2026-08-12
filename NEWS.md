@@ -12,7 +12,12 @@
   Downstream `reject_iteration()` propagates the failure to dependents
   as it would for any other failed package. The summary report gained a
   new "Packages that errored during assessment" section listing every
-  such package + its captured error text. (#116)
+  such package + its captured error text. The synthesized bundle carries
+  an `errored = TRUE` marker; a new `retry_errors` arg on `val_build()`
+  and `val_pipeline()` (default `TRUE`) causes those cached error
+  placeholders to be re-assessed on the next run without requiring
+  `replace = TRUE`. Set `retry_errors = FALSE` to preserve the cached
+  error bundle across runs. (#116)
 
 # val.pipeline 0.1.24
 

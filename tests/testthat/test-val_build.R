@@ -168,4 +168,37 @@ test_that("val_build() wraps val_pkg() in tryCatch so one pkg's error doesn't ca
   expect_true(grepl('suffix = "(error)"', src, fixed = TRUE))
   # Log line goes out at minimal so `verbose = "minimal"` still sees it.
   expect_true(grepl("ERROR while assessing", src, fixed = TRUE))
+  # Errored bundles carry an `errored = TRUE` marker so future runs
+  # can distinguish an error placeholder from a completed assessment.
+  expect_true(grepl("errored = TRUE", src, fixed = TRUE))
+})
+
+test_that("val_build() surfaces a `retry_errors` arg that re-runs cached error bundles (#116)", {
+  # Source-level guard on the retry_errors contract: the arg exists
+  # on val_build() (and val_pipeline() forwards it), the serial
+  # cached branch reads the marker and falls through to val_pkg()
+  # when TRUE, and the parallel pre-filter peels errored bundles
+  # back out of the skip-list.
+  vb <- system.file("R", "val_build.R", package = "val.pipeline")
+  if (!nzchar(vb) || !file.exists(vb)) {
+    vb <- file.path("..", "..", "R", "val_build.R")
+  }
+  vp <- system.file("R", "val_pipeline.R", package = "val.pipeline")
+  if (!nzchar(vp) || !file.exists(vp)) {
+    vp <- file.path("..", "..", "R", "val_pipeline.R")
+  }
+  skip_if_not(file.exists(vb) && file.exists(vp),
+              "val_build.R / val_pipeline.R not found")
+  src_build    <- paste(readLines(vb, warn = FALSE), collapse = "\n")
+  src_pipeline <- paste(readLines(vp, warn = FALSE), collapse = "\n")
+
+  # Formal arg on val_build() and val_pipeline() (default TRUE).
+  expect_match(src_build,    "retry_errors = TRUE")
+  expect_match(src_pipeline, "retry_errors = TRUE")
+  # val_pipeline() forwards it to val_build().
+  expect_match(src_pipeline, "retry_errors\\s*=\\s*retry_errors")
+  # Serial cached branch inspects the marker.
+  expect_match(src_build, "isTRUE\\(cached\\$errored\\)")
+  # Parallel pre-filter peels errored bundles out.
+  expect_match(src_build, "errored_flags")
 })

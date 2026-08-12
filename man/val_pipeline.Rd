@@ -13,6 +13,7 @@ val_pipeline(
   rev_deps_recursive = FALSE,
   val_date = Sys.Date(),
   replace = FALSE,
+  retry_errors = TRUE,
   out = Sys.getenv("RISK_OUTPATH", unset = getwd()),
   opt_repos = c(CRAN = "https://packagemanager.posit.co/cran/latest", BioC =
     "https://bioconductor.org/packages/3.22/bioc"),
@@ -57,6 +58,11 @@ Ignored when \code{rev_deps = NULL}.}
 
 \item{replace}{Logical. Whether to replace existing assessments. Default is
 FALSE.}
+
+\item{retry_errors}{Logical(1). Forwarded to \code{\link[=val_build]{val_build()}}. When
+\code{TRUE} (default), previously-errored packages (cached
+\verb{_meta.rds} with \code{errored = TRUE}) are re-assessed on the next
+run even when \code{replace = FALSE}. See #116.}
 
 \item{out}{Character. Output directory for assessments. Default is
 Sys.getenv("RISK_OUTPATH", unset = getwd()).}

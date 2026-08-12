@@ -15,6 +15,7 @@ val_build(
   val_date = Sys.Date(),
   out = "riskassessment",
   replace = FALSE,
+  retry_errors = TRUE,
   opt_repos = c(CRAN = "https://packagemanager.posit.co/cran/latest", BioC =
     "https://bioconductor.org/packages/3.22/bioc"),
   verbose = NULL,
@@ -66,6 +67,15 @@ directory.}
 
 \item{replace}{Logical indicating whether to replace existing assessments for
 packages that have already been assessed. Default is FALSE.}
+
+\item{retry_errors}{Logical(1). When \code{TRUE} (default), a cached
+\verb{_meta.rds} bundle whose \code{errored} marker is \code{TRUE} (i.e. the
+previous run caught a \code{val_pkg()} error and synthesized a High-tier
+placeholder) is treated as needing re-assessment on the next run,
+even when \code{replace = FALSE}. Set to \code{FALSE} to preserve the cached
+error bundle across runs (useful when the error is external and not
+yet resolved). Independent of \code{replace}; \code{replace = TRUE} still
+forces a re-run regardless. See #116.}
 
 \item{opt_repos}{Named character vector specifying the repository options for
 package installation. Default is CRAN.}

@@ -47,6 +47,14 @@
 #'   directory.
 #' @param replace Logical indicating whether to replace existing assessments for
 #'   packages that have already been assessed. Default is FALSE.
+#' @param retry_errors Logical(1). When `TRUE` (default), a cached
+#'   `_meta.rds` bundle whose `errored` marker is `TRUE` (i.e. the
+#'   previous run caught a `val_pkg()` error and synthesized a High-tier
+#'   placeholder) is treated as needing re-assessment on the next run,
+#'   even when `replace = FALSE`. Set to `FALSE` to preserve the cached
+#'   error bundle across runs (useful when the error is external and not
+#'   yet resolved). Independent of `replace`; `replace = TRUE` still
+#'   forces a re-run regardless. See #116.
 #' @param opt_repos Named character vector specifying the repository options for
 #'   package installation. Default is CRAN.
 #' @param verbose Console verbosity control. One of `"quiet"`,
@@ -148,6 +156,7 @@ val_build <- function(
     val_date = Sys.Date(),
     out = 'riskassessment',
     replace = FALSE,
+    retry_errors = TRUE,
     opt_repos = 
     c(CRAN = "https://packagemanager.posit.co/cran/latest",
       BioC = 'https://bioconductor.org/packages/3.22/bioc'),
@@ -371,7 +380,24 @@ val_build <- function(
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
 
     if (!is_dep_skip) {
-      if (!file.exists(pkg_meta_file) | replace) {
+      # Retry a previously-errored pkg on the next run when
+      # `retry_errors = TRUE` (default), regardless of `replace`.
+      # The error-catch synth below stamps `errored = TRUE` on the
+      # bundle so we can distinguish an error placeholder from a
+      # completed assessment on disk. See #116.
+      cached_errored <- FALSE
+      if (file.exists(pkg_meta_file) && !replace && isTRUE(retry_errors)) {
+        cached <- tryCatch(readRDS(pkg_meta_file),
+                           error = function(e) NULL)
+        if (isTRUE(cached$errored)) {
+          cached_errored <- TRUE
+          val_msg(paste0("\n--> ", pkg, " v", ver,
+                         " has a cached errored assessment; ",
+                         "retrying (`retry_errors = TRUE`).\n"),
+                  min_level = "minimal")
+        }
+      }
+      if (!file.exists(pkg_meta_file) | replace | cached_errored) {
         pkg_meta <- tryCatch(
           val_pkg(
             pkg = pkg,
@@ -431,7 +457,8 @@ val_build <- function(
               depends_direct  = NA_character_,
               suggests_direct = NA_character_,
               rev_deps = NA_character_,
-              assessment_runtime = list(txt = NA_character_, mins = NA)
+              assessment_runtime = list(txt = NA_character_, mins = NA),
+              errored = TRUE
             )
             tryCatch(saveRDS(err_meta, pkg_meta_file),
                      error = function(e3) invisible(NULL))
@@ -607,6 +634,23 @@ val_build <- function(
       existing_meta <- file.path(assessed,
                                  paste0(pkg_v_all, "_meta.rds"))
       already_done <- file.exists(existing_meta)
+      # Peel errored bundles back out of `already_done` when
+      # `retry_errors = TRUE` so the parallel pre-filter re-dispatches
+      # them, matching the serial cached-branch retry logic above.
+      # See #116.
+      if (isTRUE(retry_errors) && any(already_done)) {
+        errored_flags <- vapply(existing_meta[already_done], function(f) {
+          m <- tryCatch(readRDS(f), error = function(e) NULL)
+          isTRUE(m$errored)
+        }, logical(1))
+        if (any(errored_flags)) {
+          already_done[which(already_done)[errored_flags]] <- FALSE
+          val_msg(paste0("\n--> Re-dispatching ", sum(errored_flags),
+                         " previously-errored package(s) ",
+                         "(`retry_errors = TRUE`).\n"),
+                  min_level = "minimal")
+        }
+      }
       n_skip <- sum(already_done)
       if (n_skip > 0L) {
         val_msg(paste0("\n--> Skipping ", n_skip, " of ", pkgs_length,
