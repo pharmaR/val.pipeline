@@ -2,6 +2,7 @@
 
 export("%>%")
 export("%e%")
+export(assess_pkg_version_drift)
 export(build_decisions_df)
 export(configure_bioc_repositories)
 export(configure_bioc_repositories_if_requested)

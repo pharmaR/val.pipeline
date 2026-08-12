@@ -1,4 +1,18 @@
 
+# val.pipeline 0.1.25
+
+- Added `assess_pkg_version_drift()`, a diagnostic helper that
+  compares `<pkg>_<ver>_meta.rds` filenames under a run's
+  `assessed/` directory against the packages + versions
+  `val_build()` would dispatch on the next run. Classifies each pkg
+  as `match`, `drifted`, `multi_version`, `unexpected`, or
+  `missing`, so an operator can explain the gap between
+  `length(list.files(assessed, "_meta.rds$"))` (pkg-name-only count)
+  and `val_build()`'s cached-skip count (pkg + version). Prefer a
+  `val_prep` object as the expected-version source; falls back to
+  a supplied `avail_pkgs` data.frame, then `available.packages()`.
+  (#118)
+
 # val.pipeline 0.1.24
 
 - Added optional reverse-dependency expansion to `resolve_pkg_tree()`,
