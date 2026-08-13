@@ -430,6 +430,52 @@ val_finalize <- function(
   }
 
   #
+  # ---- Memory watchdog summary ----
+  #
+  # Emits p50/p95/max per-pkg peak RSS, the top-N heaviest packages, and
+  # (on Linux) a suggested `workers` for the next run keyed on
+  # available RAM / p95. Silently no-ops if no mem_watchdog.tsv landed
+  # (e.g. val_build(mem_watchdog = FALSE), fully cached rerun, or
+  # sampler unavailable on this host). See #122.
+  wd_path <- file.path(val_dir, "mem_watchdog.tsv")
+  if (file.exists(wd_path)) {
+    wd_sum <- summarize_mem_watchdog(wd_path)
+    if (!is.null(wd_sum)) {
+      val_msg(paste0(
+        "\n--> Memory watchdog (", wd_sum$n, " pkg(s) sampled",
+        if (nzchar(wd_sum$sampler_mix))
+          paste0("; sampler ", wd_sum$sampler_mix)
+        else "", "):\n",
+        "    p50 peak RSS: ", format(wd_sum$p50_mb), " MB\n",
+        "    p95 peak RSS: ", format(wd_sum$p95_mb), " MB\n",
+        "    max peak RSS: ", format(wd_sum$max_mb), " MB\n"),
+        min_level = "minimal")
+      if (nrow(wd_sum$top) > 0L) {
+        val_msg("    Top heaviest packages:\n", min_level = "minimal")
+        for (i in seq_len(nrow(wd_sum$top))) {
+          r <- wd_sum$top[i, , drop = FALSE]
+          val_msg(paste0(
+            "      ", format(i, width = 2), ". ", r$pkg,
+            if ("version" %in% names(r)) paste0(" v", r$version) else "",
+            " -- ", format(round(r$peak_rss_mb, 1)), " MB",
+            if ("elapsed_sec" %in% names(r) && is.finite(r$elapsed_sec))
+              paste0(" (", round(r$elapsed_sec, 1), "s)")
+            else "", "\n"),
+            min_level = "minimal")
+        }
+      }
+      if (!is.null(wd_sum$suggested_workers)) {
+        val_msg(paste0(
+          "    Available RAM: ~", round(wd_sum$available_ram_gb, 1),
+          " GB; reserve: ", wd_sum$reserve_gb, " GB; ",
+          "budget / p95_gb -> suggested workers for next run: ",
+          wd_sum$suggested_workers, ".\n"),
+          min_level = "minimal")
+      }
+    }
+  }
+
+  #
   # ---- Wall-clock ----
   #
   if (!is.null(val_start)) {

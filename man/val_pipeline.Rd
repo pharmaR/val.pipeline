@@ -22,6 +22,7 @@ val_pipeline(
   workers = 1L,
   freeze_opt_repos = FALSE,
   propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE),
+  mem_watchdog = TRUE,
   finalize = TRUE
 )
 }
@@ -119,6 +120,13 @@ mirrors the current session's \code{.libPaths()} into \code{R_LIBS_SITE} so
 same library search order as the parent — critical when the
 operator has pointed \code{.libPaths()} at an rv-provisioned library.
 See #99.}
+
+\item{mem_watchdog}{Logical(1). Passed through to \code{\link[=val_build]{val_build()}}. When
+\code{TRUE} (default), records per-package peak RSS to
+\verb{<val_dir>/mem_watchdog.tsv} and prints a p50/p95/max + top-10
+summary at the end of the assessment loop. The summary report
+also gains a "Top 25 heaviest packages" table when the TSV is
+present. See #122.}
 
 \item{finalize}{Logical(1). When \code{TRUE} (default), automatically
 calls \code{\link[=val_finalize]{val_finalize()}} after \code{\link[=val_build]{val_build()}} returns to collate

@@ -88,6 +88,12 @@
 #'   same library search order as the parent — critical when the
 #'   operator has pointed `.libPaths()` at an rv-provisioned library.
 #'   See #99.
+#' @param mem_watchdog Logical(1). Passed through to [val_build()]. When
+#'   `TRUE` (default), records per-package peak RSS to
+#'   `<val_dir>/mem_watchdog.tsv` and prints a p50/p95/max + top-10
+#'   summary at the end of the assessment loop. The summary report
+#'   also gains a "Top 25 heaviest packages" table when the TSV is
+#'   present. See #122.
 #' @param finalize Logical(1). When `TRUE` (default), automatically
 #'   calls [val_finalize()] after [val_build()] returns to collate
 #'   assessments, propagate dep-driven decisions, and produce the
@@ -149,6 +155,7 @@ val_pipeline <- function(
   workers = 1L,
   freeze_opt_repos = FALSE,
   propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE),
+  mem_watchdog = TRUE,
   finalize = TRUE
   ){
 
@@ -227,6 +234,7 @@ val_pipeline <- function(
     config_path     = config_path,
     workers         = workers,
     propagate_libpaths = propagate_libpaths,
+    mem_watchdog    = mem_watchdog,
     finalize        = FALSE
   )
 

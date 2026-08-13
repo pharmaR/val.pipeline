@@ -14,6 +14,7 @@ params:
   n_candidates: NULL
   pre_filtered_path: NULL
   pipeline_runtime: NULL
+  mem_watchdog_path: NULL
 format:
   html:
     toc: true
@@ -546,6 +547,68 @@ if (length(rt) > 0L) {
 } else {
   cat("_(runtime data not available)_\n")
 }
+```
+
+## Top 25 memory offenders
+
+```{r mem-watchdog-load, include = FALSE}
+mw_path <- params$mem_watchdog_path
+has_mem_watchdog <- !is.null(mw_path) && nzchar(mw_path) &&
+  file.exists(mw_path)
+mw_df <- if (has_mem_watchdog) {
+  tryCatch(
+    utils::read.delim(mw_path, sep = "\t", header = TRUE,
+                      stringsAsFactors = FALSE,
+                      check.names = FALSE, quote = ""),
+    error = function(e) NULL
+  )
+} else {
+  NULL
+}
+if (!is.null(mw_df) && "peak_rss_mb" %in% names(mw_df)) {
+  mw_df$peak_rss_mb <- suppressWarnings(as.numeric(mw_df$peak_rss_mb))
+  if ("elapsed_sec" %in% names(mw_df)) {
+    mw_df$elapsed_sec <- suppressWarnings(as.numeric(mw_df$elapsed_sec))
+  }
+}
+mw_ready <- !is.null(mw_df) && "peak_rss_mb" %in% names(mw_df) &&
+  any(is.finite(mw_df$peak_rss_mb))
+```
+
+```{r mem-watchdog-summary, results = "asis", eval = mw_ready}
+vals <- mw_df$peak_rss_mb[is.finite(mw_df$peak_rss_mb)]
+p50 <- round(as.numeric(stats::quantile(vals, 0.50)), 1)
+p95 <- round(as.numeric(stats::quantile(vals, 0.95)), 1)
+mx  <- round(max(vals), 1)
+cat("Distribution of peak RSS per package (sampled from ",
+    "`", basename(mw_path), "`): ",
+    "p50 = ", p50, " MB, ",
+    "p95 = ", p95, " MB, ",
+    "max = ", mx, " MB.\n\n", sep = "")
+```
+
+```{r mem-watchdog-table, eval = mw_ready}
+mw_top <- mw_df |>
+  dplyr::filter(is.finite(peak_rss_mb)) |>
+  dplyr::arrange(dplyr::desc(peak_rss_mb)) |>
+  dplyr::slice_head(n = 25) |>
+  dplyr::transmute(
+    Package = pkg,
+    Version = if ("version" %in% names(mw_df)) version else NA_character_,
+    `Peak RSS (MB)` = round(peak_rss_mb, 1),
+    `Elapsed (sec)` = if ("elapsed_sec" %in% names(mw_df))
+      round(elapsed_sec, 1) else NA_real_,
+    Errored = if ("errored" %in% names(mw_df))
+      tolower(as.character(errored)) %in% c("true", "1", "t", "yes")
+      else FALSE
+  )
+itable(mw_top, default_page_size = 25)
+```
+
+```{r mem-watchdog-empty, results = "asis", eval = !mw_ready}
+cat("_No `mem_watchdog.tsv` recorded for this run ",
+    "(either `val_build(mem_watchdog = FALSE)`, a fully cached rerun, ",
+    "or the peak-RSS sampler was unavailable on the host)._\n", sep = "")
 ```
 
 ```{r assessments-header, results = "asis", eval = has_assessments}

@@ -1,4 +1,27 @@
 
+# val.pipeline 0.1.26
+
+- Added per-package memory watchdog observability so `workers` on
+  `val_pipeline()` / `val_build()` can be sized against real per-package
+  peak RSS instead of eyeballed. When `mem_watchdog = TRUE` (new
+  default) `val_build()` samples each package's high-water RSS (via
+  `/proc/<pid>/status` `VmHWM` on Linux, with a `ps::ps_memory_info()`
+  fallback) and appends one row to `<val_dir>/mem_watchdog.tsv`.
+  `val_finalize()` prints p50 / p95 / max, the 10 heaviest packages,
+  and — on Linux — a suggested `workers` value for the next run keyed
+  on `MemAvailable` / p95. The summary report gained a "Top 25 memory
+  offenders" section that renders the same TSV. Cached / dep-skip
+  packages are excluded from the sample because no real work was done.
+  (#122)
+- Reordered the parallel-mode package queue so heavy packages spread
+  across workers instead of piling up at the tail. `val_build(workers
+  > 1)` now round-robin restripes the `todo` list — sorted by prior
+  `mem_watchdog.tsv` peak RSS when available, otherwise by the input
+  order — and dispatches one future per package (`future.scheduling =
+  1L`) so workers pick up alternating heavy/light packages rather than
+  chunks of consecutive tail-heavies. Serial mode (`workers = 1`) is
+  unchanged so its dep-skip short-circuit still fires. (#122)
+
 # val.pipeline 0.1.25
 
 - Caught errors thrown by `val_pkg()` inside `val_build()`'s per-package
