@@ -156,6 +156,18 @@ val_pipeline_report <- function(
     normalizePath(qual_assessments_path, winslash = "/", mustWork = TRUE)
   }
 
+  # Sibling mem_watchdog.tsv (produced by val_build(mem_watchdog = TRUE)).
+  # Passed to the template as `mem_watchdog_path`; the template renders
+  # a "Top 25 heaviest packages" table when present, and no-ops when
+  # absent (e.g. older runs, or val_build(mem_watchdog = FALSE)).
+  # See #122.
+  mw_candidate <- file.path(input_dir, "mem_watchdog.tsv")
+  mem_watchdog_path <- if (file.exists(mw_candidate)) {
+    normalizePath(mw_candidate, winslash = "/", mustWork = TRUE)
+  } else {
+    NULL
+  }
+
   # Sibling config.yml, if any
   config_candidate <- file.path(input_dir, "config.yml")
   config_path <- if (file.exists(config_candidate)) {
@@ -315,7 +327,8 @@ val_pipeline_report <- function(
     thresholds_path = if (file.exists(thresholds_rds)) thresholds_rds else NULL,
     n_candidates = n_candidates_val,
     pre_filtered_path = pf_path,
-    pipeline_runtime = runtime_str
+    pipeline_runtime = runtime_str,
+    mem_watchdog_path = mem_watchdog_path
   )
 
   # Quarto spawns a child Rscript for the render. If that child sees an

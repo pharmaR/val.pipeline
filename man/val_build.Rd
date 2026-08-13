@@ -22,6 +22,7 @@ val_build(
   config_path = NULL,
   workers = 1L,
   propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE),
+  mem_watchdog = TRUE,
   finalize = TRUE
 )
 }
@@ -121,6 +122,15 @@ function exit. Defaults to
 option to \code{FALSE} (or pass \code{propagate_libpaths = FALSE}) to opt
 out when an operator needs the child library search to stay
 isolated from the parent for some reason. See #99.}
+
+\item{mem_watchdog}{Logical(1). When \code{TRUE} (default), records
+per-package peak RSS to \verb{<val_dir>/mem_watchdog.tsv} and prints a
+compact summary (p50 / p95 / max per-worker MB, top-10 heaviest
+packages, and — on Linux — a suggested \code{workers} value for the
+next run) at the end of the assessment loop. Skips packages whose
+\verb{_meta.rds} was cached / dep-skipped since no real work was done.
+Silently no-ops if the peak-RSS sampler is unavailable on the
+host. Cost is a single line-append per package. See #122.}
 
 \item{finalize}{Logical(1). When \code{TRUE} (default), automatically
 calls \code{\link[=val_finalize]{val_finalize()}} on the run directory once every package

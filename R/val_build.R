@@ -117,6 +117,15 @@
 #'   out when an operator needs the child library search to stay
 #'   isolated from the parent for some reason. See #99.
 #'
+#' @param mem_watchdog Logical(1). When `TRUE` (default), records
+#'   per-package peak RSS to `<val_dir>/mem_watchdog.tsv` and prints a
+#'   compact summary (p50 / p95 / max per-worker MB, top-10 heaviest
+#'   packages, and — on Linux — a suggested `workers` value for the
+#'   next run) at the end of the assessment loop. Skips packages whose
+#'   `_meta.rds` was cached / dep-skipped since no real work was done.
+#'   Silently no-ops if the peak-RSS sampler is unavailable on the
+#'   host. Cost is a single line-append per package. See #122.
+#'
 #' @param finalize Logical(1). When `TRUE` (default), automatically
 #'   calls [val_finalize()] on the run directory once every package
 #'   has been assessed, so `qual_assessments.rds`, `qual_metadata.rds`,
@@ -156,6 +165,7 @@ val_build <- function(
     config_path = NULL,
     workers = 1L,
     propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE),
+    mem_watchdog = TRUE,
     finalize = TRUE
     ){
   
@@ -191,6 +201,8 @@ val_build <- function(
     stop("`workers` must be a single positive integer.", call. = FALSE)
   }
   stopifnot(is.logical(finalize), length(finalize) == 1L, !is.na(finalize))
+  stopifnot(is.logical(mem_watchdog), length(mem_watchdog) == 1L,
+            !is.na(mem_watchdog))
   apply_verbose(verbose)
   configure_bioc_repositories_if_requested(quiet = TRUE)
   configure_riskmetric_offline_if_requested(quiet = TRUE)
@@ -370,8 +382,22 @@ val_build <- function(
     pkg_v <- paste(pkg, ver, sep = "_")
     pkg_meta_file <- file.path(assessed, glue::glue("{pkg_v}_meta.rds"))
 
+    # Watchdog bookkeeping. Only meaningful for packages we're about to
+    # do real work on — cached / dep-skipped branches short-circuit
+    # before val_pkg() runs and don't move memory, so we skip them.
+    # See #122.
+    wd_path <- if (isTRUE(mem_watchdog)) {
+      file.path(val_dir, "mem_watchdog.tsv")
+    } else {
+      NULL
+    }
+    wd_did_work <- FALSE
+    wd_errored  <- FALSE
+    wd_start    <- Sys.time()
+
     if (!is_dep_skip) {
       if (!file.exists(pkg_meta_file) | replace) {
+        wd_did_work <- TRUE
         pkg_meta <- tryCatch(
           val_pkg(
             pkg = pkg,
@@ -397,6 +423,7 @@ val_build <- function(
             # val_finalize() thanks to the pkg landing in `failed_pkgs`
             # below. See #116.
             err_msg <- conditionMessage(e)
+            wd_errored <<- TRUE
             val_msg(paste0("\n\n--> ERROR while assessing ", pkg, " v", ver,
                            ": ", err_msg,
                            "\n     Marking risk as '",
@@ -556,6 +583,25 @@ val_build <- function(
                            pkg_total = pkgs_length)
     }
 
+    if (isTRUE(mem_watchdog) && wd_did_work) {
+      wd_sample <- sample_peak_rss_mb()
+      append_watchdog_row(
+        wd_path,
+        list(
+          timestamp   = format(Sys.time(), "%Y-%m-%d %H:%M:%S",
+                               tz = "UTC"),
+          pkg         = pkg,
+          version     = ver,
+          worker_pid  = Sys.getpid(),
+          peak_rss_mb = wd_sample$peak_rss_mb,
+          elapsed_sec = round(as.numeric(
+            difftime(Sys.time(), wd_start, units = "secs")), 2),
+          sampler     = wd_sample$sampler,
+          errored     = wd_errored
+        )
+      )
+    }
+
     pkg_meta
   }
 
@@ -618,6 +664,46 @@ val_build <- function(
       }
     }
 
+    # Round-robin restripe of `todo` so heavy packages (which cluster
+    # at the tail of the rev-dep-sorted input order) don't stack up
+    # simultaneously across workers and blow the RAM budget. Two
+    # flavours:
+    #
+    # 1. If a prior `mem_watchdog.tsv` is present in `val_dir` (a
+    #    re-kick of the same run, or a run copied here from a similar
+    #    cohort), sort `todo` by known peak_rss_mb desc first so
+    #    the heaviest packages spread cleanly across worker buckets.
+    # 2. Otherwise fall back to a pure round-robin over the input
+    #    order — still spreads the tail cluster (typically Bioc /
+    #    large ML pkgs) across workers even without prior peak data.
+    #
+    # Combined with `future.scheduling = 1L` below (one future per
+    # package), this means at any moment the active worker set spans
+    # the weight spectrum instead of piling into the tail all at once.
+    # Serial mode (`workers = 1`) is unaffected — dep-skip
+    # short-circuiting relies on the caller's rev-dep-sorted order.
+    # See #122.
+    if (length(todo) > workers) {
+      wd_prior_path <- file.path(val_dir, "mem_watchdog.tsv")
+      todo_pkgs <- pkgs[todo]
+      if (file.exists(wd_prior_path)) {
+        prior <- tryCatch(read_mem_watchdog_tsv(wd_prior_path),
+                          error = function(e) NULL)
+        if (!is.null(prior) && "pkg" %in% names(prior) &&
+              "peak_rss_mb" %in% names(prior)) {
+          by_pkg <- tapply(prior$peak_rss_mb, prior$pkg, max,
+                           na.rm = TRUE)
+          w <- unname(by_pkg[todo_pkgs])
+          w[!is.finite(w)] <- -Inf
+          if (any(w > -Inf)) {
+            todo <- todo[order(-w)]
+          }
+        }
+      }
+      stride <- (seq_along(todo) - 1L) %% workers
+      todo   <- todo[order(stride, seq_along(todo))]
+    }
+
     # Workers discard the meta_list return: val_pkg() has already
     # persisted every artifact we care about (`_meta.rds`,
     # `_assess_record.rds`, `_assessments.rds`, `_scores.rds`) inside
@@ -648,17 +734,23 @@ val_build <- function(
         SIMPLIFY  = FALSE,
         USE.NAMES = FALSE,
         future.seed = TRUE,
-        # Tight per-element scheduling: dispatch one pkg per future
-        # rather than pre-partitioning `todo` into ~`workers`-many
-        # chunks. A worker segfaulting or OOM-killed mid-chunk under
-        # the default chunk-size drops every remaining pkg in that
-        # chunk on the floor -- sometimes silently, sometimes with a
-        # FutureError depending on the future version -- and the
-        # parent's mapply return-value structure doesn't surface the
-        # loss to val_build(). With one-pkg-per-future, a worker
-        # death only loses the single pkg it was actively assessing;
-        # any others reassigned to a healthy worker still run. See
-        # #120.
+        # One future per package (default is `ceiling(N / workers)`
+        # per-chunk). Two reasons this matters:
+        #   1. Silent worker die-off. A worker segfaulting or
+        #      OOM-killed mid-chunk under the default chunk-size
+        #      drops every remaining pkg in that chunk on the floor
+        #      -- sometimes silently, sometimes with a FutureError
+        #      depending on the future version -- and the parent's
+        #      mapply return-value structure doesn't surface the loss
+        #      to val_build(). With one-pkg-per-future, a worker
+        #      death only loses the single pkg it was actively
+        #      assessing; any others reassigned to a healthy worker
+        #      still run. The disk-state guard immediately below then
+        #      catches the delta. See #120.
+        #   2. Heavy-pkg restripe. The interleave above only helps
+        #      if workers pick items one-at-a-time; the default
+        #      chunker would re-batch a whole stride into a single
+        #      worker and defeat the interleave. See #122.
         future.scheduling = 1L
       )
       # Disk-state guard. Even with `future.scheduling = 1L`, a mass

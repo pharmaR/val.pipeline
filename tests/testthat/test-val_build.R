@@ -193,3 +193,57 @@ test_that("val_build() parallel branch pins future.scheduling=1L and guards disk
   expect_true(grepl("stop(\"val_build(workers = \", workers,",
                     src, fixed = TRUE))
 })
+
+test_that("val_build() wires mem_watchdog to a per-pkg TSV write (#122)", {
+  vb <- system.file("R", "val_build.R", package = "val.pipeline")
+  if (!nzchar(vb) || !file.exists(vb)) {
+    vb <- file.path("..", "..", "R", "val_build.R")
+  }
+  skip_if_not(file.exists(vb), "val_build.R not found")
+  src <- paste(readLines(vb, warn = FALSE), collapse = "\n")
+
+  # Arg is exposed with the documented default.
+  expect_true(grepl("mem_watchdog = TRUE", src, fixed = TRUE))
+  # And validated as a logical(1).
+  expect_true(grepl("is.logical(mem_watchdog)", src, fixed = TRUE))
+  # assess_one() calls sample_peak_rss_mb() + append_watchdog_row(),
+  # keyed on wd_did_work (skips cached / dep-skip branches).
+  expect_true(grepl("wd_did_work", src, fixed = TRUE))
+  expect_true(grepl("sample_peak_rss_mb", src, fixed = TRUE))
+  expect_true(grepl("append_watchdog_row", src, fixed = TRUE))
+  expect_true(grepl("mem_watchdog.tsv", src, fixed = TRUE))
+  # Error branch flips wd_errored so the TSV row records the failure.
+  expect_true(grepl("wd_errored <<- TRUE", src, fixed = TRUE))
+
+  # Round-robin restripe of todo (by prior-run peaks if available,
+  # otherwise pure interleave) so heavy pkgs at the tail spread
+  # across workers rather than piling up simultaneously. See #122.
+  expect_true(grepl("stride <- (seq_along(todo) - 1L) %% workers",
+                    src, fixed = TRUE))
+  expect_true(grepl("todo   <- todo[order(stride, seq_along(todo))]",
+                    src, fixed = TRUE))
+  # One future per package: the restripe only pays off when
+  # future.scheduling forces per-element dispatch instead of chunks.
+  expect_true(grepl("future.scheduling = 1L", src, fixed = TRUE))
+})
+
+test_that("restripe: round-robin interleaves the input order across workers", {
+  # Reimplement the restripe here (val_build.R can't be reached without
+  # standing up val_prep) and pin the invariant: after restripe, the
+  # first `workers` items span the full weight range, not the head.
+  restripe <- function(todo, workers) {
+    stride <- (seq_along(todo) - 1L) %% workers
+    todo[order(stride, seq_along(todo))]
+  }
+
+  # 12 pkgs, weights sorted heavy -> light; workers = 4.
+  todo <- 1:12
+  out <- restripe(todo, workers = 4L)
+  # First 4 items must include the head + spread across the input.
+  expect_equal(out[1:4], c(1L, 5L, 9L, 2L))
+  # Every original index appears exactly once.
+  expect_setequal(out, todo)
+  # Adjacent items differ by ~workers, not 1 (indicates spread).
+  gaps <- diff(out[1:8])
+  expect_true(any(gaps >= 3L))
+})
