@@ -169,3 +169,27 @@ test_that("val_build() wraps val_pkg() in tryCatch so one pkg's error doesn't ca
   # Log line goes out at minimal so `verbose = "minimal"` still sees it.
   expect_true(grepl("ERROR while assessing", src, fixed = TRUE))
 })
+
+test_that("val_build() parallel branch pins future.scheduling=1L and guards disk-state (#120)", {
+  # Source-level guard. The behaviour (fine-grained per-pkg dispatch +
+  # post-mapply file-count check that stops the run when future_mapply
+  # returned but pkgs are missing on disk) can't be exercised without
+  # standing up a real multisession + failure injection, so pin the
+  # invariant at the source level.
+  vb <- system.file("R", "val_build.R", package = "val.pipeline")
+  if (!nzchar(vb) || !file.exists(vb)) {
+    vb <- file.path("..", "..", "R", "val_build.R")
+  }
+  skip_if_not(file.exists(vb), "val_build.R not found")
+  src <- paste(readLines(vb, warn = FALSE), collapse = "\n")
+
+  # Fine-grained scheduling so a worker's death loses at most one pkg.
+  expect_match(src, "future\\.scheduling = 1L")
+  # Post-mapply file-count guard.
+  expect_match(src, "post_meta\\s*<-")
+  expect_match(src, "landed\\s*<-\\s*sum\\(file.exists\\(post_meta\\)\\)")
+  # And it stops (not warns) when short, so val_finalize doesn't
+  # collate a truncated qual_metadata silently.
+  expect_true(grepl("stop(\"val_build(workers = \", workers,",
+                    src, fixed = TRUE))
+})
