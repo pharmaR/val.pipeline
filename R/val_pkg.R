@@ -786,6 +786,11 @@ val_pkg <- function(
     pkg = pkg,
     ver = ver,
     r_ver = getRversion(),
+    # Which val.pipeline built this bundle. Used by the summary
+    # report to display the distinct set of package versions that
+    # produced a run (a resumed run can span multiple versions if
+    # the operator updated the package between sessions). See #130.
+    val_pipeline_ver = as.character(utils::packageVersion("val.pipeline")),
     sys_info = list(R.Version()),
     repos = repo_name, # A named character
     # Plain-string label for the source repo (e.g. "CRAN", "BioC",
