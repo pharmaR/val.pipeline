@@ -456,6 +456,42 @@ if (nrow(errored) > 0L) {
 }
 ```
 
+## Packages with incomplete assessment
+
+Packages whose `val_decision()` rule ladder produced no category —
+typically a `remote_only` package with a shrunken viable-metric set,
+or a Bioc package where the initial-metrics whitelist was too thin.
+`decision` and `final_decision` are left as `NA` for these packages
+rather than silently coerced to a tier; per-package detail lives in
+the Appendix. See #124.
+
+```{r incomplete-pkgs}
+incomplete <- qual_metadata |>
+  dplyr::filter(is.na(final_decision) |
+                  final_decision_reason == "Incomplete Assessment") |>
+  dplyr::arrange(pkg) |>
+  dplyr::transmute(
+    Package = pkg,
+    Version = ver,
+    Source  = if ("repo_name" %in% names(qual_metadata))
+                as.character(repo_name) else NA_character_,
+    Reason  = ifelse(is.na(final_decision_reason) |
+                       final_decision_reason == "",
+                     "(unrecorded)", final_decision_reason),
+    Note    = ifelse(is.na(final_decision_reason_note) |
+                       final_decision_reason_note == "",
+                     "(no diagnostic)", final_decision_reason_note)
+  )
+```
+
+**`r nrow(incomplete)`** package(s) could not be categorized in this run.
+
+```{r incomplete-pkgs-tbl}
+if (nrow(incomplete) > 0L) {
+  itable(incomplete, default_page_size = 25)
+}
+```
+
 # Packages by Risk Category
 
 The tables below list every package in each risk tier, with the reason and
@@ -701,6 +737,80 @@ lic_tbl <- qa |>
   dplyr::mutate(percent = sprintf("%.1f%%", 100 * packages / sum(packages))) |>
   dplyr::rename(License = license, Packages = packages, Percent = percent)
 itable(lic_tbl, default_page_size = 15)
+```
+# Appendix: Incomplete Assessments
+
+For each package in the "Packages with incomplete assessment" table above,
+the diagnostic captured by `val_pkg()` at decision time: which metrics
+were viable, what per-metric risk category each one landed on, and the
+top-level primary/secondary category that the rule ladder emitted.
+Populated for runs post-#124; older runs will show "(not captured)".
+
+```{r incomplete-appendix, results = "asis"}
+if ("assessment_gaps" %in% names(qual_metadata)) {
+  gaps_rows <- which(
+    vapply(qual_metadata$assessment_gaps,
+           function(x) !is.null(x) && length(x) > 0L,
+           logical(1))
+  )
+} else {
+  gaps_rows <- integer(0)
+}
+
+if (length(gaps_rows) == 0L) {
+  cat("_(No packages with captured assessment gaps in this run.)_\n")
+} else {
+  qa_lookup <- if (exists("qa", inherits = FALSE) &&
+                     is.data.frame(qa) && "pkg" %in% names(qa)) qa else NULL
+  for (i in gaps_rows) {
+    pkg_i <- qual_metadata$pkg[i]
+    ver_i <- qual_metadata$ver[i]
+    g     <- qual_metadata$assessment_gaps[[i]]
+    cat(sprintf("## %s (v%s)\n\n", pkg_i, ver_i))
+    if (!is.null(g$note) && !is.na(g$note) && nzchar(g$note)) {
+      cat(g$note, "\n\n")
+    }
+    prim_cat_i <- g$primary_risk_category
+    if (is.null(prim_cat_i)) prim_cat_i <- NA
+    sec_cat_i <- g$secondary_risk_category
+    if (is.null(sec_cat_i)) sec_cat_i <- NA
+    cat(sprintf("- **Primary risk category**: `%s`\n", prim_cat_i))
+    cat(sprintf("- **Secondary risk category**: `%s`\n\n", sec_cat_i))
+
+    vm <- g$viable_metrics
+    mc <- g$metric_cats
+    if (length(mc) > 0L) {
+      metric_tbl <- tibble::tibble(
+        Metric   = sub("_cat$", "", names(mc)),
+        Category = as.character(unname(mc))
+      )
+      if (!is.null(qa_lookup)) {
+        qa_row <- qa_lookup[qa_lookup$pkg == pkg_i, , drop = FALSE]
+        if (nrow(qa_row) >= 1L) {
+          metric_tbl$Value <- vapply(metric_tbl$Metric, function(m) {
+            if (m %in% names(qa_row)) {
+              v <- qa_row[[m]][1]
+              if (is.null(v) || (length(v) == 1L && is.na(v))) return("NA")
+              format(v)
+            } else {
+              "(not in qual_assessments)"
+            }
+          }, character(1))
+        }
+      }
+      cat("**Per-metric outcomes:**\n\n")
+      print(kable(metric_tbl, align = "llr"))
+      cat("\n")
+    } else {
+      cat("_(No per-metric categories captured.)_\n\n")
+    }
+
+    if (length(vm) > 0L) {
+      cat("**Viable metrics (", length(vm), "):** `",
+          paste(vm, collapse = "`, `"), "`\n\n", sep = "")
+    }
+  }
+}
 ```
 
 # Appendix: Metric Thresholds

@@ -800,7 +800,26 @@ val_build <- function(
       pkg_meta <- assess_one(pkg, ver, i,
                              is_dep_skip = is_dep_skip,
                              failed_snapshot = failed_pkgs)
-      if (!is_dep_skip && pkg_meta$decision != decisions[1]) {
+      # Silent-NA guard. When val_decision()'s rule ladder collapses
+      # for a pkg (typically remote_only pkgs with a shrunken
+      # viable-metric set), it returns final_risk = NA without
+      # throwing; val_pkg() then persists a bundle with decision = NA.
+      # Without this guard, the ! = comparison below evaluates to NA
+      # and takes the whole run down. Skip dep propagation for the
+      # NA pkg and log at minimal; the report will surface it under
+      # "Packages with incomplete assessment". reject_iteration() at
+      # finalize time treats NA decisions as non-failing rather than
+      # cascading them into dep-driven downgrades. See #124.
+      if (!is_dep_skip && is.na(pkg_meta$decision)) {
+        val_msg(paste0("\n\n--> WARNING: ", pkg, " v", ver,
+                       " has NA decision on its meta bundle ",
+                       "(rule ladder produced no category). ",
+                       "Skipping dep propagation for this pkg; ",
+                       "see the summary report's ",
+                       "'Packages with incomplete assessment' ",
+                       "section for details.\n\n"),
+                min_level = "minimal")
+      } else if (!is_dep_skip && pkg_meta$decision != decisions[1]) {
         val_msg(paste0("\n\n--> ", pkg, " v", ver," was assessed with a '",
                        pkg_meta$decision,"' risk. All packages that depend on it will also be marked as '",
                        decisions[length(decisions)],"' risk.\n\n"),

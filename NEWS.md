@@ -1,4 +1,23 @@
 
+# val.pipeline 0.1.27
+
+- Guarded `val_build()`'s serial-branch dep-propagation check against
+  `NA` decisions from `val_pkg()`. Previously, when `val_decision()`'s
+  rule ladder produced no category (typically a `remote_only` or Bioc
+  package with a shrunken viable-metric set), `pkg_meta$decision` came
+  back `NA`, the `!= decisions[1]` comparison evaluated to `NA`, and
+  the whole run took an "missing value where TRUE/FALSE needed" halt
+  near the tail. `val_pkg()` now stashes an `assessment_gaps` list on
+  the meta bundle (viable metrics, per-metric categories, primary /
+  secondary risk categories, synthesized note) and flips
+  `decision_reason` to `"Incomplete Assessment"`. Decisions themselves
+  stay `NA` — no silent coercion to a tier. `val_finalize()` preserves
+  the diagnostic as a list-col on `qual_metadata`, and the summary
+  report gained a "Packages with incomplete assessment" table plus a
+  per-package appendix section with viable metrics, per-metric
+  categories, and cross-joined actual scores from `qual_assessments`.
+  (#124)
+
 # val.pipeline 0.1.26
 
 - Added per-package memory watchdog observability so `workers` on

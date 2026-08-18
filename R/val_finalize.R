@@ -269,6 +269,15 @@ val_finalize <- function(
     bundle <- readRDS(file.path(assessed, meta_files[[i]]))
     tmap <- bundle[["timings"]]
     bundle[["timings"]] <- NULL
+    # Pull `assessment_gaps` out before `list_flatten()` so it stays a
+    # single list-col instead of exploding into ~5 nested columns
+    # (viable_metrics, metric_cats, ...). Populated by val_pkg() when
+    # val_decision() couldn't emit a category for a pkg (typically a
+    # remote_only pkg with a shrunken viable-metric set). Absent on
+    # older bundles -> NULL. Report reads it back list-of-lists via
+    # `qual_metadata$assessment_gaps[[i]]`. See #124.
+    gaps <- bundle[["assessment_gaps"]]
+    bundle[["assessment_gaps"]] <- NULL
 
     x <- purrr::list_flatten(bundle)
     x$depends  <- list(x$depends)
@@ -282,6 +291,7 @@ val_finalize <- function(
     x$suggests_direct <- list(x$suggests_direct)
     x$rev_deps <- list(x$rev_deps)
     x$sys_info <- list(x$sys_info)
+    x$assessment_gaps <- list(gaps)
     pkgs_df0_rows[[i]] <- dplyr::as_tibble(x)
 
     if (!is.null(tmap) && length(tmap) > 0L) {
