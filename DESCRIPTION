@@ -1,6 +1,6 @@
 Package: val.pipeline
 Title: Validation Pipeline Example
-Version: 0.1.29
+Version: 0.1.30
 Authors@R: 
   c(
     person(

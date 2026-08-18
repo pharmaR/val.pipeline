@@ -71,6 +71,20 @@ itable <- function(df, ..., searchable = TRUE, filterable = TRUE,
     knitr::kable(df, ...)
   }
 }
+
+# Format a duration (minutes) as "Xh Ym" when >= 1h, "Ym" for
+# 1 <= mins < 60, "X.XXm" for < 1 minute. Returns "-" for NA / non-
+# finite input so table cells never blow up on missing data. See #130.
+format_hm <- function(mins) {
+  x <- suppressWarnings(as.numeric(mins))
+  if (length(x) != 1L || !is.finite(x) || x < 0) return("-")
+  if (x < 1) return(sprintf("%.2f m", x))
+  rounded_min <- round(x)
+  if (rounded_min < 60) return(sprintf("%d m", as.integer(rounded_min)))
+  h <- rounded_min %/% 60
+  m <- rounded_min - h * 60
+  sprintf("%dh %02dm", as.integer(h), as.integer(m))
+}
 ```
 
 ```{r load-inputs}
@@ -138,11 +152,35 @@ meta_rows <- list(
   c("Metric package",        paste(metric_pkg, collapse = ", ")),
   c("Repositories",          paste(repos, collapse = "; "))
 )
-if (!is.null(params$pipeline_runtime) &&
-      nzchar(as.character(params$pipeline_runtime))) {
-  meta_rows <- c(meta_rows, list(
-    c("val_pipeline() runtime", as.character(params$pipeline_runtime))
-  ))
+# val.pipeline version(s) that produced this run. Sourced from the
+# per-pkg `val_pipeline_ver` list-col on qual_metadata (populated by
+# val_pkg() as of #130). A resumed run can span multiple versions if
+# the operator updated the package between sessions -- show the
+# distinct set in insertion order so the reader sees the mix.
+if ("val_pipeline_ver" %in% names(qual_metadata)) {
+  vp_vers <- unique(stats::na.omit(as.character(qual_metadata$val_pipeline_ver)))
+  vp_vers <- vp_vers[nzchar(vp_vers)]
+  if (length(vp_vers) > 0L) {
+    meta_rows <- c(meta_rows, list(
+      c("val.pipeline version(s)", paste(vp_vers, collapse = ", "))
+    ))
+  }
+}
+# Cumulative pipeline runtime = sum of per-pkg assessment_runtime_mins
+# across the cohort. Each pkg only runs once, so summing correctly
+# accounts for time spent across resumed sessions -- unlike the prior
+# `params$pipeline_runtime` field which was Sys.time() - val_start of
+# only the LAST session. See #130.
+if ("assessment_runtime_mins" %in% names(qual_metadata)) {
+  rt_all <- suppressWarnings(
+    as.numeric(qual_metadata$assessment_runtime_mins))
+  rt_all <- rt_all[is.finite(rt_all) & rt_all >= 0]
+  if (length(rt_all) > 0L) {
+    meta_rows <- c(meta_rows, list(
+      c("val_pipeline() runtime (cumulative)",
+        format_hm(sum(rt_all)))
+    ))
+  }
 }
 if (!is.null(params$n_candidates)) {
   meta_rows <- c(meta_rows, list(
@@ -368,19 +406,77 @@ kable(final_counts, col.names = c("Final decision", "Packages", "Percent"),
 
 Packages whose category changed because of dependency propagation.
 
+```{r decision-crosstab-downgrade-callout, results = "asis"}
+downgraded_n <- sum(qual_metadata$decision != qual_metadata$final_decision,
+                    na.rm = TRUE)
+# Large-font callout above the crosstab so the reader's eye lands on
+# the headline number first. See #130.
+cat("::: {style=\"font-size: 1.8em; font-weight: 600; margin: 0.5em 0 0.75em;\"}\n",
+    format(downgraded_n, big.mark = ","),
+    " package(s) downgraded from their initial decision\n",
+    ":::\n", sep = "")
+```
+
 ```{r decision-crosstab}
 xt <- qual_metadata |>
   dplyr::count(decision, final_decision, .drop = FALSE) |>
   tidyr::pivot_wider(names_from = final_decision, values_from = n,
                      values_fill = 0L, names_expand = TRUE)
 kable(xt, caption = "Rows = initial decision, Columns = final decision")
-
-downgraded_n <- sum(qual_metadata$decision != qual_metadata$final_decision,
-                    na.rm = TRUE)
 ```
 
-**`r downgraded_n`** package(s) were downgraded from their initial decision
-because of a failing (Medium/High) dependency.
+Downgrades happen when a runtime dependency failed its assessment
+(Medium/High), so PPM cannot serve the parent package with a
+complete install closure.
+
+## Ripple effect: failing packages by dep-downgrade count
+
+For every package that got downgraded because of a failing dep
+(`final_decision_reason` is `Dependency` or `Pre-Approved (dep
+failed)`), the failing direct dep(s) are already named in
+`final_decision_reason_note`. This table inverts that mapping to
+show which failing packages had the biggest downstream footprint
+— i.e. how many other packages each one dragged down.
+
+```{r ripple-effect}
+ripple_src <- qual_metadata |>
+  dplyr::filter(final_decision_reason %in%
+                  c("Dependency", "Pre-Approved (dep failed)")) |>
+  dplyr::filter(!is.na(final_decision_reason_note) &
+                  nzchar(final_decision_reason_note)) |>
+  dplyr::transmute(
+    child_pkg = pkg,
+    culprits = strsplit(final_decision_reason_note, "\\s*,\\s*")
+  ) |>
+  tidyr::unnest_longer(culprits) |>
+  dplyr::filter(nzchar(culprits))
+
+if (nrow(ripple_src) > 0L) {
+  # Look up each culprit's own final decision so operators can see at
+  # a glance whether it errored, was dep-driven itself, or landed
+  # High on its own risk assessment. Left join tolerates culprits
+  # that aren't in qual_metadata (e.g. a system dep not assessed
+  # here) by leaving those cells NA.
+  culprit_lookup <- qual_metadata |>
+    dplyr::select(culprits = pkg,
+                  culprit_decision = final_decision,
+                  culprit_reason = final_decision_reason)
+  ripple_tbl <- ripple_src |>
+    dplyr::count(culprits, name = "downgraded_pkgs") |>
+    dplyr::left_join(culprit_lookup, by = "culprits") |>
+    dplyr::arrange(dplyr::desc(downgraded_pkgs), culprits) |>
+    dplyr::slice_head(n = 100) |>
+    dplyr::transmute(
+      `Failing package`         = culprits,
+      `Downgraded pkgs (count)` = downgraded_pkgs,
+      `Its own decision`        = as.character(culprit_decision),
+      `Its own reason`          = as.character(culprit_reason)
+    )
+  itable(ripple_tbl, default_page_size = 25)
+} else {
+  cat("_No dep-driven downgrades recorded in this run._\n")
+}
+```
 
 ## Reasons driving the final decision
 
@@ -492,7 +588,7 @@ if (nrow(incomplete) > 0L) {
 }
 ```
 
-# Packages by Risk Category
+# Packages
 
 The tables below list every package in each risk tier, with the reason and
 supporting note (driver metrics for `Risk Assessment`, failing dependency
@@ -550,13 +646,13 @@ rt <- rt[!is.na(rt)]
 
 if (length(rt) > 0L) {
   rt_tbl <- tibble::tribble(
-    ~Metric, ~`Minutes`,
-    "Packages with recorded runtime", length(rt),
-    "Total runtime (mins)",           round(sum(rt), 1),
-    "Total runtime (hours)",          round(sum(rt) / 60, 2),
-    "Mean per package (mins)",        round(mean(rt), 3),
-    "Median per package (mins)",      round(stats::median(rt), 3),
-    "Max per package (mins)",         round(max(rt), 2)
+    ~Metric, ~Value,
+    "Packages with recorded runtime",
+      format(length(rt), big.mark = ","),
+    "Cumulative runtime",             format_hm(sum(rt)),
+    "Mean per package",               format_hm(mean(rt)),
+    "Median per package",             format_hm(stats::median(rt)),
+    "Max per package",                format_hm(max(rt))
   )
   kable(rt_tbl, align = "lr")
 } else {
@@ -564,7 +660,10 @@ if (length(rt) > 0L) {
 }
 ```
 
-## Ten slowest packages
+## Slowest packages
+
+Sourced as the 50 slowest per-package assessments; use the page-size
+control to browse fewer rows at a time.
 
 ```{r slowest-pkgs}
 if (length(rt) > 0L) {
@@ -572,20 +671,24 @@ if (length(rt) > 0L) {
     dplyr::mutate(runtime_mins = as.numeric(assessment_runtime_mins)) |>
     dplyr::filter(!is.na(runtime_mins)) |>
     dplyr::arrange(dplyr::desc(runtime_mins)) |>
-    dplyr::slice_head(n = 10) |>
+    dplyr::slice_head(n = 50) |>
     dplyr::transmute(
       Package = pkg,
       Version = ver,
       `Final decision` = as.character(final_decision),
+      Runtime = vapply(runtime_mins, format_hm, character(1)),
       `Runtime (mins)` = round(runtime_mins, 2)
     )
-  kable(slow_df, align = "llrr")
+  itable(slow_df, default_page_size = 10)
 } else {
   cat("_(runtime data not available)_\n")
 }
 ```
 
-## Top 25 memory offenders
+## Memory offenders
+
+Sourced as the 50 packages with the largest peak RSS during
+assessment; use the page-size control to browse fewer rows at a time.
 
 ```{r mem-watchdog-load, include = FALSE}
 mw_path <- params$mem_watchdog_path
@@ -627,7 +730,7 @@ cat("Distribution of peak RSS per package (sampled from ",
 mw_top <- mw_df |>
   dplyr::filter(is.finite(peak_rss_mb)) |>
   dplyr::arrange(dplyr::desc(peak_rss_mb)) |>
-  dplyr::slice_head(n = 25) |>
+  dplyr::slice_head(n = 50) |>
   dplyr::transmute(
     Package = pkg,
     Version = if ("version" %in% names(mw_df)) version else NA_character_,
@@ -691,15 +794,22 @@ itable(tbl, default_page_size = 25)
 
 ## Package coverage (`covr_coverage`)
 
+The 65% boundary mirrors the Low-tier coverage threshold in
+`inst/config.yml` (`decide.rules.covr_coverage`) — packages at or
+above 65% pass the coverage rule for the Low tier; below it they
+land in Medium or higher unless another rule pulls them down.
+
 ```{r coverage, eval = has_assessments && "covr_coverage" %in% names(qa)}
 cov <- suppressWarnings(as.numeric(qa$covr_coverage))
 cov_tbl <- tibble::tibble(
-  Bucket = c("Not measured (NA)", "0%", "1-49%", "50-79%", "80-94%", "95-100%"),
+  Bucket = c("Not measured (NA)", "0%", "1-49%", "50-64%",
+             "65-79%", "80-94%", "95-100%"),
   Packages = c(
     sum(is.na(cov)),
     sum(cov == 0, na.rm = TRUE),
     sum(cov > 0 & cov < 50, na.rm = TRUE),
-    sum(cov >= 50 & cov < 80, na.rm = TRUE),
+    sum(cov >= 50 & cov < 65, na.rm = TRUE),
+    sum(cov >= 65 & cov < 80, na.rm = TRUE),
     sum(cov >= 80 & cov < 95, na.rm = TRUE),
     sum(cov >= 95 & cov <= 100, na.rm = TRUE)
   )

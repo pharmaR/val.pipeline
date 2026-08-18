@@ -509,7 +509,7 @@ test_that("val_pipeline_report errors on missing pre_filtered_path", {
   )
 })
 
-test_that("val_pipeline_report shows val_pipeline() runtime row when supplied", {
+test_that("val_pipeline_report shows cumulative val_pipeline() runtime row from qual_metadata (#130)", {
   skip_if_no_quarto()
 
   work <- tempfile(pattern = "vpr_")
@@ -519,6 +519,13 @@ test_that("val_pipeline_report shows val_pipeline() runtime row when supplied", 
   qm_path <- file.path(work, "qual_metadata.rds")
   saveRDS(make_fake_qual_metadata(), qm_path)
 
+  # The top meta table's runtime line is now sourced from the
+  # cumulative sum of per-pkg `assessment_runtime_mins` rather than
+  # the `pipeline_runtime` param (which was only the LAST session's
+  # wall clock and read as deceiving on resumed runs). The fake
+  # cohort sums to 0.1 + 0.05 + 3.5 + 0.2 + 0.5 = 4.35 min => "4 m".
+  # The `pipeline_runtime` param is still accepted for back-compat
+  # but no longer displayed in the meta table. See #130.
   out <- val_pipeline_report(
     qual_metadata_path = qm_path,
     qual_assessments_path = NA,
@@ -529,8 +536,8 @@ test_that("val_pipeline_report shows val_pipeline() runtime row when supplied", 
     quiet = TRUE
   )
   html <- paste(readLines(out, warn = FALSE), collapse = "\n")
-  expect_true(grepl("val_pipeline() runtime", html, fixed = TRUE))
-  expect_true(grepl("18h 42m 15s", html, fixed = TRUE))
+  expect_true(grepl("val_pipeline() runtime (cumulative)", html, fixed = TRUE))
+  expect_true(grepl("4 m", html, fixed = TRUE))
 })
 
 test_that("val_pipeline_report omits pre-filter sub-headers when RDS absent", {
