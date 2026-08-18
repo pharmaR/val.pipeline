@@ -1,4 +1,21 @@
 
+# val.pipeline 0.1.32
+
+- **Parallel workers now inherit `options(repos = opt_repos)`** (and
+  `pkgType = "source"` when `ref == "source"`) from the parent
+  session. `future::multisession` boots each worker in a fresh R
+  process that does NOT inherit `options()`, so `get_repo_origin()` ->
+  `getOption("repos")` inside the worker returned R's factory default
+  `c(CRAN = "@CRAN@")`, no substring-match ever hit, and every
+  parallel-assessed pkg was stamped `repos = "unknown"` on its
+  `_meta.rds` bundle. That literal then leaked into the summary
+  report's Run Metadata "Repositories" row and any downstream
+  consumer of `qual_metadata$repos`. Re-apply both options inside the
+  worker's option-priming block, alongside the existing
+  `val.pipeline.verbose` / `val.pipeline.config_path` /
+  `val.pipeline.log_file` / `val.pipeline.log_level` re-hydration.
+  Serial runs (`workers = 1`) were never affected. (#132)
+
 # val.pipeline 0.1.29
 
 - Re-fixed the `<<-` scope bug in `val_finalize()`'s
