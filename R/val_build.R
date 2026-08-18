@@ -649,6 +649,12 @@ val_build <- function(
     # runs also match the parent's install behaviour.
     repos_tier    <- opt_repos
     pkgtype_tier  <- if (identical(ref, "source")) "source" else NULL
+    # `scipen` isn't set inside val_build() itself (val_pipeline() /
+    # val_prep_pipeline() set it in the parent session), so it also
+    # fails to cross the multisession boundary. Hoist it to keep
+    # numeric formatting inside worker-emitted strings (versions,
+    # sizes, timing dumps, etc.) matching serial-mode output.
+    scipen_tier   <- getOption("scipen", 0L)
 
     # Pre-filter already-assessed pkgs before dispatch. In parallel
     # mode there's no dep-skip state to update in-loop, so any pkg
@@ -741,6 +747,7 @@ val_build <- function(
               options(repos = repos_tier)
             }
           }
+          options(scipen = scipen_tier)
           assess_one(pkg, ver, pkg_cnt,
                      is_dep_skip = FALSE,
                      failed_snapshot = character(0))

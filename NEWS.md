@@ -2,8 +2,8 @@
 # val.pipeline 0.1.32
 
 - **Parallel workers now inherit `options(repos = opt_repos)`** (and
-  `pkgType = "source"` when `ref == "source"`) from the parent
-  session. `future::multisession` boots each worker in a fresh R
+  `pkgType = "source"` when `ref == "source"`, plus `scipen` from
+  the parent) from the parent session. `future::multisession` boots each worker in a fresh R
   process that does NOT inherit `options()`, so `get_repo_origin()` ->
   `getOption("repos")` inside the worker returned R's factory default
   `c(CRAN = "@CRAN@")`, no substring-match ever hit, and every
