@@ -322,6 +322,32 @@ if (!is.null(val_dir) && nzchar(as.character(val_dir))) {
       if (!is.na(.br) && nzchar(.br)) {
         .set_value("Has bug reports url", as.character(.br))
       }
+      # Has source control fallback. `pkg_metric_has_source_control()`
+      # in {riskmetric} returns "unknown" when it can't parse a code
+      # host URL from the pkg's URL field, but the URL is often
+      # present in `DESCRIPTION` -- just as a plain github.com /
+      # gitlab.com / bitbucket.org link that riskmetric didn't
+      # recognize. Extract it here rather than showing "unknown".
+      # See #130.
+      .url <- if ("URL" %in% colnames(.desc)) .desc[1, "URL"] else NA
+      if (!is.na(.url) && nzchar(.url)) {
+        .url_bits <- trimws(unlist(strsplit(as.character(.url),
+                                            "[,\\s]+")))
+        .url_bits <- .url_bits[nzchar(.url_bits)]
+        .code_hosts <- c("github.com", "gitlab.com", "bitbucket.org",
+                         "codeberg.org", "sr.ht", "gitea.io")
+        .src_urls <- .url_bits[
+          vapply(.url_bits,
+                 function(u) any(vapply(.code_hosts,
+                                        function(h) grepl(h, u, fixed = TRUE),
+                                        logical(1))),
+                 logical(1))
+        ]
+        if (length(.src_urls) > 0L) {
+          .set_value("Has source control",
+                     paste(unique(.src_urls), collapse = ", "))
+        }
+      }
     }
   }
 }

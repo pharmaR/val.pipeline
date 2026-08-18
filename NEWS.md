@@ -1,4 +1,56 @@
 
+# val.pipeline 0.1.31
+
+- Summary report **"Run Metadata" → "Repositories"** row now drops the
+  literal `"unknown"` value returned by `get_repo_origin()` when a pkg's
+  source URL fails to substring-match any entry in `getOption("repos")`
+  at assessment time. Matches the existing NA-filter pattern already
+  applied to `ref` / `metric_pkg` on the same row set. (#130)
+
+# val.pipeline 0.1.30
+
+- Summary report polish batch (#130):
+  - **"Packages by Risk Category"** section heading trimmed to
+    **"Packages"** — the subsection headings under it (Low / Medium
+    / High) already convey the risk-tier grouping.
+  - **New "Ripple effect" table** under "Initial vs. final decision"
+    that ranks failing packages by the number of other packages
+    they dragged down as a dep failure. Sourced by parsing
+    `final_decision_reason_note` on every dep-downgraded row and
+    counting occurrences per culprit; joined back against
+    `qual_metadata` so each culprit's own decision + reason are
+    shown alongside the ripple count.
+  - **Coverage buckets** in Metric-Level Summaries now cleave at 65%,
+    mirroring the Low-tier `covr_coverage` threshold from
+    `inst/config.yml`. Old three-band split (50-79 / 80-94 / 95-100)
+    is now four bands (50-64 / 65-79 / 80-94 / 95-100).
+  - **"Ten slowest packages"** → **"Slowest packages"**; sources the
+    top 50 rows and renders via `itable()` with a page-size dropdown
+    (10 / 25 / 50 / 100), default 10.
+  - **"Top 25 memory offenders"** → **"Memory offenders"**; same
+    treatment — 50 rows sourced, default page 25.
+  - **"Initial vs. final decision"**: the downgrade count now
+    renders in a large-font callout above the crosstab so it's the
+    first thing an operator sees.
+  - **Package report "Has source control"**: when riskmetric couldn't
+    parse a code-host URL and returned `"unknown"`, the pkg template
+    now falls back to reading the sourced `DESCRIPTION`'s `URL:`
+    field for a github/gitlab/bitbucket/codeberg/sr.ht/gitea link,
+    mirroring the existing "Has bug reports url" fallback.
+  - **Top-of-report runtime** is now **cumulative** (sum of
+    per-package `assessment_runtime_mins`) so a run resumed across
+    multiple sessions shows total work rather than the last
+    session's wall clock. Formatted as `Hh MMm` (e.g. `41h 12m`).
+  - **Runtime section**: total / mean / median / max are now
+    formatted as `Hh MMm` where >= 1h, `Xm` for 1-59 min, `X.XX m`
+    for sub-minute values.
+  - **`val.pipeline` version(s)**: a new `val_pipeline_ver` field is
+    persisted on each `_meta.rds` (from `utils::packageVersion()` at
+    `val_pkg()` time). The summary report's meta table surfaces the
+    distinct set of versions that produced the run -- resumed runs
+    that spanned a package update will now show every version that
+    contributed.
+
 # val.pipeline 0.1.29
 
 - Re-fixed the `<<-` scope bug in `val_finalize()`'s

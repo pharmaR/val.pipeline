@@ -176,3 +176,19 @@ test_that("val_finalize preserves assessment_gaps as a list-col (#124)", {
     info = "val_finalize must reattach assessment_gaps as a list-col"
   )
 })
+
+test_that("val_pkg persists val_pipeline_ver on the meta bundle (#130)", {
+  # A resumed run may span multiple val.pipeline versions if the
+  # operator upgraded between sessions. Persist the running version on
+  # every meta bundle so the summary report can surface the distinct
+  # set. Standing up val_pkg() takes a real build, so pin at the
+  # source level.
+  src <- readLines(test_path("..", "..", "R", "val_pkg.R"))
+  src <- paste(src, collapse = "\n")
+
+  expect_true(
+    grepl("val_pipeline_ver = as.character(utils::packageVersion(\"val.pipeline\"))",
+          src, fixed = TRUE),
+    info = "meta_list must carry val_pipeline_ver"
+  )
+})
