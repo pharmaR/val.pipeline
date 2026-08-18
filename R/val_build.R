@@ -638,6 +638,23 @@ val_build <- function(
     # writes so concurrent worker appends interleave cleanly. See #87.
     log_file_tier    <- getOption("val.pipeline.log_file", NULL)
     log_level_tier   <- getOption("val.pipeline.log_level", "normal")
+    # Repo option is likewise NOT inherited across the multisession
+    # boundary. Without this, `get_repo_origin()` -> `getOption("repos")`
+    # inside the worker returns R's default `c(CRAN = "@CRAN@")`, no
+    # substring-match ever hits, and every parallel-assessed pkg gets
+    # `repos = "unknown"` stamped onto its `_meta.rds` bundle (which
+    # then leaks into the summary report's Run Metadata "Repositories"
+    # row and any downstream consumer of `qual_metadata$repos`). See
+    # #132. `pkgType = "source"` piggybacks so parallel source-tier
+    # runs also match the parent's install behaviour.
+    repos_tier    <- opt_repos
+    pkgtype_tier  <- if (identical(ref, "source")) "source" else NULL
+    # `scipen` isn't set inside val_build() itself (val_pipeline() /
+    # val_prep_pipeline() set it in the parent session), so it also
+    # fails to cross the multisession boundary. Hoist it to keep
+    # numeric formatting inside worker-emitted strings (versions,
+    # sizes, timing dumps, etc.) matching serial-mode output.
+    scipen_tier   <- getOption("scipen", 0L)
 
     # Pre-filter already-assessed pkgs before dispatch. In parallel
     # mode there's no dep-skip state to update in-loop, so any pkg
@@ -723,6 +740,14 @@ val_build <- function(
             options(val.pipeline.log_file  = log_file_tier,
                     val.pipeline.log_level = log_level_tier)
           }
+          if (!is.null(repos_tier)) {
+            if (!is.null(pkgtype_tier)) {
+              options(repos = repos_tier, pkgType = pkgtype_tier)
+            } else {
+              options(repos = repos_tier)
+            }
+          }
+          options(scipen = scipen_tier)
           assess_one(pkg, ver, pkg_cnt,
                      is_dep_skip = FALSE,
                      failed_snapshot = character(0))
