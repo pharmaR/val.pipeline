@@ -136,7 +136,17 @@ if (has_pre_filter) {
 ```{r run-metadata}
 r_ver <- unique(qual_metadata$r_ver)
 val_dates <- unique(as.character(qual_metadata$val_date))
+# Split, unique, and drop "unknown" (unnamed literal returned by
+# `get_repo_origin()` in R/utils.R when the pkg's source URL doesn't
+# substring-match any entry in `getOption("repos")` at assessment
+# time -- typically dep-skipped bundles whose repo was resolved
+# before the option was populated, or pkgs pulled from an ad-hoc
+# `Additional_repositories:` / GitHub tarball path). Leaving it in
+# the "Repositories" row shows a misleading literal in the top meta
+# table. Same NA-filter idea already applied to `ref` / `metric_pkg`
+# below. See #130.
 repos <- unique(unlist(strsplit(as.character(qual_metadata$repos), "\\s*,\\s*")))
+repos <- setdiff(repos, c("unknown", NA_character_, ""))
 # Drop NAs before flattening: rows whose packages were categorised via
 # dependency propagation (never independently assessed by riskmetric)
 # leave `ref` / `metric_pkg` unset, and we don't want a literal "NA" to

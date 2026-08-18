@@ -1,4 +1,12 @@
 
+# val.pipeline 0.1.31
+
+- Summary report **"Run Metadata" → "Repositories"** row now drops the
+  literal `"unknown"` value returned by `get_repo_origin()` when a pkg's
+  source URL fails to substring-match any entry in `getOption("repos")`
+  at assessment time. Matches the existing NA-filter pattern already
+  applied to `ref` / `metric_pkg` on the same row set. (#130)
+
 # val.pipeline 0.1.30
 
 - Summary report polish batch (#130):
