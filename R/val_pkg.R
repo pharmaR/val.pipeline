@@ -654,6 +654,64 @@ val_pkg <- function(
     .default = NA_character_
   )
 
+  # Silent-NA capture. val_decision() can return final_risk = NA when
+  # its rule ladder produces no category for this pkg — typically a
+  # remote_only pkg whose shrunken viable-metric set means the primary
+  # rules score `unknown` AND the secondary rules also don't match.
+  # Preserve `decision = NA` per operator preference (don't silently
+  # coerce to a tier), but overwrite decision_reason with a distinct
+  # tag ("Incomplete Assessment") and stash an `assessment_gaps` list
+  # so the summary report can surface which metrics were viable,
+  # which categories fired, and why the ladder produced nothing. See
+  # #124.
+  assessment_gaps <- NULL
+  if (is.na(decision$final_risk)) {
+    metric_cat_cols <- names(decision)[
+      grepl("_cat$", names(decision), perl = TRUE) &
+      !grepl("cataa$", names(decision), perl = TRUE)
+    ]
+    metric_cats <- if (length(metric_cat_cols) > 0L) {
+      vapply(metric_cat_cols,
+             function(c) as.character(decision[[c]][1]),
+             character(1))
+    } else {
+      character(0)
+    }
+    prim_cat <- if ("primary_risk_category" %in% names(decision)) {
+      as.character(decision$primary_risk_category[1])
+    } else {
+      NA_character_
+    }
+    sec_cat <- if ("secondary_risk_category" %in% names(decision)) {
+      as.character(decision$secondary_risk_category[1])
+    } else {
+      NA_character_
+    }
+    note <- if (identical(prim_cat, "unknown") &&
+                  (is.na(sec_cat) || identical(sec_cat, "unknown"))) {
+      paste0("Primary rule ladder scored 'unknown' and secondary ",
+             "rule ladder also produced no category. Typically a ",
+             "remote_only / Bioc pkg whose viable-metric set is too ",
+             "thin to trigger any rule.")
+    } else if (identical(prim_cat, "unknown")) {
+      paste0("Primary rule ladder scored 'unknown'; ",
+             "secondary rule ladder produced no matching category.")
+    } else {
+      paste0("Rule ladder produced no matching category ",
+             "(primary = '", prim_cat, "', ",
+             "secondary = '", sec_cat, "').")
+    }
+    assessment_gaps <- list(
+      viable_metrics          = viable_metrics,
+      metric_cats             = metric_cats,
+      primary_risk_category   = prim_cat,
+      secondary_risk_category = sec_cat,
+      note                    = note
+    )
+    decision_reason      <- "Incomplete Assessment"
+    decision_reason_note <- note
+  }
+
   val_msg("\n-->", pkg_v,"decision reason:\n---->", decision_reason, "\n",
           min_level = "normal")
   if(!is.na(decision_reason_note)) {
@@ -749,6 +807,11 @@ val_pkg <- function(
     suggests_direct = if(identical(suggests_direct, character(0))) NA_character_ else suggests_direct,
     rev_deps = if(is.null(pkg_assessment$reverse_dependencies)) NA_character_ else pkg_assessment$reverse_dependencies |> as.vector(),
     assessment_runtime = list(txt = ass_mins_txt, mins = ass_mins),
+    # Diagnostic capture when val_decision()'s rule ladder produced
+    # `final_risk = NA` for this pkg -- populated in the "Silent-NA
+    # capture" block above. NULL for pkgs with a real decision. See
+    # #124.
+    assessment_gaps = assessment_gaps,
     # Per-phase elapsed seconds captured via val_time_block() around
     # the fat blocks (download, untar, assess_initial, assess_final,
     # decision, report). Named list; each value is a numeric vector

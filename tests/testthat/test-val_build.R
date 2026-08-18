@@ -247,3 +247,21 @@ test_that("restripe: round-robin interleaves the input order across workers", {
   gaps <- diff(out[1:8])
   expect_true(any(gaps >= 3L))
 })
+
+test_that("val_build serial branch guards against NA pkg_meta$decision (#124)", {
+  # val_decision() can return final_risk = NA when its rule ladder produces
+  # no category for a pkg (typically remote_only pkgs with a shrunken
+  # viable-metric set). val_pkg() then persists a bundle with decision =
+  # NA. Without a guard, the `!= decisions[1]` comparison in val_build()'s
+  # serial branch evaluates to NA and takes the whole run down. Assert the
+  # NA guard survives.
+  src <- readLines(test_path("..", "..", "R", "val_build.R"))
+  src <- paste(src, collapse = "\n")
+
+  expect_true(grepl("is.na(pkg_meta$decision)", src, fixed = TRUE),
+              info = "val_build.R must NA-guard pkg_meta$decision before !=")
+  expect_true(
+    grepl("has NA decision on its meta bundle", src, fixed = TRUE),
+    info = "NA-decision branch must emit an operator-visible message"
+  )
+})

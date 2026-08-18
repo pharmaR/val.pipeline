@@ -138,3 +138,41 @@ test_that("val_pkg() validates 'val_date' parameter", {
 #   })
 # })
 
+
+test_that("val_pkg NA-decision capture surfaces via source-level markers (#124)", {
+  # val_decision() can return final_risk = NA (typically remote_only /
+  # Bioc pkgs with a thin viable-metric set). val_pkg() must NOT silently
+  # coerce that NA to a tier -- it must (a) keep decision = NA, (b) flip
+  # decision_reason to "Incomplete Assessment", and (c) stash an
+  # `assessment_gaps` list on the meta bundle so val_finalize() and the
+  # summary report can surface it. Standing up the full val_pkg() call
+  # requires a live package build, so pin the invariant at the source
+  # level.
+  src <- readLines(test_path("..", "..", "R", "val_pkg.R"))
+  src <- paste(src, collapse = "\n")
+
+  expect_true(grepl("Incomplete Assessment", src, fixed = TRUE),
+              info = "val_pkg.R must set decision_reason='Incomplete Assessment' when final_risk is NA")
+  expect_true(grepl("is.na(decision$final_risk)", src, fixed = TRUE),
+              info = "val_pkg.R must branch on is.na(decision$final_risk)")
+  expect_true(grepl("assessment_gaps = assessment_gaps", src, fixed = TRUE),
+              info = "meta bundle must carry the assessment_gaps list-col")
+})
+
+test_that("val_finalize preserves assessment_gaps as a list-col (#124)", {
+  # `purrr::list_flatten(bundle)` would explode assessment_gaps across ~5
+  # nested cols. It must be pulled out before flatten (mirroring how
+  # `timings` is handled) and reattached as a single list-col so the
+  # report can read qual_metadata$assessment_gaps[[i]].
+  src <- readLines(test_path("..", "..", "R", "val_finalize.R"))
+  src <- paste(src, collapse = "\n")
+
+  expect_true(
+    grepl("bundle[[\"assessment_gaps\"]] <- NULL", src, fixed = TRUE),
+    info = "val_finalize must strip assessment_gaps before list_flatten()"
+  )
+  expect_true(
+    grepl("x$assessment_gaps <- list(gaps)", src, fixed = TRUE),
+    info = "val_finalize must reattach assessment_gaps as a list-col"
+  )
+})
