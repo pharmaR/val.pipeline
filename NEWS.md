@@ -1,4 +1,19 @@
 
+# val.pipeline 0.1.28
+
+- Pre-filtered already-assessed packages out of `val_build()`'s serial
+  loop, mirroring the `!replace` skip the parallel branch has had
+  since #91. Previously, resuming a mostly-complete run (e.g. 1602 of
+  1606 packages already on disk) meant emitting a `val_msg` line per
+  cached package before the loop even reached the four unassessed
+  ones — clogging the log with thousands of "already assessed" lines.
+  The serial branch now reads `_meta.rds` for each cached package
+  once up front, replays any cached failure (`decision != decisions[1]`,
+  ignoring NAs) into `dont_run` / `failed_pkgs` so subsequent uncached
+  packages still get dep-skipped correctly, and iterates only the
+  filtered `todo` list. The in-loop dep-skip check for newly-assessed
+  failures is unchanged. (#126)
+
 # val.pipeline 0.1.27
 
 - Guarded `val_build()`'s serial-branch dep-propagation check against
