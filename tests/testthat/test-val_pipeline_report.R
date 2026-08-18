@@ -694,3 +694,50 @@ test_that("val_pipeline_report disables renv autoloader for the quarto subproces
   expect_identical(Sys.getenv("RENV_CONFIG_AUTOLOADER_ENABLED", unset = NA),
                    NA_character_)
 })
+
+test_that("val_pipeline_report renders PDF via typst without weight errors (#134)", {
+  # Every other test in this file passes `format = "html"` and never
+  # exercises the typst PDF backend. #131's downgrade-callout used
+  # numeric CSS `font-weight: 600`, which Pandoc translates into
+  # typst `weight: "600"` (a stringified integer). Typst accepts
+  # integers 100-900 OR named weights ("thin" / ... / "semibold" /
+  # "bold" / ...) but not a string containing digits, so PDF
+  # renders blew up mid-typst-compile while HTML renders were fine.
+  # This test locks the fix in: any future numeric-weight regression
+  # would fail the typst compile the same way.
+  skip_if_no_quarto()
+
+  work <- tempfile(pattern = "vpr_pdf_")
+  dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+
+  qm_path <- file.path(work, "qual_metadata.rds")
+  saveRDS(make_fake_qual_metadata(), qm_path)
+
+  out <- tryCatch(
+    val_pipeline_report(
+      qual_metadata_path    = qm_path,
+      qual_assessments_path = NA,
+      format                = "pdf",
+      quiet                 = TRUE
+    ),
+    error = function(e) e
+  )
+  # Some environments ship Quarto without the bundled typst binary
+  # (or without a working local typst install). If that's the case
+  # the render fails with a typst-not-found message rather than a
+  # weight-validation error -- skip cleanly instead of failing.
+  if (inherits(out, "error")) {
+    msg <- conditionMessage(out)
+    if (grepl("typst", msg, ignore.case = TRUE) &&
+        grepl("not found|no such file|command not found|installed",
+              msg, ignore.case = TRUE)) {
+      skip("typst backend not available in this environment")
+    }
+    stop(out)
+  }
+
+  expect_length(out, 1L)
+  expect_true(file.exists(out))
+  expect_match(out, "\\.pdf$")
+})

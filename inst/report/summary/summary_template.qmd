@@ -421,7 +421,7 @@ downgraded_n <- sum(qual_metadata$decision != qual_metadata$final_decision,
                     na.rm = TRUE)
 # Large-font callout above the crosstab so the reader's eye lands on
 # the headline number first. See #130.
-cat("::: {style=\"font-size: 1.8em; font-weight: 600; margin: 0.5em 0 0.75em;\"}\n",
+cat("::: {style=\"font-size: 1.8em; font-weight: bold; margin: 0.5em 0 0.75em;\"}\n",
     format(downgraded_n, big.mark = ","),
     " package(s) downgraded from their initial decision\n",
     ":::\n", sep = "")

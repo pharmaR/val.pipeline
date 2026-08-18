@@ -1,4 +1,20 @@
 
+# val.pipeline 0.1.33
+
+- **Summary report PDF renders again.** The `decision-crosstab-
+  downgrade-callout` chunk added in #131 wrote CSS
+  `font-weight: 600` on the callout span. Pandoc translates that
+  numeric weight into typst `weight: "600"` (a string) which
+  typst rejects — it accepts integers 100-900 or the named weights
+  `"thin"` / `"regular"` / `"semibold"` / `"bold"` / etc. HTML
+  renders unaffected; only the typst PDF backend was broken.
+  Switch to `font-weight: bold`, which Pandoc maps cleanly to
+  `weight: "bold"` in typst and renders essentially the same in
+  HTML. Adds a `format = "pdf"` regression test to
+  `test-val_pipeline_report.R` since every existing test in that
+  file explicitly requests `format = "html"` and never exercised
+  the typst path. (#134)
+
 # val.pipeline 0.1.32
 
 - **Parallel workers now inherit `options(repos = opt_repos)`** (and
