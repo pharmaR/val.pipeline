@@ -365,3 +365,25 @@ test_that("the buggy `<<-` variant would have spun forever (regression proof, #1
   }
   expect_equal(run_buggy(), 10L)
 })
+
+test_that("reject_iteration convergence loop uses `<-`, not `<<-`, in any caller (#128)", {
+  # #103 fixed a `<<-` scope bug in val_build.R that turned the
+  # fixed-point loop over reject_iteration() into an infinite loop
+  # for any cohort large enough to need > 1 propagation pass. #101
+  # extracted that same loop into val_finalize.R in flight and copied
+  # the pre-existing bug forward; #103's patch never landed on the
+  # new location. Guard against a third re-introduction by scanning
+  # every .R file in R/ for the specific offending patterns.
+  r_files <- list.files(test_path("..", "..", "R"),
+                        pattern = "\\.R$", full.names = TRUE)
+  hits <- character(0)
+  for (f in r_files) {
+    src <- paste(readLines(f, warn = FALSE), collapse = "\n")
+    if (grepl("failed[[:space:]]*<<-[[:space:]]*pkgs_df", src) ||
+          grepl("pkgs_df[[:space:]]*<<-[[:space:]]*reject_iteration",
+                src)) {
+      hits <- c(hits, basename(f))
+    }
+  }
+  expect_length(hits, 0)
+})
