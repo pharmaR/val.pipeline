@@ -793,7 +793,66 @@ val_build <- function(
     # the dep-skip branch of `assess_one()`). A plain `for` loop makes
     # the per-iter release explicit and avoids the ~1-3 GB `pkg_bundles`
     # list that used to accumulate on full CRAN+BioC cohorts. See #91.
-    for (i in seq_along(pkgs)) {
+
+    # Pre-filter already-assessed pkgs and replay their failures into
+    # dont_run / failed_pkgs before entering the loop. Same
+    # `!replace` semantic as the parallel branch above (#91). Without
+    # this, a resumed run on a mostly-complete cohort (e.g. 1602 of
+    # 1606 done) would still emit a val_msg line per cached pkg,
+    # clogging the log. The in-loop dep-skip check further down is
+    # preserved untouched -- newly-assessed failures still propagate
+    # to still-pending uncached rev-deps. See #126.
+    todo <- seq_along(pkgs)
+    if (!replace) {
+      pkg_v_all_s   <- paste(pkgs, vers, sep = "_")
+      existing_meta_s <- file.path(assessed,
+                                   paste0(pkg_v_all_s, "_meta.rds"))
+      already_done_s  <- file.exists(existing_meta_s)
+      n_skip_s <- sum(already_done_s)
+      if (n_skip_s > 0L) {
+        # Replay cached failures. Same criterion as the in-loop
+        # branch: decision non-NA and != decisions[1] (typically
+        # "Low"). NA decisions are ignored (val_finalize's
+        # reject_iteration() will handle them). Reads only the two
+        # scalar fields we need out of each cached bundle; the full
+        # bundle is discarded.
+        idx_done <- which(already_done_s)
+        replay_dont <- character(0)
+        replay_fail <- character(0)
+        for (j in idx_done) {
+          bundle_j <- tryCatch(readRDS(existing_meta_s[[j]]),
+                               error = function(e) NULL)
+          if (is.null(bundle_j)) next
+          dec_j <- bundle_j[["decision"]]
+          if (length(dec_j) != 1L || is.na(dec_j)) next
+          if (!identical(dec_j, decisions[1])) {
+            rd_j <- bundle_j[["rev_deps"]]
+            if (length(rd_j) > 0L) {
+              rd_j <- rd_j[!is.na(rd_j)]
+              replay_dont <- c(replay_dont, rd_j)
+            }
+            replay_fail <- c(replay_fail, pkgs[[j]])
+          }
+        }
+        if (length(replay_dont) > 0L) {
+          dont_run <- unique(c(dont_run, replay_dont))
+        }
+        if (length(replay_fail) > 0L) {
+          failed_pkgs <- unique(c(failed_pkgs, replay_fail))
+        }
+        val_msg(paste0("\n--> Skipping ", n_skip_s, " of ",
+                       pkgs_length,
+                       " package(s) already assessed on disk ",
+                       "(`_meta.rds` present under `assessed/`). ",
+                       "Replayed ", length(replay_fail),
+                       " cached failure(s) into dep-skip state. ",
+                       "Set `replace = TRUE` to re-run them.\n"),
+                min_level = "minimal")
+        todo <- which(!already_done_s)
+      }
+    }
+
+    for (i in todo) {
       pkg <- pkgs[[i]]
       ver <- vers[[i]]
       is_dep_skip <- pkg %in% dont_run

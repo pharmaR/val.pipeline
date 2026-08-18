@@ -265,3 +265,27 @@ test_that("val_build serial branch guards against NA pkg_meta$decision (#124)", 
     info = "NA-decision branch must emit an operator-visible message"
   )
 })
+
+test_that("val_build serial branch pre-filters cached pkgs + replays failures (#126)", {
+  # Mirror parallel branch's `!replace` skip: when a cached _meta.rds
+  # is on disk for a pkg, the serial loop should not re-issue a
+  # val_msg line per pkg (log spam on resumed runs). Cached failures
+  # must be replayed into dont_run/failed_pkgs so subsequent uncached
+  # pkgs still get dep-skipped correctly.
+  src <- readLines(test_path("..", "..", "R", "val_build.R"))
+  src <- paste(src, collapse = "\n")
+
+  expect_true(
+    grepl("Replayed ", src, fixed = TRUE),
+    info = "serial branch must emit the replay-count message on resume"
+  )
+  expect_true(
+    grepl("replay_dont", src, fixed = TRUE) &&
+      grepl("replay_fail", src, fixed = TRUE),
+    info = "serial branch must accumulate cached-failure replay state"
+  )
+  expect_true(
+    grepl("for (i in todo)", src, fixed = TRUE),
+    info = "serial loop must iterate over `todo` (filtered), not seq_along(pkgs)"
+  )
+})
