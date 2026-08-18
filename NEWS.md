@@ -1,4 +1,20 @@
 
+# val.pipeline 0.1.29
+
+- Re-fixed the `<<-` scope bug in `val_finalize()`'s
+  `reject_iteration()` convergence loop that was originally patched
+  in `val_build()` via #103. When #101 extracted the loop from
+  `val_build.R` into the new `val_finalize.R`, it carried the
+  pre-existing `<<-` forward verbatim; #103 (in flight against the
+  old `val_build.R` location) never touched the new copy, so the
+  fix was never applied here. `<<-` inside a top-level function
+  writes to the enclosing scope, leaving the local `failed` /
+  `pkgs_df` bindings pinned at their iter-1 values -- turning the
+  fixed-point loop into an infinite loop for any cohort whose
+  iter-1 result differs from the seed. Guarded against a third
+  re-introduction with a source-level test that scans every `.R`
+  file in `R/` for the offending pattern. (#128)
+
 # val.pipeline 0.1.28
 
 - Pre-filtered already-assessed packages out of `val_build()`'s serial

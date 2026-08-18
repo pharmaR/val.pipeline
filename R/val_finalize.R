@@ -352,10 +352,21 @@ val_finalize <- function(
                  n_after - length(seed_failed), " vs. seed).\n"),
           min_level = "normal")
 
+  # NB: use `<-` (not `<<-`) here. `<<-` inside a top-level function
+  # skips the function's own frame and searches the ENCLOSING scope
+  # (the package namespace, then globalenv) for an existing binding,
+  # leaving the local `failed` / `pkgs_df` bindings unchanged. That
+  # turns the fixed-point loop into an infinite loop the moment the
+  # iter-1 result differs from the seed (i.e. any cohort large enough
+  # that dep propagation actually needs a second pass). Originally
+  # fixed in val_build.R via #103; the bug was reintroduced here when
+  # #101 extracted the loop into val_finalize.R verbatim (including
+  # the pre-existing `<<-`) while #103 was in flight against the old
+  # val_build.R location. See #128 for the regression + guard.
   while (!identical(pkgs_df$pkg[pkgs_df$final_decision != decisions[1]],
                     failed)) {
-    failed <<- pkgs_df$pkg[pkgs_df$final_decision != decisions[1]]
-    pkgs_df <<- reject_iteration(pkgs_df, dec_reject, deps, decisions, failed)
+    failed <- pkgs_df$pkg[pkgs_df$final_decision != decisions[1]]
+    pkgs_df <- reject_iteration(pkgs_df, dec_reject, deps, decisions, failed)
     iter <- iter + 1L
     n_after <- sum(pkgs_df$final_decision != decisions[1])
     val_msg(paste0("    iter ", iter, ": ", n_after, " pkg(s) above '",
