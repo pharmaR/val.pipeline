@@ -65,6 +65,13 @@ test_that("parallel workers reinstate the BiocManager shim (#136)", {
   # up and reinstalls the shim. Live-network verification is out of
   # scope for a unit test; this presence check locks the fix in
   # against future refactors that drop the re-invocation.
+  #
+  # Same category / same fix for `configure_riskmetric_offline()`,
+  # which shims riskmetric's assess_reverse_dependencies.default,
+  # memoise_bioc_available, and pkg_bioc -- the memoise_bioc_available
+  # shim in particular is what saves an air-gapped worker from a
+  # hard-coded read.dcf() against bioconductor.org. Both shims must
+  # be re-invoked inside every worker.
   src_path <- system.file("R", "val_build.R", package = "val.pipeline",
                           mustWork = FALSE)
   if (!nzchar(src_path) || !file.exists(src_path)) {
@@ -73,18 +80,13 @@ test_that("parallel workers reinstate the BiocManager shim (#136)", {
   skip_if_not(file.exists(src_path), "val_build.R source not available")
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
-  # The re-invocation lives inside the worker FUN body, not the
-  # parent-side setup at L207. Grep for the call, then check that
-  # it also appears after `assess_one(` (or the tier-hoist block).
-  expect_match(
-    src,
-    "configure_bioc_repositories_if_requested",
-    perl = TRUE
-  )
-  # Look for at least two occurrences: parent-side (L207) + worker-side.
-  n_hits <- length(gregexpr(
-    "configure_bioc_repositories_if_requested",
-    src, fixed = TRUE
-  )[[1]])
-  expect_gte(n_hits, 2L)
+  # Both re-invocations live inside the worker FUN body (not the
+  # parent-side setup at L207/L208). Look for at least two
+  # occurrences of each: parent-side + worker-side.
+  for (fn in c("configure_bioc_repositories_if_requested",
+               "configure_riskmetric_offline_if_requested")) {
+    expect_match(src, fn, perl = TRUE)
+    n_hits <- length(gregexpr(fn, src, fixed = TRUE)[[1]])
+    expect_gte(n_hits, 2L)
+  }
 })

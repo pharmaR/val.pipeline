@@ -1,27 +1,33 @@
 
 # val.pipeline 0.1.34
 
-- **Parallel workers now reinstate the BiocManager shim.** The
-  \`configure_bioc_repositories()\` shim -- installed by
+- **Parallel workers now reinstate both BiocManager and riskmetric
+  shims.** The \`configure_bioc_repositories()\` shim -- installed by
   \`val_pipeline()\` / \`val_prep_pipeline()\` / \`val_build()\` at
   startup when \`VAL_PIPELINE_INTERNAL_BIOC=1\` is set -- rewrites
   \`BiocManager::repositories()\` via \`utils::assignInNamespace()\`
   and toggles \`options(BiocManager.check_repositories = FALSE)\`.
-  Both are session-scoped in-memory mutations that do NOT survive
-  the \`future::multisession\` boundary, so on air-gapped / PPM-only
-  hosts every worker booted with a stock \`BiocManager\` namespace
-  whose \`repositories()\` returned the public
-  \`https://bioconductor.org/...\` URLs. Downstream riskmetric calls
-  (e.g. \`assess_reverse_dependencies()\`) then failed with
-  \`cannot open the connection to 'https://bioconductor.org/
-  packages/.../PACKAGES'\` -- users reported 100s of Bioc-adjacent
-  pkgs failing this way in a single parallel run. The env var itself
-  crosses the boundary (OS inheritance) and
-  \`configure_bioc_repositories_if_requested()\` is safely
-  re-callable, so a plain re-invocation inside the worker \`FUN\`
-  body reinstates the shim. Serial mode was always fine. Same
-  category of parent-session-state gap as #133's \`options(repos)\`
-  fix. (#136)
+  Companion shim \`configure_riskmetric_offline()\` (also installed
+  at the same three entry points, gated on
+  \`VAL_PIPELINE_INTERNAL_RISKMETRIC\`) rewrites
+  \`riskmetric::assess_reverse_dependencies.default\`,
+  \`riskmetric::memoise_bioc_available\`, and
+  \`riskmetric::pkg_bioc\`. All of these are session-scoped in-memory
+  namespace mutations that do NOT survive the
+  \`future::multisession\` boundary. On air-gapped / PPM-only hosts
+  every worker booted with stock \`BiocManager\` /
+  \`riskmetric\` namespaces, so downstream calls
+  (\`riskmetric::assess_reverse_dependencies()\`,
+  \`memoise_bioc_available()\`'s hard-coded \`read.dcf\` against
+  \`https://bioconductor.org/packages/release/bioc/src/contrib/PACKAGES\`,
+  etc.) failed with
+  \`cannot open the connection to 'https://bioconductor.org/...'\`.
+  Users reported 100s of Bioc-adjacent pkgs failing this way in a
+  single parallel run. Env vars cross the boundary (OS inheritance)
+  and both helpers are safely re-callable, so plain re-invocations
+  inside the worker \`FUN\` body reinstate both shims. Serial mode
+  was always fine. Same category of parent-session-state gap as
+  #133's \`options(repos)\` fix. (#136)
 
 # val.pipeline 0.1.33
 

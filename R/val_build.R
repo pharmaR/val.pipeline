@@ -768,6 +768,22 @@ val_build <- function(
           val.pipeline::configure_bioc_repositories_if_requested(
             quiet = TRUE
           )
+          # `configure_riskmetric_offline()` similarly rewrites
+          # `riskmetric::assess_reverse_dependencies.default`,
+          # `riskmetric::memoise_bioc_available`, and
+          # `riskmetric::pkg_bioc` via `utils::assignInNamespace()`.
+          # `memoise_bioc_available()` hard-codes a `read.dcf()` against
+          # `https://bioconductor.org/packages/release/bioc/src/contrib/PACKAGES`
+          # (see riskmetric R/utils_memoised.R), so on an air-gapped
+          # host any worker that boots without this shim still blows
+          # up when riskmetric asks for a Bioc pkg's version --
+          # separately and in addition to the BiocManager-shim path
+          # patched above. Both are session-scoped namespace
+          # mutations; both need re-invocation inside every worker.
+          # See #136.
+          val.pipeline::configure_riskmetric_offline_if_requested(
+            quiet = TRUE
+          )
           assess_one(pkg, ver, pkg_cnt,
                      is_dep_skip = FALSE,
                      failed_snapshot = character(0))
