@@ -48,3 +48,43 @@ test_that("parallel workers rehydrate options(repos = opt_repos) (#132)", {
   # the `pkgType`-included or bare form.
   expect_match(src, "options\\(repos\\s*=\\s*repos_tier", perl = TRUE)
 })
+
+test_that("parallel workers reinstate the BiocManager shim (#136)", {
+  # Source-level guard. `configure_bioc_repositories()` rewrites
+  # BiocManager::repositories() via utils::assignInNamespace() -- an
+  # in-memory session-scoped mutation that does NOT survive the
+  # future::multisession boundary. Parent calls
+  # `configure_bioc_repositories_if_requested()` at val_build entry
+  # (L207), but the worker boots a fresh R session with a stock
+  # BiocManager namespace, so any Bioc-touching call inside the
+  # worker (e.g. riskmetric::assess_reverse_dependencies()) hits the
+  # public bioconductor.org URL and fails on air-gapped hosts. The
+  # fix is to re-invoke `configure_bioc_repositories_if_requested()`
+  # inside the future_mapply() FUN body -- the VAL_PIPELINE_INTERNAL_BIOC
+  # env var DOES cross the process boundary, so the helper picks it
+  # up and reinstalls the shim. Live-network verification is out of
+  # scope for a unit test; this presence check locks the fix in
+  # against future refactors that drop the re-invocation.
+  src_path <- system.file("R", "val_build.R", package = "val.pipeline",
+                          mustWork = FALSE)
+  if (!nzchar(src_path) || !file.exists(src_path)) {
+    src_path <- testthat::test_path("..", "..", "R", "val_build.R")
+  }
+  skip_if_not(file.exists(src_path), "val_build.R source not available")
+  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  # The re-invocation lives inside the worker FUN body, not the
+  # parent-side setup at L207. Grep for the call, then check that
+  # it also appears after `assess_one(` (or the tier-hoist block).
+  expect_match(
+    src,
+    "configure_bioc_repositories_if_requested",
+    perl = TRUE
+  )
+  # Look for at least two occurrences: parent-side (L207) + worker-side.
+  n_hits <- length(gregexpr(
+    "configure_bioc_repositories_if_requested",
+    src, fixed = TRUE
+  )[[1]])
+  expect_gte(n_hits, 2L)
+})

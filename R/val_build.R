@@ -748,6 +748,26 @@ val_build <- function(
             }
           }
           options(scipen = scipen_tier)
+          # `configure_bioc_repositories()` installs a session-scoped
+          # shim on `BiocManager::repositories()` via
+          # `utils::assignInNamespace()` and sets
+          # `options(BiocManager.check_repositories = FALSE)`. Both are
+          # in-memory session state and do NOT survive the
+          # multisession boundary -- a worker boots with a stock
+          # BiocManager namespace whose `repositories()` returns the
+          # hardcoded public `https://bioconductor.org/...` URLs, and
+          # any downstream Bioc call (e.g. riskmetric's
+          # `assess_reverse_dependencies()`) then blows up with
+          # "cannot open the connection to 'https://bioconductor.org/
+          # packages/.../PACKAGES'" on air-gapped / PPM-only hosts.
+          # The `VAL_PIPELINE_INTERNAL_BIOC` env var does cross the
+          # process boundary (OS-level inheritance), and
+          # `configure_bioc_repositories_if_requested()` is safely
+          # re-callable, so a plain re-invocation inside the worker
+          # reinstates the shim. See #136.
+          val.pipeline::configure_bioc_repositories_if_requested(
+            quiet = TRUE
+          )
           assess_one(pkg, ver, pkg_cnt,
                      is_dep_skip = FALSE,
                      failed_snapshot = character(0))

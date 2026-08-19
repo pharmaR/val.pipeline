@@ -1,4 +1,28 @@
 
+# val.pipeline 0.1.34
+
+- **Parallel workers now reinstate the BiocManager shim.** The
+  \`configure_bioc_repositories()\` shim -- installed by
+  \`val_pipeline()\` / \`val_prep_pipeline()\` / \`val_build()\` at
+  startup when \`VAL_PIPELINE_INTERNAL_BIOC=1\` is set -- rewrites
+  \`BiocManager::repositories()\` via \`utils::assignInNamespace()\`
+  and toggles \`options(BiocManager.check_repositories = FALSE)\`.
+  Both are session-scoped in-memory mutations that do NOT survive
+  the \`future::multisession\` boundary, so on air-gapped / PPM-only
+  hosts every worker booted with a stock \`BiocManager\` namespace
+  whose \`repositories()\` returned the public
+  \`https://bioconductor.org/...\` URLs. Downstream riskmetric calls
+  (e.g. \`assess_reverse_dependencies()\`) then failed with
+  \`cannot open the connection to 'https://bioconductor.org/
+  packages/.../PACKAGES'\` -- users reported 100s of Bioc-adjacent
+  pkgs failing this way in a single parallel run. The env var itself
+  crosses the boundary (OS inheritance) and
+  \`configure_bioc_repositories_if_requested()\` is safely
+  re-callable, so a plain re-invocation inside the worker \`FUN\`
+  body reinstates the shim. Serial mode was always fine. Same
+  category of parent-session-state gap as #133's \`options(repos)\`
+  fix. (#136)
+
 # val.pipeline 0.1.33
 
 - **Summary report PDF renders again.** The `decision-crosstab-
