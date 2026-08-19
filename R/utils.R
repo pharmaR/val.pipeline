@@ -247,56 +247,64 @@ update_opt_repos <- function(
     val_date = Sys.Date(),
     opt_repos = getOption("repos")
 ) {
-  
-  if("CRAN" %in% toupper(names(opt_repos))) {
-    cran_pos <- which("CRAN" == toupper(names(opt_repos)))
-    curr_cran <- opt_repos[[cran_pos]]
-    # Grab the "base url", which will be the entire text string up till the last "/"
-    base_url <- dirname(curr_cran)
-    
-    # if val_date is today & curr_cran is already "latest" or ends in today's date, then don't update
-    if(val_date == Sys.Date()) {
-      if(stringr::str_detect(curr_cran, "latest") |
-         stringr::str_detect(curr_cran, as.character(Sys.Date()))
-      ) {
-        val_msg(paste0("\n--> 'CRAN' repo is already set to latest snapshot. No update needed.\n"),
-                min_level = "normal")
-        return(opt_repos)
-      } else {
-        val_msg(paste0("--> Updating 'CRAN' repo to use latest snapshot.\n"),
-                min_level = "normal")
-        new_cran <- file.path(base_url, "latest")
-        opt_repos[[cran_pos]] <- new_cran
-        return(opt_repos)
-      }
-    } else {
-      # if val_date is not today, then check"
-      # is val_date not being used at all?
-      if(!stringr::str_detect(curr_cran, as.character(val_date))) {
-        if(stringr::str_detect(curr_cran, "latest") |
-           stringr::str_detect(curr_cran, as.character(Sys.Date()))
-        ) {
-          val_msg(paste0("--> Updating 'CRAN' repo to use validation date: ", val_date, "\n"),
-                  min_level = "normal")
-          new_cran <- gsub("latest", as.character(val_date), 
-              gsub("\\d{4}-\\d{2}-\\d{2}", as.character(val_date), curr_cran)
-          )
-        } else {
-          val_msg(paste0("\n--> 'CRAN' repo is currently set to use date: ", stringr::str_extract(curr_cran, "\\d{4}-\\d{2}-\\d{2}"), "\n"),
-                  min_level = "normal")
-          old_date <- stringr::str_extract(curr_cran, "\\d{4}-\\d{2}-\\d{2}")
-          if(!is.na(old_date)) {
-            new_cran <- gsub(old_date, as.character(val_date), curr_cran)
-          } else {
-            new_cran <- paste0(base_url, as.character(val_date))
-          }
-        }
-        
-        opt_repos[[cran_pos]] <- new_cran
 
-      } # else val_date was found
-    }
+  if (is.null(opt_repos) || length(opt_repos) == 0) return(opt_repos)
+  if (!"CRAN" %in% toupper(names(opt_repos))) return(opt_repos)
+
+  cran_pos <- which("CRAN" == toupper(names(opt_repos)))
+  curr_cran <- opt_repos[[cran_pos]]
+  val_date_chr <- as.character(val_date)
+
+  # Only ever rewrite the FINAL path segment (the snapshot "tail").
+  # PPM URLs like `.../cran-r4.5-2026-07-21/latest` embed a fixed
+  # snapshot date in the repo slug -- swapping dates anywhere else
+  # in the URL corrupts the slug and 404s. See #140.
+  base_url <- dirname(curr_cran)
+  tail <- basename(curr_cran)
+
+  slug_has_date <- grepl("\\d{4}-\\d{2}-\\d{2}", base_url)
+  tail_is_latest <- identical(tail, "latest")
+  tail_is_date <- grepl("^\\d{4}-\\d{2}-\\d{2}$", tail)
+
+  # Config is authoritative when the slug already encodes a snapshot
+  # date -- e.g. PPM's `<repo>-<date>/latest` frozen-mirror pattern.
+  if (slug_has_date && tail_is_latest) {
+    val_msg(paste0("\n--> 'CRAN' repo slug already encodes a snapshot date; ",
+                   "leaving config URL untouched (", curr_cran, ").\n"),
+            min_level = "normal")
+    return(opt_repos)
   }
+
+  if (val_date_chr == as.character(Sys.Date())) {
+    if (tail_is_latest || tail == val_date_chr) {
+      val_msg("\n--> 'CRAN' repo is already set to latest snapshot. No update needed.\n",
+              min_level = "normal")
+      return(opt_repos)
+    }
+    val_msg("--> Updating 'CRAN' repo to use latest snapshot.\n",
+            min_level = "normal")
+    opt_repos[[cran_pos]] <- file.path(base_url, "latest")
+    return(opt_repos)
+  }
+
+  # val_date != today
+  if (tail_is_date) {
+    if (tail == val_date_chr) return(opt_repos)  # already correct
+    val_msg(paste0("\n--> 'CRAN' repo is currently set to use date: ", tail, "\n"),
+            min_level = "normal")
+    opt_repos[[cran_pos]] <- file.path(base_url, val_date_chr)
+    return(opt_repos)
+  }
+
+  if (tail_is_latest) {
+    val_msg(paste0("--> Updating 'CRAN' repo to use validation date: ",
+                   val_date_chr, "\n"),
+            min_level = "normal")
+    opt_repos[[cran_pos]] <- file.path(base_url, val_date_chr)
+    return(opt_repos)
+  }
+
+  # Unrecognized tail (e.g. custom path suffix) -- leave untouched.
   return(opt_repos)
 }
   

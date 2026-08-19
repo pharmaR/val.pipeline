@@ -1,4 +1,14 @@
 
+# val.pipeline 0.1.36
+
+- Fix `update_opt_repos()` mangling PPM URLs whose slug encodes the
+  snapshot date (e.g. `.../cran-r4.5-2026-07-21/latest`). The old
+  nested `gsub()` swapped the slug's embedded date AND the `/latest`
+  tail, producing broken paths like `.../cran-r4.5-2026-07-21/2026-07-21/src/contrib`.
+  The rewrite now only touches the final path segment via
+  `dirname()`/`basename()`, and treats any URL whose slug already
+  encodes a date as authoritative (no-op). (#140)
+
 # val.pipeline 0.1.35
 
 - Summary report polish batch (#138):
