@@ -48,3 +48,45 @@ test_that("parallel workers rehydrate options(repos = opt_repos) (#132)", {
   # the `pkgType`-included or bare form.
   expect_match(src, "options\\(repos\\s*=\\s*repos_tier", perl = TRUE)
 })
+
+test_that("parallel workers reinstate the BiocManager shim (#136)", {
+  # Source-level guard. `configure_bioc_repositories()` rewrites
+  # BiocManager::repositories() via utils::assignInNamespace() -- an
+  # in-memory session-scoped mutation that does NOT survive the
+  # future::multisession boundary. Parent calls
+  # `configure_bioc_repositories_if_requested()` at val_build entry
+  # (L207), but the worker boots a fresh R session with a stock
+  # BiocManager namespace, so any Bioc-touching call inside the
+  # worker (e.g. riskmetric::assess_reverse_dependencies()) hits the
+  # public bioconductor.org URL and fails on air-gapped hosts. The
+  # fix is to re-invoke `configure_bioc_repositories_if_requested()`
+  # inside the future_mapply() FUN body -- the VAL_PIPELINE_INTERNAL_BIOC
+  # env var DOES cross the process boundary, so the helper picks it
+  # up and reinstalls the shim. Live-network verification is out of
+  # scope for a unit test; this presence check locks the fix in
+  # against future refactors that drop the re-invocation.
+  #
+  # Same category / same fix for `configure_riskmetric_offline()`,
+  # which shims riskmetric's assess_reverse_dependencies.default,
+  # memoise_bioc_available, and pkg_bioc -- the memoise_bioc_available
+  # shim in particular is what saves an air-gapped worker from a
+  # hard-coded read.dcf() against bioconductor.org. Both shims must
+  # be re-invoked inside every worker.
+  src_path <- system.file("R", "val_build.R", package = "val.pipeline",
+                          mustWork = FALSE)
+  if (!nzchar(src_path) || !file.exists(src_path)) {
+    src_path <- testthat::test_path("..", "..", "R", "val_build.R")
+  }
+  skip_if_not(file.exists(src_path), "val_build.R source not available")
+  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  # Both re-invocations live inside the worker FUN body (not the
+  # parent-side setup at L207/L208). Look for at least two
+  # occurrences of each: parent-side + worker-side.
+  for (fn in c("configure_bioc_repositories_if_requested",
+               "configure_riskmetric_offline_if_requested")) {
+    expect_match(src, fn, perl = TRUE)
+    n_hits <- length(gregexpr(fn, src, fixed = TRUE)[[1]])
+    expect_gte(n_hits, 2L)
+  }
+})
