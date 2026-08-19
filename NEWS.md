@@ -1,4 +1,37 @@
 
+# val.pipeline 0.1.35
+
+- Summary report polish batch (#138):
+  - **Run Metadata**: new `Elapsed time` row alongside the existing
+    cumulative-runtime row. Sourced by parsing the first
+    `=== val_build() @ <timestamp> ===` banner in
+    `<val_dir>/val_pipeline.log` (written by `init_val_log()` at
+    `val_build()` entry) and comparing to render time. Complements
+    the cumulative row: for resumed multi-session runs, elapsed
+    includes the calendar gap between sessions.
+  - **Run Metadata**: `Metric package` row now includes the installed
+    version, e.g. `riskmetric 0.2.5`. Sourced from
+    `utils::packageVersion()` at render time.
+  - **Run Metadata**: new `Pre-filter method` row inserted before
+    `Metric package`, showing `riskscore <version>`. Omitted when
+    riskscore isn't installed.
+  - **Downgrade callout** in "Initial vs. final decision" upgraded
+    from a bare bold-text block to a tinted bordered infographic
+    card (pastel-orange) so it separates visibly from the section
+    headers instead of blending in.
+  - **Risk-level infographic cards**: new colored card strip
+    (pastel green / yellow / red for Low / Medium / High) rendered
+    under both `Final decision counts` (replacing the previous
+    table entirely) and the `Packages` header. Each card shows
+    count + percent in large font. Palette generalizes to future
+    N-band schemes via a green->yellow->red gradient interpolated
+    with `grDevices::colorRampPalette()`.
+  - **Memory offenders**: spell out **RSS** = Resident Set Size on
+    first use.
+  - Passes new `log_file_path` param to the summary template so
+    the elapsed-runtime calculation can find the log; populated
+    automatically from `<input_dir>/val_pipeline.log` when present.
+
 # val.pipeline 0.1.34
 
 - **Parallel workers now reinstate both BiocManager and riskmetric

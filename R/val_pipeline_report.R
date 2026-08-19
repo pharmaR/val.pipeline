@@ -168,6 +168,19 @@ val_pipeline_report <- function(
     NULL
   }
 
+  # Sibling val_pipeline.log, if any. The template parses its first
+  # `=== val_build() @ <timestamp> ===` header line to compute the
+  # elapsed wall-clock time from initial run kickoff to report render
+  # -- useful for reporting real-world "how long did this run take",
+  # which for a resumed multi-session run differs from cumulative
+  # per-pkg assessment time. See #138.
+  log_candidate <- file.path(input_dir, "val_pipeline.log")
+  log_file_path <- if (file.exists(log_candidate)) {
+    normalizePath(log_candidate, winslash = "/", mustWork = TRUE)
+  } else {
+    NULL
+  }
+
   # Sibling config.yml, if any
   config_candidate <- file.path(input_dir, "config.yml")
   config_path <- if (file.exists(config_candidate)) {
@@ -328,7 +341,8 @@ val_pipeline_report <- function(
     n_candidates = n_candidates_val,
     pre_filtered_path = pf_path,
     pipeline_runtime = runtime_str,
-    mem_watchdog_path = mem_watchdog_path
+    mem_watchdog_path = mem_watchdog_path,
+    log_file_path = log_file_path
   )
 
   # Quarto spawns a child Rscript for the render. If that child sees an
