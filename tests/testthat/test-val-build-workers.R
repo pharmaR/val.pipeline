@@ -32,12 +32,8 @@ test_that("parallel workers rehydrate options(repos = opt_repos) (#132)", {
   # verification would require spinning up a multisession cluster and
   # actually assessing a package, which is prohibitively expensive
   # here; a source-level presence check catches the regression class.
-  src_path <- system.file("R", "val_build.R", package = "val.pipeline",
-                          mustWork = FALSE)
-  if (!nzchar(src_path) || !file.exists(src_path)) {
-    src_path <- testthat::test_path("..", "..", "R", "val_build.R")
-  }
-  skip_if_not(file.exists(src_path), "val_build.R source not available")
+  src_path <- src_path_for("val_build.R")
+  skip_if_not(nzchar(src_path), "val_build.R source not available")
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   # Parent hoists opt_repos into a tier variable alongside the other
@@ -72,12 +68,8 @@ test_that("parallel workers reinstate the BiocManager shim (#136)", {
   # shim in particular is what saves an air-gapped worker from a
   # hard-coded read.dcf() against bioconductor.org. Both shims must
   # be re-invoked inside every worker.
-  src_path <- system.file("R", "val_build.R", package = "val.pipeline",
-                          mustWork = FALSE)
-  if (!nzchar(src_path) || !file.exists(src_path)) {
-    src_path <- testthat::test_path("..", "..", "R", "val_build.R")
-  }
-  skip_if_not(file.exists(src_path), "val_build.R source not available")
+  src_path <- src_path_for("val_build.R")
+  skip_if_not(nzchar(src_path), "val_build.R source not available")
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   # Both re-invocations live inside the worker FUN body (not the

@@ -1,4 +1,24 @@
 
+# val.pipeline 0.1.38
+
+- CI: drop `macos-latest` from the `R-CMD-check.yaml` matrix. The
+  `tomledit` 0.1.1 binary published for aarch64-apple-darwin has a
+  broken extendr symbol that prevents load, and no newer release is
+  available. Restore once tomledit ships a fixed binary. (#144)
+- Fix `R CMD check` on ubuntu + windows (had been failing on `main`
+  since 2026-08-11). Adds `ps` to `Suggests:` so the
+  `requireNamespace("ps", ...)` call in `R/mem_watchdog.R` clears the
+  \"'loadNamespace' or 'requireNamespace' call not declared from: 'ps'\"
+  WARNING (fatal under CI's `error-on: "warning"`). Wraps five
+  source-scan tests in `test-val_pkg.R`, `test-val_build.R`, and
+  `test-reject_iteration.R` with the `system.file()` / `test_path()` /
+  `skip_if_not(file.exists(...))` pattern (already used by
+  `test-val-build-workers.R`) so they no longer error under R CMD check
+  when `R/*.R` source is unavailable. Updates
+  `test-bioc-remote-initial-metrics.R` test 1 to expect `NULL` — the
+  `bioc_remote_initial_metrics:` key is intentionally commented out in
+  `inst/config.yml`. (#144)
+
 # val.pipeline 0.1.37
 
 - Bump the minimum `{riskscore}` requirement to `>= 0.1.3` and pin the

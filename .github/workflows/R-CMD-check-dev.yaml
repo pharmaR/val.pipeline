@@ -15,19 +15,16 @@ jobs:
 
     name: ${{ matrix.config.os }} (${{ matrix.config.r }})
 
-    continue-on-error: ${{ matrix.config.allow-failure == true }}
-
     strategy:
       fail-fast: false
       matrix:
         config:
-          # macOS is allowed to fail: the `tomledit` 0.1.1 binary published to
-          # PPM/CRAN for aarch64-apple-darwin has a broken extendr symbol
-          # (`_R_init_tomledit_extendr`) that prevents the package from
-          # loading. There is no newer tomledit release yet, and rebuilding
-          # from source on the runner requires a Rust toolchain we don't
-          # currently provision. Revisit once tomledit ships a fixed binary.
-          - {os: macos-latest, allow-failure: true}
+          # macOS runner is not part of the matrix: the `tomledit` 0.1.1
+          # binary published for aarch64-apple-darwin has a broken extendr
+          # symbol (`_R_init_tomledit_extendr`) that prevents load, and no
+          # newer tomledit release is available. Restore the macOS entry
+          # once tomledit ships a fixed binary (or we provision a Rust
+          # toolchain on the runner to build from source).
           - {os: windows-latest}
           - {os: ubuntu-latest}
 

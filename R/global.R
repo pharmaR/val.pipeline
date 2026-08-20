@@ -17,5 +17,5 @@ utils::globalVariables(c(
   "sug_failed", "suggests", "suggests_direct",
   "dec_id_df", "decisions", "secondary_risk_category", "rule_lst",
   "Metric", "Type",
-  "phase", "seconds", "total_s", "ver"
+  "phase", "seconds", "total_s", "ver", "pkg"
 ))

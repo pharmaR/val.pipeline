@@ -255,7 +255,9 @@ test_that("val_build serial branch guards against NA pkg_meta$decision (#124)", 
   # NA. Without a guard, the `!= decisions[1]` comparison in val_build()'s
   # serial branch evaluates to NA and takes the whole run down. Assert the
   # NA guard survives.
-  src <- readLines(test_path("..", "..", "R", "val_build.R"))
+  src_path <- src_path_for("val_build.R")
+  skip_if_not(nzchar(src_path), "val_build.R source not available")
+  src <- readLines(src_path)
   src <- paste(src, collapse = "\n")
 
   expect_true(grepl("is.na(pkg_meta$decision)", src, fixed = TRUE),
@@ -272,7 +274,9 @@ test_that("val_build serial branch pre-filters cached pkgs + replays failures (#
   # val_msg line per pkg (log spam on resumed runs). Cached failures
   # must be replayed into dont_run/failed_pkgs so subsequent uncached
   # pkgs still get dep-skipped correctly.
-  src <- readLines(test_path("..", "..", "R", "val_build.R"))
+  src_path <- src_path_for("val_build.R")
+  skip_if_not(nzchar(src_path), "val_build.R source not available")
+  src <- readLines(src_path)
   src <- paste(src, collapse = "\n")
 
   expect_true(

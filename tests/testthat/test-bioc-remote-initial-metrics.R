@@ -1,12 +1,14 @@
-test_that("default bioc_remote_initial_metrics whitelist is the two known-safe assessments", {
+test_that("default bioc_remote_initial_metrics matches the commented-out config default", {
+  # `bioc_remote_initial_metrics:` is intentionally commented out in
+  # inst/config.yml (see the comment there about pre-0.1.10 behaviour).
+  # `pull_config()` therefore returns NULL for the default rule tier,
+  # meaning bioc_remote pkgs run every riskmetric assessment. If the
+  # whitelist is ever restored to the shipped config, update this test
+  # to expect the character vector back.
   withr::local_envvar(VAL_PIPELINE_CONFIG = "")
   withr::local_options(val.pipeline.config_path = NULL)
   out <- pull_config(val = "bioc_remote_initial_metrics", rule_type = "default")
-  expect_type(out, "character")
-  expect_setequal(
-    out,
-    c("assess_reverse_dependencies", "assess_dependencies")
-  )
+  expect_null(out)
 })
 
 test_that("bioc_remote_initial_metrics accepts a user-supplied whitelist", {
