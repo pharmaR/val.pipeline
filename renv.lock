@@ -3195,7 +3195,7 @@
     },
     "riskscore": {
       "Package": "riskscore",
-      "Version": "0.1.2",
+      "Version": "0.1.3",
       "Source": "GitHub",
       "Title": "A Catalog for `riskmetric` Results Across Public Repositories",
       "Authors@R": "c(  person(\"Aaron\", \"Clark\", , \"clark.aaronchris@gmail.com\", role = c(\"cre\", \"aut\"), comment = c(ORCID = \"0000-0002-0123-0970\")), person(family = \"R Validation Hub\", role = c(\"cph\", \"fnd\")) )",
@@ -3220,7 +3220,7 @@
       "RemoteRepo": "riskscore",
       "RemoteUsername": "pharmar",
       "RemoteRef": "latest",
-      "RemoteSha": "64b1335f1c277e42f4fec684dd3de2d011e54914",
+      "RemoteSha": "1f9df6dddc1a0c654c1d681042c26788159cf7e3",
       "NeedsCompilation": "no",
       "Author": "Aaron Clark [cre, aut] (ORCID: <https://orcid.org/0000-0002-0123-0970>), R Validation Hub [cph, fnd]",
       "Maintainer": "Aaron Clark <clark.aaronchris@gmail.com>"
