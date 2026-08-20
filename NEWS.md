@@ -1,6 +1,10 @@
 
 # val.pipeline 0.1.38
 
+- CI: drop `macos-latest` from the `R-CMD-check.yaml` matrix. The
+  `tomledit` 0.1.1 binary published for aarch64-apple-darwin has a
+  broken extendr symbol that prevents load, and no newer release is
+  available. Restore once tomledit ships a fixed binary. (#144)
 - Fix `R CMD check` on ubuntu + windows (had been failing on `main`
   since 2026-08-11). Adds `ps` to `Suggests:` so the
   `requireNamespace("ps", ...)` call in `R/mem_watchdog.R` clears the

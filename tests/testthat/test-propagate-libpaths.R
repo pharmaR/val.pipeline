@@ -17,6 +17,12 @@ test_that("val_build() mirrors .libPaths() into R_LIBS_SITE during the run", {
     c(fake_lib, .libPaths()),
     action = "prefix",
     {
+      # Capture whatever normalized form with_libpaths + .libPaths()
+      # stored (Windows canonicalizes backslash -> "/" and may
+      # expand 8.3 short-names, so the raw `fake_lib` string
+      # generally won't be a literal prefix of the captured value).
+      expected_head <- .libPaths()[1]
+
       # Simulate the same block val_build() runs:
       run <- function() {
         new_r_libs_site <- paste(.libPaths(), collapse = .Platform$path.sep)
@@ -25,9 +31,9 @@ test_that("val_build() mirrors .libPaths() into R_LIBS_SITE during the run", {
       }
       captured <- run()
 
-      # Inside run(), R_LIBS_SITE should start with the fake_lib we
-      # prepended via with_libpaths.
-      expect_true(startsWith(captured, fake_lib))
+      # Inside run(), R_LIBS_SITE should start with the .libPaths()
+      # head that with_libpaths prepended.
+      expect_true(startsWith(captured, expected_head))
 
       # And after run() returns, R_LIBS_SITE must be restored.
       expect_identical(Sys.getenv("R_LIBS_SITE"), "/preexisting/site")
