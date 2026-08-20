@@ -374,8 +374,14 @@ test_that("reject_iteration convergence loop uses `<-`, not `<<-`, in any caller
   # the pre-existing bug forward; #103's patch never landed on the
   # new location. Guard against a third re-introduction by scanning
   # every .R file in R/ for the specific offending patterns.
-  r_files <- list.files(test_path("..", "..", "R"),
-                        pattern = "\\.R$", full.names = TRUE)
+  r_dir <- testthat::test_path("..", "..", "R")
+  if (!dir.exists(r_dir)) {
+    r_dir <- system.file("R", package = "val.pipeline")
+  }
+  skip_if_not(nzchar(r_dir) && dir.exists(r_dir),
+              "R/ source dir not available")
+  r_files <- list.files(r_dir, pattern = "\\.R$", full.names = TRUE)
+  skip_if(length(r_files) == 0, "no .R source files found in R/")
   hits <- character(0)
   for (f in r_files) {
     src <- paste(readLines(f, warn = FALSE), collapse = "\n")

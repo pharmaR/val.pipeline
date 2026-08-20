@@ -148,7 +148,9 @@ test_that("val_pkg NA-decision capture surfaces via source-level markers (#124)"
   # summary report can surface it. Standing up the full val_pkg() call
   # requires a live package build, so pin the invariant at the source
   # level.
-  src <- readLines(test_path("..", "..", "R", "val_pkg.R"))
+  src_path <- src_path_for("val_pkg.R")
+  skip_if_not(nzchar(src_path), "val_pkg.R source not available")
+  src <- readLines(src_path)
   src <- paste(src, collapse = "\n")
 
   expect_true(grepl("Incomplete Assessment", src, fixed = TRUE),
@@ -164,7 +166,9 @@ test_that("val_finalize preserves assessment_gaps as a list-col (#124)", {
   # nested cols. It must be pulled out before flatten (mirroring how
   # `timings` is handled) and reattached as a single list-col so the
   # report can read qual_metadata$assessment_gaps[[i]].
-  src <- readLines(test_path("..", "..", "R", "val_finalize.R"))
+  src_path <- src_path_for("val_finalize.R")
+  skip_if_not(nzchar(src_path), "val_finalize.R source not available")
+  src <- readLines(src_path)
   src <- paste(src, collapse = "\n")
 
   expect_true(
@@ -183,7 +187,9 @@ test_that("val_pkg persists val_pipeline_ver on the meta bundle (#130)", {
   # every meta bundle so the summary report can surface the distinct
   # set. Standing up val_pkg() takes a real build, so pin at the
   # source level.
-  src <- readLines(test_path("..", "..", "R", "val_pkg.R"))
+  src_path <- src_path_for("val_pkg.R")
+  skip_if_not(nzchar(src_path), "val_pkg.R source not available")
+  src <- readLines(src_path)
   src <- paste(src, collapse = "\n")
 
   expect_true(
