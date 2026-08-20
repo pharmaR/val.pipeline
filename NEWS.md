@@ -1,4 +1,12 @@
 
+# val.pipeline 0.1.37
+
+- Bump the minimum `{riskscore}` requirement to `>= 0.1.3` and pin the
+  `Remotes:` entry to `pharmar/riskscore@latest` so `remotes` /
+  `renv::restore()` pull from the branch that actually ships the
+  compiled `assessed_latest` / `scored_latest` datasets. Refresh the
+  stale `val_categorize()` docstring accordingly. (#142)
+
 # val.pipeline 0.1.36
 
 - Fix `update_opt_repos()` mangling PPM URLs whose slug encodes the

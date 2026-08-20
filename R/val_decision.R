@@ -229,7 +229,8 @@ val_decision <- function(
 #' used to set thresholds (and later update final decision (if not already 'high
 #' risk')) AND filter packages before running val_build(). Note: If PACKAGES
 #' file had assessments, we'd be using that (paired with \{val.filter\}), but
-#' instead, we're going to use riskscore::latest for the time being
+#' instead, we use `riskscore::assessed_latest` / `riskscore::scored_latest`
+#' (compiled from the `latest` branch of pharmar/riskscore).
 #'
 #' @param source character, either "riskscore" (default), "PACKAGES", or a
 #'   data.frame.
@@ -271,7 +272,7 @@ val_categorize <- function(
     # Use "pkg_cran_remote" data from riskscore::cran_assessed_latest
     # remotes::install_github("pharmar/riskscore", force = TRUE,
     #                         ref = "latest")
-    pv <- utils::packageVersion("riskscore") # verify ‘v0.1.1'
+    pv <- utils::packageVersion("riskscore")
     riskscore_run_date <- riskscore::assessed_latest$riskmetric_run_date |> unique()
     val_msg(paste0("\n--> Using {riskscore} Version: 'v", pv, "', last compiled on '",
                    riskscore_run_date,"'.\n"),
