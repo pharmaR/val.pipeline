@@ -417,6 +417,69 @@ pull_config <- function(
   return(list(default_lst = default_lst, rule_lst = rule_lst))
 }
 
+#' Pull the covr Env-var Block for `val_pkg()`
+#'
+#' Reads the `default: covr_env_vars:` map from `inst/config.yml` (or a
+#' user-supplied override, resolved the same way as [pull_config()]) and
+#' returns it as a named character vector suitable for
+#' [withr::with_envvar()].
+#'
+#' `val_pkg()` uses the result to wrap the final `pkg_assess()` call so
+#' that `assess_covr_coverage` runs under a controlled environment —
+#' most importantly with `NOT_CRAN="true"` so `testthat::skip_on_cran()`
+#' does not silently drop tests. See the block-level docstring on
+#' `covr_env_vars:` in `inst/config.yml` for the rationale.
+#'
+#' The helper is deliberately tolerant of missing / empty configuration:
+#' when the key is absent, `NULL`, or an empty list it returns a
+#' zero-length named character vector, and [withr::with_envvar()] then
+#' becomes a no-op wrapper (i.e. the parent session's environment is
+#' inherited unchanged).
+#'
+#' @param config_path Character(1) or `NULL`. Passed straight through to
+#'   [pull_config()]; the same resolution rules apply.
+#'
+#' @return A named character vector. Names are env-var names, values are
+#'   the strings to set them to. Zero-length when the config block is
+#'   absent or empty.
+#'
+#' @examples
+#' # Read the shipped defaults:
+#' pull_covr_env_vars()
+#'
+#' @export
+pull_covr_env_vars <- function(config_path = NULL) {
+  raw <- pull_config(
+    val = "covr_env_vars",
+    rule_type = "default",
+    config_path = config_path
+  )
+  if (is.null(raw) || length(raw) == 0) {
+    return(stats::setNames(character(0), character(0)))
+  }
+  if (is.null(names(raw)) || any(!nzchar(names(raw)))) {
+    stop(
+      "`covr_env_vars` in config.yml must be a named map (env var -> ",
+      "value); got an unnamed entry.",
+      call. = FALSE
+    )
+  }
+  # Coerce every value to character; `withr::with_envvar()` sets each
+  # entry via `Sys.setenv()`, which only accepts strings. `config` may
+  # deserialize a bare `true` / `false` as logical, so normalize here
+  # rather than force the yaml to always quote the RHS.
+  as_char <- vapply(raw, function(x) {
+    if (is.logical(x)) {
+      if (isTRUE(x)) "true" else "false"
+    } else {
+      as.character(x)
+    }
+  }, character(1))
+  names(as_char) <- names(raw)
+  as_char
+}
+
+
 #' Build Decisions Data.Frame
 #'
 #' Helper function that creates the minimally necessary data.frame for

@@ -36,6 +36,7 @@
 #' @importFrom riskreports package_report
 #' @importFrom dplyr filter pull select arrange as_tibble
 #' @importFrom tools package_dependencies
+#' @importFrom withr with_envvar
 #'
 #' @return A list containing package metadata, assessment results, and
 #'   decisions.
@@ -472,9 +473,25 @@ val_pkg <- function(
       }
       
       pkg_assessment0 <- val_time_block("assess_final",
-        pkg_ref |>
-          # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
-          riskmetric::pkg_assess(assessments = assess_metrics))
+        withr::with_envvar(
+          # Layer A env-var normalization for `assess_covr_coverage`
+          # (issue #146). `covr::package_coverage()` does not set
+          # NOT_CRAN internally — verified against the installed covr
+          # namespace — so `testthat::skip_on_cran()` fires during our
+          # coverage runs and silently drops a large slice of many
+          # packages' test suites. The block is scoped via
+          # `with_envvar()` so it never leaks into the parent R
+          # session, and it's applied to the *final* pkg_assess() only:
+          # the initial pass already excludes `assess_covr_coverage`.
+          # Applying it to all metrics in the final pass (rather than
+          # just covr_coverage) is deliberate — the env vars are
+          # harmless to the other metrics, and this avoids the need to
+          # split the pkg_assess() call into two runs.
+          new = pull_covr_env_vars(),
+          code = pkg_ref |>
+            # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
+            riskmetric::pkg_assess(assessments = assess_metrics)
+        ))
       
       # strip assessment of '.recording' attribute:
       pkg_assessment <-  pkg_assessment0 |> 
