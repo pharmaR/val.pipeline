@@ -1,4 +1,20 @@
 
+# val.pipeline 0.1.39
+
+- **Layer A covr env-var normalization**: `val_pkg()` now wraps the
+  final `riskmetric::pkg_assess()` call — the one that may include
+  `assess_covr_coverage` — in `withr::with_envvar()` seeded from a new
+  `default: covr_env_vars:` block in `inst/config.yml`
+  (`NOT_CRAN="true"`, `TESTTHAT="true"`,
+  `_R_CHECK_FORCE_SUGGESTS_="false"`). Fixes the silent
+  `testthat::skip_on_cran()` skips that were dropping large slices of a
+  package's test suite from the covr run and pushing packages into
+  the High `covr_coverage` bucket for reasons unrelated to real
+  coverage. Extend the map without touching R code. Also scaffolds
+  `NOT_ON_CRAN=""` and `RUN_SLOW_TESTS="false"` in the defaults so
+  reviewers can flip on those common opt-in knobs without editing R
+  code; both ship off. (#146, #152)
+
 # val.pipeline 0.1.38
 
 - CI: drop `macos-latest` from the `R-CMD-check.yaml` matrix. The
