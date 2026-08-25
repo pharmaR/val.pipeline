@@ -10,7 +10,10 @@
   `testthat::skip_on_cran()` skips that were dropping large slices of a
   package's test suite from the covr run and pushing packages into
   the High `covr_coverage` bucket for reasons unrelated to real
-  coverage. Extend the map without touching R code. (#146)
+  coverage. Extend the map without touching R code. Also scaffolds
+  `NOT_ON_CRAN=""` and `RUN_SLOW_TESTS="false"` in the defaults so
+  reviewers can flip on those common opt-in knobs without editing R
+  code; both ship off. (#146, #152)
 
 # val.pipeline 0.1.38
 

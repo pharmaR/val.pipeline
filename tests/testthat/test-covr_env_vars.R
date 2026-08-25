@@ -8,15 +8,19 @@ test_that("pull_covr_env_vars() returns the shipped conservative defaults", {
 
   expect_type(env, "character")
   expect_true(!is.null(names(env)))
-  # The three defaults documented in NEWS.md and inst/config.yml. Anchor
+  # The five defaults documented in NEWS.md and inst/config.yml. Anchor
   # the set exactly so a maintainer who broadens the block has to update
   # this test on purpose (and NEWS).
   expect_setequal(
     names(env),
-    c("NOT_CRAN", "TESTTHAT", "_R_CHECK_FORCE_SUGGESTS_")
+    c("NOT_CRAN", "TESTTHAT", "_R_CHECK_FORCE_SUGGESTS_",
+      "NOT_ON_CRAN", "RUN_SLOW_TESTS")
   )
   expect_identical(unname(env[c("NOT_CRAN", "TESTTHAT")]), c("true", "true"))
   expect_identical(unname(env["_R_CHECK_FORCE_SUGGESTS_"]), "false")
+  # NOT_ON_CRAN and RUN_SLOW_TESTS are scaffolded off; reviewers flip on.
+  expect_identical(unname(env["NOT_ON_CRAN"]), "")
+  expect_identical(unname(env["RUN_SLOW_TESTS"]), "false")
 })
 
 test_that("pull_covr_env_vars() honours a config override", {
