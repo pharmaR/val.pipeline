@@ -22,6 +22,8 @@ val_pipeline(
   workers = 1L,
   freeze_opt_repos = FALSE,
   toml_install_suggestions = TRUE,
+  capture_covr_skip_report = TRUE,
+  covr_skip_report_threshold = NULL,
   propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE),
   mem_watchdog = TRUE,
   finalize = TRUE
@@ -124,6 +126,30 @@ silently skip during the covr run — paired with the Layer A
 \verb{covr_env_vars:} (\code{NOT_CRAN=true}) default from issue #146.
 Set to \code{FALSE} for the pre-0.1.39 lean install (hard deps only).
 Ignored when \code{prep} is supplied (the toml is already written).}
+
+\item{capture_covr_skip_report}{Logical(1). Master on/off switch
+for the per-package testthat skip report that runs alongside
+\code{assess_covr_coverage}. When \code{TRUE} (default), \code{val_pkg()}
+captures the report for every non-auto-accept pkg whose raw
+\code{covr_coverage} came in below \code{covr_skip_report_threshold}.
+When \code{FALSE}, no extra \code{testthat::test_dir()} runs and the
+\code{covr_n_test} / \code{covr_n_skip} / \code{covr_pct_skip} /
+\code{covr_effective_coverage} columns are stamped \code{NA} for every
+package. Overrides the \code{covr_skip_report$capture} config
+default via an R option scoped to this \code{val_pipeline()} call.
+See #150.}
+
+\item{covr_skip_report_threshold}{Numeric(1) on 0-100 scale, or
+\code{NULL} (default). When \code{NULL}, falls back to the config
+\code{covr_skip_report$threshold} value (defaults to \code{65}, matching
+the covr_coverage Medium/Low cutoff): the skip report is
+captured only for pkgs whose raw \code{covr_coverage} came in below
+the cutoff — the fast path, since packages above the threshold
+are already auto-accepting on covr_coverage. Pass an explicit
+numeric to override the config default per-run. Pass \code{100} to
+capture the skip report for every non-auto-accept pkg (all real
+coverage values are strictly less than 100). Ignored when
+\code{capture_covr_skip_report = FALSE}. See #150.}
 
 \item{propagate_libpaths}{Logical(1). Passed through to \code{\link[=val_build]{val_build()}};
 see there for the full rationale. In short: when \code{TRUE} (default),

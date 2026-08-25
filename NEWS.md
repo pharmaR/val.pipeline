@@ -1,3 +1,57 @@
+# val.pipeline 0.1.42
+
+- **`covr_skip_report`: surface which tests are being skipped and
+  why.** `val_pkg()` now runs a standalone
+  `testthat::test_dir()` on the package source right after the
+  final `pkg_assess()` call, under the same env-var block as
+  `assess_covr_coverage` (`pull_covr_env_vars()` from #146), and
+  captures per-block skip counts + top skip messages via the new
+  `capture_covr_skip_report()` helper. The full report rides as an
+  attribute on `pkg_assessment` (read directly by the per-package
+  riskreports template); matching scalar summaries
+  (`covr_n_test`, `covr_n_skip`, `covr_pct_skip`) land on
+  `meta_list` so `val_finalize()` binds them into
+  `qual_metadata.rds`.
+  - **Per-package report**: new "Test skip summary" section in
+    `inst/report/package/pkg_template.qmd` — totals table + top-10
+    skip reasons. Guarded on the attribute being present, so older
+    assessment RDS files render unchanged.
+  - **Summary report**: new "Test skip summary (`covr_skip_report`)"
+    section in `inst/report/summary/summary_template.qmd` — skip-%
+    distribution buckets + top-25 packages by skip count paired
+    with their `covr_coverage` %. Backfills the three scalar cols
+    with `NA` so historical `qual_metadata.rds` files still render.
+  - Only runs on non-auto-accepted packages (the population that
+    actually runs `assess_covr_coverage`). `testthat`-based tests
+    only; tinytest / RUnit / no-tests packages return `NULL`
+    silently and the aggregate cols are stamped `NA_integer_` /
+    `NA_real_`. (#150)
+  - **Threshold gate** (perf): by default the extra
+    `test_dir()` is only run for packages whose raw
+    `covr_coverage` came in below **65** (matching the
+    `covr_coverage` rule's Medium/Low cutoff). Packages already
+    above the threshold have covr_coverage as their auto-accept
+    lever, so the skip report adds no decision-relevant info
+    while doubling per-pkg wall-clock. New `covr_skip_report:`
+    config block (`capture`, `threshold`) governs the default;
+    two new `val_pipeline()` args
+    (`capture_covr_skip_report = TRUE`,
+    `covr_skip_report_threshold = NULL`) override per run
+    without editing config. `covr_skip_report_threshold = NULL`
+    (default) falls back to the config threshold (65); pass
+    `100` to capture for every non-auto-accept pkg (any real
+    coverage number is < 100); pass `FALSE` to
+    `capture_covr_skip_report` to disable entirely.
+  - **Effective coverage estimate**: new
+    `covr_effective_coverage` scalar on `meta_list` /
+    `qual_metadata.rds`, computed as
+    `covr_coverage / (1 - pct_skip / 100)` capped at 100.
+    Rough upper-bound projection of what coverage would have
+    been if the skipped test blocks had covered code at the
+    average rate of the blocks that ran. Reviewer-facing signal
+    for "would this pkg have passed if not for skips?" —
+    labelled as an estimate in both per-package and summary
+    reports so it's not treated as ground truth.
 
 
 # val.pipeline 0.1.41
