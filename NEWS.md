@@ -1,4 +1,22 @@
 
+# val.pipeline (development version)
+
+- **`write_pipeline_toml()` now emits `install_suggestions = true`
+  per dep by default.** Every entry under `[project].dependencies` is
+  rendered as an inline table `{ name = "pkg", install_suggestions =
+  true }` so `rv` installs each package's Suggests when materializing
+  the pipeline snapshot. This closes the gap left by the Layer A
+  env-var work (#146) — with `NOT_CRAN=true` set for the covr run,
+  test files gated on `testthat::skip_if_not_installed("someSuggest")`
+  need their Suggests present in the pipeline library or they still
+  silently skip. `rv` only supports `install_suggestions` as a
+  per-dependency field (no top-level toggle exists in the rv schema
+  — verified in `a2-ai/rv/src/config.rs`), so every entry gets the
+  field set individually. Set the new `install_suggestions = FALSE`
+  argument to opt back into the pre-0.1.39 bare-string dependency
+  shape (kept for smoke-test fixtures / callers that don't want the
+  install-time bloat). (#148)
+
 # val.pipeline 0.1.38
 
 - CI: drop `macos-latest` from the `R-CMD-check.yaml` matrix. The

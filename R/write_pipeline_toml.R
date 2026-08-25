@@ -33,6 +33,25 @@
 #'   (e.g. `"4.5"`).
 #' @param name Character(1) written under `[project].name`. Defaults
 #'   to `"val.pipeline run"`.
+#' @param install_suggestions Logical(1). When `TRUE` (the default),
+#'   every dependency is rendered as an inline table
+#'   `{ name = "pkg", install_suggestions = true }` so `rv` installs
+#'   the package *and* its `Suggests` dependencies when materializing
+#'   the pipeline snapshot. When `FALSE`, dependencies are rendered as
+#'   bare strings (`"pkg"`), matching the pre-0.1.39 behaviour, and
+#'   `rv` installs hard deps only.
+#'
+#'   Defaulting to `TRUE` is intentional and paired with Layer A env-var
+#'   normalization (issue #146): with `NOT_CRAN=true` set for the covr
+#'   run, tests gated on `testthat::skip_if_not_installed("someSuggest")`
+#'   need their Suggests present in the pipeline library or they still
+#'   silently skip. Preinstalling Suggests via `rv` closes that gap
+#'   before `val_build()` starts, at the cost of a heavier initial
+#'   install. `rv` only accepts `install_suggestions` as a per-dependency
+#'   field (no top-level toggle exists in the rv schema — verified in
+#'   `a2-ai/rv/src/config.rs`), so `TRUE` here means every entry gets
+#'   the field set individually. The resulting toml is longer but is
+#'   what `rv` expects.
 #' @param path Character(1). Where to write the toml file.
 #'
 #' @return `path`, invisibly.
@@ -45,6 +64,7 @@ write_pipeline_toml <- function(
   local_repo = NULL,
   r_version = paste(R.Version()$major, R.Version()$minor, sep = "."),
   name      = "val.pipeline run",
+  install_suggestions = TRUE,
   path
 ){
   if (!is.character(pkgs) || length(pkgs) == 0)
@@ -52,6 +72,10 @@ write_pipeline_toml <- function(
   if (is.null(opt_repos) || length(opt_repos) == 0 ||
       is.null(names(opt_repos)))
     stop("`opt_repos` must be a named character vector", call. = FALSE)
+  if (!is.logical(install_suggestions) ||
+      length(install_suggestions) != 1L ||
+      is.na(install_suggestions))
+    stop("`install_suggestions` must be TRUE or FALSE", call. = FALSE)
   if (!nzchar(path)) stop("`path` must be a non-empty string", call. = FALSE)
 
   # Optionally prepend a caller-supplied repo (typically a PPM URL that
@@ -87,12 +111,27 @@ write_pipeline_toml <- function(
     repos_out
   ) |> unname()
 
+  # Build the `dependencies` field. When `install_suggestions` is TRUE
+  # each entry is rendered as an inline table so `rv` installs the
+  # package plus its Suggests. Rendering as inline tables (rather than
+  # strings) is the only rv-supported form for this flag — verified in
+  # `a2-ai/rv/src/config.rs` — there is no top-level toggle in the rv
+  # schema. When FALSE the entries are bare strings, matching the
+  # pre-0.1.39 behaviour.
+  if (install_suggestions) {
+    deps_out <- lapply(pkgs, function(nm) {
+      list(name = nm, install_suggestions = TRUE)
+    })
+  } else {
+    deps_out <- pkgs
+  }
+
   project <- tomledit::toml(
     project = list(
       name         = name,
       r_version    = r_version,
       repositories = repos_lst,
-      dependencies = pkgs
+      dependencies = deps_out
     )
   )
 

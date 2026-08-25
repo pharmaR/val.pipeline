@@ -41,12 +41,49 @@ test_that("write_pipeline_toml() writes the expected TOML shape", {
     which(txt == bioc_line)
   )
 
-  # dependencies rendered one-per-line for readability.
+  # dependencies rendered one-per-line for readability, as inline
+  # tables with `install_suggestions = true` (issue #148 — the new
+  # default, so rv preinstalls Suggests up-front and downstream
+  # `testthat::skip_if_not_installed()` guards stop silently
+  # zeroing out coverage).
+  expect_true(any(txt == "dependencies = ["))
+  dep_lines <- grep("\\{ name = \"", txt, value = TRUE)
+  expect_length(dep_lines, 3L)
+  expect_match(dep_lines[1], "\\{ name = \"dplyr\"")
+  expect_match(dep_lines[2], "\\{ name = \"ggplot2\"")
+  expect_match(dep_lines[3], "\\{ name = \"rlang\"")
+  # Every dep carries the install_suggestions field.
+  expect_true(all(grepl("install_suggestions = true", dep_lines)))
+  # Trailing comma on the last dep entry (mirrors the repositories
+  # block so re-ordering / adding is a one-line diff).
+  expect_match(dep_lines[3], "\\},\\s*$")
+  expect_true(any(txt == "]"))
+})
+
+
+test_that("write_pipeline_toml(install_suggestions = FALSE) renders bare-string deps", {
+  # Opt-out path preserved for smoke-test fixtures / callers that don't
+  # want the Suggests bloat.
+  tmp <- withr::local_tempfile(fileext = ".toml")
+  write_pipeline_toml(
+    pkgs      = c("dplyr", "ggplot2", "rlang"),
+    opt_repos = c(
+      CRAN = "https://packagemanager.posit.co/cran/2026-06-21"
+    ),
+    r_version = "4.5",
+    name      = "unit-test",
+    install_suggestions = FALSE,
+    path      = tmp
+  )
+  txt <- readLines(tmp)
+
   expect_true(any(txt == "dependencies = ["))
   expect_true(any(txt == "\t\"dplyr\","))
   expect_true(any(txt == "\t\"ggplot2\","))
   expect_true(any(txt == "\t\"rlang\""))
   expect_true(any(txt == "]"))
+  # No inline-table shape should appear anywhere in the dep block.
+  expect_length(grep("\\{ name = \"dplyr\"", txt), 0L)
 })
 
 
@@ -78,6 +115,26 @@ test_that("write_pipeline_toml() validates its inputs", {
       path = ""
     ),
     "non-empty string"
+  )
+
+  expect_error(
+    write_pipeline_toml(
+      pkgs = "dplyr",
+      opt_repos = c(CRAN = "x"),
+      install_suggestions = NA,
+      path = tmp
+    ),
+    "TRUE or FALSE"
+  )
+
+  expect_error(
+    write_pipeline_toml(
+      pkgs = "dplyr",
+      opt_repos = c(CRAN = "x"),
+      install_suggestions = c(TRUE, FALSE),
+      path = tmp
+    ),
+    "TRUE or FALSE"
   )
 })
 
