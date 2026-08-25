@@ -91,6 +91,28 @@
 #'   `covr_env_vars:` (`NOT_CRAN=true`) default from issue #146.
 #'   Set to `FALSE` for the pre-0.1.39 lean install (hard deps only).
 #'   Ignored when `prep` is supplied (the toml is already written).
+#' @param capture_covr_skip_report Logical(1). Master on/off switch
+#'   for the per-package testthat skip report that runs alongside
+#'   `assess_covr_coverage`. When `TRUE` (default), `val_pkg()`
+#'   captures the report for every non-auto-accept pkg whose raw
+#'   `covr_coverage` came in below `covr_skip_report_threshold`.
+#'   When `FALSE`, no extra `testthat::test_dir()` runs and the
+#'   `covr_n_test` / `covr_n_skip` / `covr_pct_skip` /
+#'   `covr_effective_coverage` columns are stamped `NA` for every
+#'   package. Overrides the `covr_skip_report$capture` config
+#'   default via an R option scoped to this `val_pipeline()` call.
+#'   See #150.
+#' @param covr_skip_report_threshold Numeric(1) on 0-100 scale, or
+#'   `NULL` (default). When `NULL`, falls back to the config
+#'   `covr_skip_report$threshold` value (defaults to `65`, matching
+#'   the covr_coverage Medium/Low cutoff): the skip report is
+#'   captured only for pkgs whose raw `covr_coverage` came in below
+#'   the cutoff — the fast path, since packages above the threshold
+#'   are already auto-accepting on covr_coverage. Pass an explicit
+#'   numeric to override the config default per-run. Pass `100` to
+#'   capture the skip report for every non-auto-accept pkg (all real
+#'   coverage values are strictly less than 100). Ignored when
+#'   `capture_covr_skip_report = FALSE`. See #150.
 #' @param propagate_libpaths Logical(1). Passed through to [val_build()];
 #'   see there for the full rationale. In short: when `TRUE` (default),
 #'   mirrors the current session's `.libPaths()` into `R_LIBS_SITE` so
@@ -165,6 +187,8 @@ val_pipeline <- function(
   workers = 1L,
   freeze_opt_repos = FALSE,
   toml_install_suggestions = TRUE,
+  capture_covr_skip_report = TRUE,
+  covr_skip_report_threshold = NULL,
   propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE),
   mem_watchdog = TRUE,
   finalize = TRUE
@@ -179,6 +203,20 @@ val_pipeline <- function(
   stopifnot(is.logical(toml_install_suggestions),
             length(toml_install_suggestions) == 1L,
             !is.na(toml_install_suggestions))
+  stopifnot(is.logical(capture_covr_skip_report),
+            length(capture_covr_skip_report) == 1L,
+            !is.na(capture_covr_skip_report))
+  if (!is.null(covr_skip_report_threshold)) {
+    covr_skip_report_threshold <- suppressWarnings(
+      as.numeric(covr_skip_report_threshold))
+    if (length(covr_skip_report_threshold) != 1L ||
+        is.na(covr_skip_report_threshold) ||
+        covr_skip_report_threshold < 0 ||
+        covr_skip_report_threshold > 100) {
+      stop("`covr_skip_report_threshold` must be a single numeric ",
+           "on [0, 100] or NULL.", call. = FALSE)
+    }
+  }
   stopifnot(is.logical(finalize), length(finalize) == 1L, !is.na(finalize))
   if (!is.null(prep) && !inherits(prep, "val_prep")) {
     stop("`prep` must be a `val_prep` object returned by val_prep_pipeline().",
@@ -192,6 +230,27 @@ val_pipeline <- function(
   old_cfg <- options()["val.pipeline.config_path"]
   on.exit(options(old_cfg), add = TRUE)
   apply_config_path(config_path)
+
+  # Route pull_covr_skip_report_config() to user overrides for the
+  # duration of this val_pipeline() scope. Options are restored on
+  # exit so they don't leak into subsequent standalone `val_pkg()`
+  # calls in the same R session. This is the only mechanism because
+  # val_pkg() reads its skip-report gate directly from config (no
+  # dedicated arg), so a session-scoped option is the least-invasive
+  # way to plumb a per-run override through val_build() workers.
+  # See #150.
+  old_skip <- options()[c("val.pipeline.capture_covr_skip_report",
+                          "val.pipeline.covr_skip_report_threshold")]
+  on.exit(options(old_skip), add = TRUE)
+  options(val.pipeline.capture_covr_skip_report = capture_covr_skip_report)
+  # Only override the config threshold when the user actually passed a
+  # value; NULL (default) means "use config", which is 65 out of the
+  # box (matches the covr_coverage Medium/Low cutoff). Setting an
+  # option to NULL via options() removes it, which happens to yield
+  # the same fallback semantics but only by accident — this explicit
+  # gate makes the intent unambiguous.
+  if (!is.null(covr_skip_report_threshold))
+    options(val.pipeline.covr_skip_report_threshold = covr_skip_report_threshold)
 
   #
   # ---- Prep phase ----

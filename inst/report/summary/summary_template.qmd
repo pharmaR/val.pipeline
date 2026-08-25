@@ -982,6 +982,104 @@ cov_tbl <- tibble::tibble(
 kable(cov_tbl, align = "lrr")
 ```
 
+## Test skip summary (`covr_skip_report`)
+
+Standalone `testthat::test_dir()` runs on each package source under
+the same env-var block as `covr_coverage` (`NOT_CRAN=true`,
+`TESTTHAT=true`, `_R_CHECK_FORCE_SUGGESTS_=false`; see
+`inst/config.yml`). Skips are counted per `test_that()` block, not
+per expectation — a skipped block contributed nothing to the
+`covr_coverage` percentage above, so packages at the top of the
+"most skipped" table are almost always the same packages whose
+val.pipeline coverage came in materially lower than their published
+badge.
+
+Populated for non-auto-accepted packages that ship
+`tests/testthat/` (i.e. the population that actually runs
+`assess_covr_coverage`). Missing columns are backfilled with `NA`
+so historical `qual_metadata.rds` files predating this feature
+still render.
+
+```{r skip-report-backfill, eval = TRUE, echo = FALSE}
+# Backward-compat: older qual_metadata.rds files don't have the
+# covr_skip_report scalar columns. Add them as NA so the chunks
+# below can key on `has_skip_report` without column-existence
+# guards.
+for (col in c("covr_n_test", "covr_n_skip", "covr_pct_skip",
+              "covr_effective_coverage")) {
+  if (!col %in% names(qual_metadata)) {
+    qual_metadata[[col]] <- if (col %in% c("covr_pct_skip",
+                                           "covr_effective_coverage"))
+                              NA_real_ else NA_integer_
+  }
+}
+has_skip_report <- any(!is.na(qual_metadata$covr_n_skip))
+```
+
+```{r skip-report-distribution, eval = has_skip_report}
+skip <- suppressWarnings(as.numeric(qual_metadata$covr_pct_skip))
+skip_tbl <- tibble::tibble(
+  Bucket = c("Not measured (NA)", "0% (nothing skipped)", "1-9%",
+             "10-24%", "25-49%", "50-74%", "75-100%"),
+  Packages = c(
+    sum(is.na(skip)),
+    sum(skip == 0, na.rm = TRUE),
+    sum(skip > 0 & skip < 10, na.rm = TRUE),
+    sum(skip >= 10 & skip < 25, na.rm = TRUE),
+    sum(skip >= 25 & skip < 50, na.rm = TRUE),
+    sum(skip >= 50 & skip < 75, na.rm = TRUE),
+    sum(skip >= 75 & skip <= 100, na.rm = TRUE)
+  )
+) |>
+  dplyr::mutate(Percent = sprintf("%.1f%%", 100 * Packages / sum(Packages)))
+kable(skip_tbl, align = "lrr")
+```
+
+```{r skip-report-top-skippers, eval = has_skip_report}
+# Top 25 packages by test-block skip count. Filter out NA (auto-
+# accepted / no testthat dir) so the table is composed of packages
+# a reviewer can actually investigate. Sort by skip count desc,
+# break ties on skip percentage (a package with 20 skips out of 200
+# is more concerning than 20 out of 2000).
+top_skippers <- qual_metadata |>
+  dplyr::filter(!is.na(.data$covr_n_skip) & .data$covr_n_skip > 0L) |>
+  dplyr::transmute(
+    Package  = .data$pkg,
+    Version  = .data$ver,
+    Skipped  = as.integer(.data$covr_n_skip),
+    Total    = as.integer(.data$covr_n_test),
+    Percent  = sprintf("%.1f%%", .data$covr_pct_skip),
+    Coverage = if ("covr_coverage" %in% names(qa)) {
+      # Look up the coverage number for these rows so the reviewer
+      # can see the pairing directly. NA when the pkg didn't produce
+      # a numeric coverage (e.g. covr crash).
+      pcv <- suppressWarnings(as.numeric(qa$covr_coverage))
+      names(pcv) <- qa$pkg
+      out <- pcv[.data$pkg]
+      ifelse(is.na(out), "-", sprintf("%.1f%%", out))
+    } else "-",
+    # Estimate: what covr_coverage would have been if the skipped
+    # test blocks covered code at the average rate of the ones
+    # that did run. Rough upper bound (see
+    # `?covr_effective_coverage`) — labelled "est." to remind
+    # reviewers not to treat it as ground truth.
+    `Coverage (est.)` = ifelse(
+      is.na(.data$covr_effective_coverage), "-",
+      sprintf("%.1f%%", .data$covr_effective_coverage))
+  ) |>
+  dplyr::arrange(dplyr::desc(.data$Skipped), dplyr::desc(.data$Percent)) |>
+  utils::head(25)
+
+if (nrow(top_skippers) > 0L) {
+  itable(top_skippers, default_page_size = 10)
+} else {
+  cat("No packages had any tests skipped under the current",
+      "`covr_env_vars` block. Either the shipped defaults are",
+      "already unlocking every gated test, or `assess_covr_coverage`",
+      "was not run for any package in this cohort.\n")
+}
+```
+
 ## R CMD check outcomes
 
 ```{r rcmd-check, eval = has_assessments && all(c("r_cmd_check_errors","r_cmd_check_warnings") %in% names(qa))}

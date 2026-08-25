@@ -1,6 +1,6 @@
 Package: val.pipeline
 Title: Validation Pipeline Example
-Version: 0.1.41
+Version: 0.1.42
 Authors@R: 
   c(
     person(
@@ -37,7 +37,6 @@ Suggests:
     BiocManager,
     memoise,
     ps,
-    testthat (>= 3.0.0),
     future,
     future.apply
 Config/testthat/edition: 3
@@ -55,6 +54,7 @@ Imports:
     riskscore (>= 0.1.3),
     rlang,
     stringr,
+    testthat (>= 3.0.0),
     tibble,
     tidyr,
     tomledit,

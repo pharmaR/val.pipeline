@@ -118,6 +118,38 @@ default:
     _R_CHECK_FORCE_SUGGESTS_: "false"
     NOT_ON_CRAN: ""
     RUN_SLOW_TESTS: "false"
+  # ------------------------------------------------------------------
+  # covr_skip_report:
+  #   Controls when `val_pkg()` captures a per-package testthat skip
+  #   report alongside `assess_covr_coverage`. The extra
+  #   `testthat::test_dir()` call adds meaningful wall-clock per pkg,
+  #   so most runs only want it on the pkgs where the skips are
+  #   actually driving the risk decision — i.e. those below the covr
+  #   `Low` cutoff.
+  #
+  #   capture: logical. Master on/off switch. `false` disables the
+  #     feature entirely — no extra test_dir() runs, and the
+  #     `covr_n_test` / `covr_n_skip` / `covr_pct_skip` /
+  #     `covr_effective_coverage` columns are all NA. `true`
+  #     (default) enables capture, subject to `threshold` below.
+  #
+  #   threshold: numeric on the same 0-100 scale as the
+  #     `covr_coverage:` rule below. Capture runs only for pkgs
+  #     whose raw covr_coverage came in below this cutoff. Defaults
+  #     to 65 to match the current Medium/Low cutoff of the
+  #     `covr_coverage:` rule. Set to 100 to capture for every
+  #     non-auto-accept pkg (i.e. every pkg that actually executed
+  #     `assess_covr_coverage`).
+  #
+  #   Both keys can be overridden per run via the
+  #   `capture_covr_skip_report` / `covr_skip_report_threshold` args
+  #   on `val_pipeline()`; the args set R options that
+  #   `pull_covr_skip_report_config()` consults before falling back
+  #   to this block.
+  # ------------------------------------------------------------------
+  covr_skip_report:
+    capture: true
+    threshold: 65
   # Repo sources for which Posit Package Manager does *not* support
   # curated (allow-list) package lists, and therefore must be shipped
   # as blocklists instead. For each source listed here,

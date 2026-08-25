@@ -441,6 +441,15 @@ val_pkg <- function(
     reuse_init <- src_ref == "pkg_cran_remote" &&
                   do_init &&
                   !identical(init_source, "pkg_source")
+
+    # Default: no skip report captured. Overwritten below when the
+    # non-auto-accept branch runs `assess_covr_coverage` and we
+    # capture the paired testthat skip report (#150). Kept declared
+    # here at outer scope so the `meta_list` construction downstream
+    # can reference `covr_skip_report` without a branch-order
+    # dependency.
+    covr_skip_report <- NULL
+
     if (reuse_init) {
       pkg_assessment <- init_pkg_assessment
       pkg_scores <- init_pkg_scores
@@ -505,6 +514,50 @@ val_pkg <- function(
       # Find which dirs end in "-test"
       pkg_test_dir <- wd_dirs[grepl("-tests$", wd_dirs)]
       unlink(pkg_test_dir, recursive = TRUE, force = TRUE)
+
+      # Capture a testthat skip report (issue #150). Standalone
+      # testthat::test_dir() run under the same env-var block as covr
+      # so the skip population matches what `assess_covr_coverage`
+      # actually saw. `covr::package_coverage()` runs test files via
+      # `sys.source()` — bypassing testthat's reporter chain — so the
+      # skip counts are unrecoverable from the covr result itself.
+      #
+      # Gating: `covr_skip_report:` config block + optional
+      # `capture_covr_skip_report` / `covr_skip_report_threshold`
+      # overrides from val_pipeline(). `!auto_accepted` is a hard
+      # prerequisite (this branch is the one that actually ran
+      # `assess_covr_coverage`); inside that population:
+      #   * `capture == FALSE`  — skip entirely (fastest).
+      #   * `threshold` numeric — capture only when the raw covr
+      #     coverage came in below `threshold` (0-100 scale,
+      #     default 65 matching the covr_coverage Medium/Low
+      #     cutoff). Set threshold to 100 in the arg / config to
+      #     capture for every non-auto-accept pkg.
+      # See #150.
+      skip_cfg <- pull_covr_skip_report_config()
+      cov_raw <- pkg_assessment$covr_coverage$totalcoverage %e% NA_real_
+      coverage_val <- if (is.null(cov_raw)) NA_real_ else
+        suppressWarnings(as.numeric(cov_raw))[1]
+      should_capture <- !auto_accepted && skip_cfg$capture &&
+        isTRUE(is.finite(coverage_val) &&
+               coverage_val < skip_cfg$threshold)
+      if (should_capture) {
+        val_msg(paste0("\n-->", pkg_v,
+          " capturing covr_skip_report (coverage=",
+          if (is.finite(coverage_val)) formatC(coverage_val, digits = 1,
+                                               format = "f") else "NA",
+          ", threshold=", skip_cfg$threshold, ")\n"),
+          min_level = "normal")
+        covr_skip_report <- val_time_block("skip_report",
+          capture_covr_skip_report(
+            pkg_source_path = file.path(sourced, pkg),
+            env_vars        = pull_covr_env_vars()
+          )
+        )
+        if (!is.null(covr_skip_report)) {
+          attr(pkg_assessment, "covr_skip_report") <- covr_skip_report
+        }
+      }
     }
     
   
@@ -829,6 +882,44 @@ val_pkg <- function(
     suggests_direct = if(identical(suggests_direct, character(0))) NA_character_ else suggests_direct,
     rev_deps = if(is.null(pkg_assessment$reverse_dependencies)) NA_character_ else pkg_assessment$reverse_dependencies |> as.vector(),
     assessment_runtime = list(txt = ass_mins_txt, mins = ass_mins),
+    # Testthat skip report scalars (issue #150). Populated when
+    # `assess_covr_coverage` was included in the final pass (i.e.
+    # `!auto_accepted`) and the package ships a `tests/testthat/`
+    # directory. `NA_integer_` / `NA_real_` for every other case
+    # (auto-accepted, tinytest / RUnit / no-tests packages, or a
+    # `testthat::test_dir()` failure that `capture_covr_skip_report()`
+    # absorbed). `val_finalize()` binds these into `qual_metadata.rds`
+    # so the summary report can render cohort-level tables, and the
+    # full `covr_skip_report` list (with per-message top reasons) rides
+    # as an attribute on `pkg_assessment` for the per-package report.
+    # See `capture_covr_skip_report()` in R/utils.R for the shape.
+    covr_n_test    = if (is.null(covr_skip_report)) NA_integer_
+                     else covr_skip_report$totals$n_test,
+    covr_n_skip    = if (is.null(covr_skip_report)) NA_integer_
+                     else covr_skip_report$totals$n_skip,
+    covr_pct_skip  = if (is.null(covr_skip_report) ||
+                         covr_skip_report$totals$n_test == 0L)
+                       NA_real_
+                     else 100 * covr_skip_report$totals$n_skip /
+                       covr_skip_report$totals$n_test,
+    # Estimate: what covr_coverage would have been if the skipped
+    # test_that() blocks had covered code at the *average* rate of
+    # the blocks that did run. `covr_coverage / (1 - pct_skip / 100)`,
+    # capped at 100. Rough upper bound — labelled "estimate" in the
+    # per-package and summary reports. NA when either coverage or
+    # pct_skip is missing (covr_coverage errored, skip capture off
+    # for this pkg, tests dir missing, etc.). See
+    # `covr_effective_coverage()` in R/utils.R. Issue #150 follow-up.
+    covr_effective_coverage = {
+      cov_v <- pkg_assessment$covr_coverage$totalcoverage %e% NA_real_
+      cov_v <- if (is.null(cov_v)) NA_real_ else
+        suppressWarnings(as.numeric(cov_v))[1]
+      pct_v <- if (is.null(covr_skip_report) ||
+                   covr_skip_report$totals$n_test == 0L) NA_real_
+               else 100 * covr_skip_report$totals$n_skip /
+                     covr_skip_report$totals$n_test
+      covr_effective_coverage(coverage_pct = cov_v, pct_skip = pct_v)
+    },
     # Diagnostic capture when val_decision()'s rule ladder produced
     # `final_risk = NA` for this pkg -- populated in the "Silent-NA
     # capture" block above. NULL for pkgs with a real decision. See

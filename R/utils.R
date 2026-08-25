@@ -480,6 +480,278 @@ pull_covr_env_vars <- function(config_path = NULL) {
 }
 
 
+#' Resolve the effective `covr_skip_report` configuration for the
+#' current run
+#'
+#' Reads the `default: covr_skip_report:` block from `inst/config.yml`
+#' (or the caller-supplied `config_path`), applies R-option overrides
+#' set by [val_pipeline()]
+#' (`val.pipeline.capture_covr_skip_report`,
+#' `val.pipeline.covr_skip_report_threshold`), validates the shape,
+#' and returns a two-element list `list(capture, threshold)`.
+#'
+#' The R-option layer is what lets a user pass
+#' `val_pipeline(capture_covr_skip_report = FALSE)` at the entry point
+#' and have every downstream `val_pkg()` worker see the override
+#' without needing an extra function arg threaded through
+#' `val_build()`.
+#'
+#' @param config_path Optional path to a custom `config.yml`; forwarded
+#'   verbatim to [pull_config()]. Defaults to the package config.
+#'
+#' @return A list with elements:
+#' \describe{
+#'   \item{capture}{Logical(1). `FALSE` disables the feature entirely.}
+#'   \item{threshold}{Numeric(1) on 0-100 scale. Capture runs for
+#'     pkgs whose raw covr_coverage came in below this cutoff. Set
+#'     to `100` to capture for every non-auto-accept pkg.}
+#' }
+#'
+#' @keywords internal
+pull_covr_skip_report_config <- function(config_path = NULL) {
+  raw <- pull_config(
+    val = "covr_skip_report",
+    rule_type = "default",
+    config_path = config_path
+  )
+  capture <- raw$capture %||% TRUE
+  threshold <- raw$threshold %||% 65
+
+  # R-option overrides win over config. val_pipeline() sets these on
+  # entry (only when the user actually passed a value) and restores
+  # them on exit.
+  opt_capture <- getOption("val.pipeline.capture_covr_skip_report", NULL)
+  opt_thresh  <- getOption("val.pipeline.covr_skip_report_threshold", NULL)
+  if (!is.null(opt_capture)) capture <- opt_capture
+  if (!is.null(opt_thresh))  threshold <- opt_thresh
+
+  if (!is.logical(capture) || length(capture) != 1L || is.na(capture)) {
+    stop("`covr_skip_report$capture` must be TRUE or FALSE; got ",
+         format(capture), ".", call. = FALSE)
+  }
+  threshold <- suppressWarnings(as.numeric(threshold))
+  if (length(threshold) != 1L || is.na(threshold) ||
+      threshold < 0 || threshold > 100) {
+    stop("`covr_skip_report$threshold` must be a single numeric on ",
+         "[0, 100]; got ", format(threshold), ".",
+         call. = FALSE)
+  }
+  list(capture = capture, threshold = threshold)
+}
+
+# (Sentinel removed; no longer needed — threshold is always numeric.)
+
+
+#' Estimate effective code coverage by projecting skipped tests onto
+#' the covered-line rate of the tests that actually ran
+#'
+#' Simple, cheap approximation used by [val_pkg()] to give reviewers
+#' a rough "would this pkg have passed if the skipped tests had run?"
+#' signal. Formally:
+#'
+#'   effective = coverage_pct / (1 - pct_skip / 100)
+#'
+#' capped at 100. Assumes skipped `test_that()` blocks would have
+#' contributed to line coverage at the *average* rate of the blocks
+#' that did run. That is almost never exactly true — skipped tests
+#' often target the exact code that was already uncovered — so the
+#' result is an upper-bound approximation, not ground truth. The
+#' per-package and summary report templates label it as an estimate.
+#'
+#' @param coverage_pct Numeric(1). Raw `covr_coverage` on 0-100 scale
+#'   (i.e. `pkg_assessment$covr_coverage$totalcoverage` for a
+#'   riskmetric-shaped assessment).
+#' @param pct_skip Numeric(1). Skip rate on 0-100 scale, i.e.
+#'   `covr_skip_report$totals$n_skip / n_test * 100`.
+#'
+#' @return Numeric(1) on 0-100 scale, or `NA_real_` when either input
+#'   is `NA`, `pct_skip >= 100` (division by zero), or
+#'   `coverage_pct` is not finite.
+#'
+#' @keywords internal
+covr_effective_coverage <- function(coverage_pct, pct_skip) {
+  if (length(coverage_pct) != 1L || length(pct_skip) != 1L) return(NA_real_)
+  if (is.na(coverage_pct) || is.na(pct_skip)) return(NA_real_)
+  if (!is.finite(coverage_pct) || !is.finite(pct_skip)) return(NA_real_)
+  if (pct_skip >= 100) return(NA_real_)
+  min(100, coverage_pct / (1 - pct_skip / 100))
+}
+
+
+#' Capture a `testthat` Skip Report for a Package Source
+#'
+#' Runs `testthat::test_dir()` on `<pkg_source_path>/tests/testthat/`
+#' under a controlled environment and returns a structured summary of
+#' how many tests were skipped and why. `val_pkg()` uses this to
+#' surface *why* a package's `covr_coverage` came in lower than the
+#' maintainer's GitHub badge suggests — the top drivers are almost
+#' always `testthat::skip_on_cran()`, `testthat::skip_if_offline()`,
+#' `testthat::skip_if_not_installed("<Suggests>")`, or a
+#' maintainer-invented `Sys.getenv("<flag>")` guard.
+#'
+#' The report is aggregated per test *block* (i.e. one `test_that()`
+#' call), not per expectation. A skipped block counts once. This
+#' matches how a reviewer thinks about "how many tests were skipped"
+#' and avoids inflating counts when a skipped block would have
+#' contained many expectations.
+#'
+#' Failure modes are absorbed silently — a broken test suite or a
+#' `testthat` version mismatch must never derail `val_pkg()`. The
+#' function returns `NULL` when:
+#'
+#' * `pkg_source_path/tests/testthat/` does not exist (e.g. the
+#'   package uses `tinytest`, `RUnit`, or no tests at all — tinytest /
+#'   RUnit support is a deliberate follow-up),
+#' * `testthat::test_dir()` errors for any reason.
+#'
+#' The caller should treat `NULL` as "unknown" and stamp the
+#' downstream aggregate columns as `NA`.
+#'
+#' @param pkg_source_path Character(1). Path to an extracted package
+#'   source (i.e. the directory that contains `DESCRIPTION`).
+#' @param env_vars Named character vector of environment variables to
+#'   set for the test run via [withr::with_envvar()]. Typically the
+#'   output of [pull_covr_env_vars()] so the standalone testthat run
+#'   sees the same env as the covr run and reports the same skip
+#'   population. Empty by default.
+#'
+#' @return `NULL` on any failure, otherwise a list with two elements:
+#'   \describe{
+#'     \item{`totals`}{A named list of integers: `n_test` (total
+#'       `test_that()` blocks executed), `n_pass` (blocks where every
+#'       expectation passed), `n_fail` (blocks with at least one
+#'       failure), `n_skip` (blocks that hit a `testthat::skip*()`
+#'       call), `n_error` (blocks that errored), `n_warn` (blocks that
+#'       emitted a warning expectation).}
+#'     \item{`top_reasons`}{A `data.frame` with columns `reason`
+#'       (character) and `n` (integer), sorted by `n` descending,
+#'       truncated to the top 10 skip messages. Empty
+#'       (`0`-row) when no tests were skipped.}
+#'   }
+#'
+#' @importFrom testthat test_dir SilentReporter
+#' @importFrom withr with_envvar
+#'
+#' @examples
+#' \dontrun{
+#' # Called from val_pkg() right after the final pkg_assess() call:
+#' env <- pull_covr_env_vars()
+#' capture_covr_skip_report(file.path(sourced, pkg), env_vars = env)
+#' }
+#'
+#' @export
+capture_covr_skip_report <- function(pkg_source_path,
+                                     env_vars = character(0)) {
+  # `tests/testthat/` presence is the sole gate. `test_dir()` needs
+  # this directory to bootstrap, and its absence is the fast path for
+  # tinytest / RUnit / no-tests packages that we deliberately don't
+  # cover here.
+  tests_dir <- file.path(pkg_source_path, "tests", "testthat")
+  if (!dir.exists(tests_dir)) {
+    return(NULL)
+  }
+
+  # `env_vars` must be a *named* character vector for
+  # `withr::with_envvar()`; an unnamed input would silently be ignored.
+  # `character(0)` (unnamed) is fine — it becomes a no-op wrapper.
+  if (length(env_vars) > 0L && is.null(names(env_vars))) {
+    stop("`env_vars` must be a named character vector.", call. = FALSE)
+  }
+
+  results <- tryCatch({
+    withr::with_envvar(
+      new = env_vars,
+      code = suppressMessages(suppressWarnings(
+        testthat::test_dir(
+          tests_dir,
+          reporter        = testthat::SilentReporter$new(),
+          stop_on_failure = FALSE,
+          stop_on_warning = FALSE
+        )
+      ))
+    )
+  }, error = function(e) NULL)
+  if (is.null(results)) return(NULL)
+
+  # Aggregate per test block (one `test_that()` call = one entry in
+  # `results`). `expectation_skip` is short-circuiting in testthat, so
+  # its presence in a block means the block was skipped — no
+  # per-expectation skew.
+  n_test  <- length(results)
+  n_skip  <- 0L
+  n_fail  <- 0L
+  n_error <- 0L
+  n_warn  <- 0L
+  skip_msgs <- character(0)
+  for (t in results) {
+    block_skipped <- FALSE
+    block_failed  <- FALSE
+    block_errored <- FALSE
+    block_warned  <- FALSE
+    for (r in t$results) {
+      if (inherits(r, "expectation_skip")) {
+        block_skipped <- TRUE
+        # Skip messages are typically short and repeat across many
+        # blocks (e.g. "On CRAN"), which makes their frequency table
+        # the most useful signal for a reviewer. testthat prepends
+        # "Reason: " to every skip message before storing it on the
+        # expectation object; strip that prefix so the top-reasons
+        # table shows the raw skip() argument the maintainer wrote.
+        msg <- r$message
+        if (is.null(msg) || is.na(msg) || !nzchar(msg)) {
+          msg <- "(no reason recorded)"
+        } else {
+          msg <- sub("^Reason:\\s*", "", msg)
+          if (!nzchar(msg)) msg <- "(no reason recorded)"
+        }
+        skip_msgs <- c(skip_msgs, msg)
+      } else if (inherits(r, "expectation_failure")) {
+        block_failed <- TRUE
+      } else if (inherits(r, "expectation_error")) {
+        block_errored <- TRUE
+      } else if (inherits(r, "expectation_warning")) {
+        block_warned <- TRUE
+      }
+    }
+    if (block_skipped) n_skip  <- n_skip  + 1L
+    if (block_failed)  n_fail  <- n_fail  + 1L
+    if (block_errored) n_error <- n_error + 1L
+    if (block_warned)  n_warn  <- n_warn  + 1L
+  }
+  n_pass <- n_test - n_skip - n_fail - n_error
+
+  # Top skip reasons as a frequency table, truncated to 10. Empty
+  # data.frame (typed columns) when nothing was skipped so downstream
+  # callers can bind rows without special-casing NULL.
+  top_reasons <- if (length(skip_msgs) > 0L) {
+    tbl <- sort(table(skip_msgs), decreasing = TRUE)
+    df <- data.frame(
+      reason = as.character(names(tbl)),
+      n      = as.integer(tbl),
+      stringsAsFactors = FALSE
+    )
+    utils::head(df, 10L)
+  } else {
+    data.frame(
+      reason = character(0),
+      n      = integer(0),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  list(
+    totals = list(
+      n_test  = as.integer(n_test),
+      n_pass  = as.integer(n_pass),
+      n_fail  = as.integer(n_fail),
+      n_skip  = as.integer(n_skip),
+      n_warn  = as.integer(n_warn),
+      n_error = as.integer(n_error)
+    ),
+    top_reasons = top_reasons
+  )
+}
+
 #' Build Decisions Data.Frame
 #'
 #' Helper function that creates the minimally necessary data.frame for

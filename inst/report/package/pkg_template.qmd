@@ -613,6 +613,96 @@ cat(paste(.rdep_names, collapse = ", "), ".\n\n", sep = "")
 ```
 
 
+```{r covr_skip_report_prep, include=FALSE}
+# Test skip summary (val.pipeline issue #150). `capture_covr_skip_report()`
+# in val_pkg.R attaches a structured summary to `d_riskmetric` when
+# `assess_covr_coverage` was included in the final pass and the
+# package ships a `tests/testthat/` directory. Absent for auto-
+# accepted packages, tinytest / RUnit packages, and any older
+# `assessment.rds` file that predates this feature. The section
+# renders only when the attribute is present.
+.skip <- attr(d_riskmetric, "covr_skip_report", exact = TRUE)
+.has_skip_report <- !is.null(.skip) &&
+  is.list(.skip) && !is.null(.skip$totals) &&
+  is.numeric(.skip$totals$n_test)
+```
+
+
+```{r covr_skip_report_section, eval=.has_skip_report, results='asis'}
+cat("## Test skip summary\n\n")
+cat(
+  "This summary is produced by running `testthat::test_dir()` on the",
+  "package source with the same environment-variable overrides",
+  "(`NOT_CRAN=true`, `TESTTHAT=true`, `_R_CHECK_FORCE_SUGGESTS_=false`;",
+  "see `inst/config.yml`) as the `covr_coverage` run above. It shows",
+  "which `test_that()` blocks were skipped and — where available — the",
+  "message passed to `testthat::skip*()`. A block that was skipped",
+  "here also contributed *nothing* to the `covr_coverage` percentage,",
+  "so a large `Skipped` bar is the most common explanation for a",
+  "package's val.pipeline coverage coming in materially lower than",
+  "the maintainer's GitHub badge (which typically runs on CI without",
+  "`NOT_CRAN` etc.).\n\n"
+)
+```
+
+```{r covr_skip_report_totals, eval=.has_skip_report}
+#| tab.cap: "**Test skip totals**. Counted per `test_that()` block (not per expectation)."
+.t <- .skip$totals
+.skip_totals_df <- data.frame(
+  Metric = c(
+    "Total test blocks",
+    "Passed",
+    "Skipped",
+    "Failed",
+    "Errored",
+    "Warned"
+  ),
+  Count = c(
+    .t$n_test, .t$n_pass, .t$n_skip, .t$n_fail, .t$n_error, .t$n_warn
+  )
+)
+.skip_totals_df$Percent <- ifelse(
+  .t$n_test > 0L,
+  sprintf("%.1f%%", 100 * .skip_totals_df$Count / .t$n_test),
+  "-"
+)
+knitr::kable(.skip_totals_df, align = "lrr")
+```
+
+```{r covr_effective_coverage_note, eval=.has_skip_report, results='asis'}
+# Show an estimated coverage figure: what covr_coverage would have
+# been if the skipped test blocks had covered code at the average
+# rate of the blocks that did run. It's an upper-bound approximation
+# (see ?covr_effective_coverage) — labelled as an estimate so
+# reviewers don't treat it as ground truth. NA when covr_coverage
+# itself errored or 100% of blocks were skipped.
+.cov_raw <- tryCatch(
+  as.numeric(d_riskmetric$covr_coverage$totalcoverage),
+  error = function(e) NA_real_
+)
+.cov_raw <- if (length(.cov_raw) == 0L) NA_real_ else .cov_raw[1]
+.pct_skip <- if (.t$n_test > 0L) 100 * .t$n_skip / .t$n_test else NA_real_
+.eff <- val.pipeline:::covr_effective_coverage(.cov_raw, .pct_skip)
+if (is.finite(.eff)) {
+  cat(sprintf(
+    paste0("**Estimated effective `covr_coverage`: %.1f%%** ",
+           "(reported = %.1f%%; skipped test blocks = %.1f%%). ",
+           "This is a rough upper-bound projection assuming skipped ",
+           "blocks would have covered code at the average rate of ",
+           "the blocks that ran. Not ground truth.\n\n"),
+    .eff, .cov_raw, .pct_skip
+  ))
+}
+```
+
+```{r covr_skip_report_reasons, eval=.has_skip_report && nrow(.skip$top_reasons) > 0L}
+#| tab.cap: "**Top skip reasons**. Frequency of each `testthat::skip*()` message across the run."
+.reasons_df <- .skip$top_reasons
+names(.reasons_df) <- c("Reason", "Blocks")
+knitr::kable(.reasons_df, align = "lr")
+```
+
+
 # Installation environment
 
 
