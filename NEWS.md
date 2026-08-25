@@ -1,5 +1,5 @@
 
-# val.pipeline (development version)
+# val.pipeline 0.1.39
 
 - **Layer A covr env-var normalization**: `val_pkg()` now wraps the
   final `riskmetric::pkg_assess()` call — the one that may include
