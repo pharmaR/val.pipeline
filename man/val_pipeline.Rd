@@ -21,6 +21,7 @@ val_pipeline(
   config_path = NULL,
   workers = 1L,
   freeze_opt_repos = FALSE,
+  toml_install_suggestions = TRUE,
   propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE),
   mem_watchdog = TRUE,
   finalize = TRUE
@@ -112,6 +113,17 @@ folder (\verb{R_<ver>/<YYYYMMDD>/}) to reflect the date the analysis
 was actually executed. \code{val_date} still governs the output
 directory name and every \code{val_date} field written to metadata.
 See #89.}
+
+\item{toml_install_suggestions}{Logical(1). Forwarded to
+\code{\link[=val_prep_pipeline]{val_prep_pipeline()}} (and from there to \code{\link[=write_pipeline_toml]{write_pipeline_toml()}}).
+When \code{TRUE} (default), the emitted \code{pipeline.toml} renders every
+dependency as \verb{\{ name = "pkg", install_suggestions = true \}} so
+\code{rv} preinstalls each package's \code{Suggests}. This closes the gap
+where \code{testthat::skip_if_not_installed("someSuggest")} guards
+silently skip during the covr run — paired with the Layer A
+\verb{covr_env_vars:} (\code{NOT_CRAN=true}) default from issue #146.
+Set to \code{FALSE} for the pre-0.1.39 lean install (hard deps only).
+Ignored when \code{prep} is supplied (the toml is already written).}
 
 \item{propagate_libpaths}{Logical(1). Passed through to \code{\link[=val_build]{val_build()}};
 see there for the full rationale. In short: when \code{TRUE} (default),

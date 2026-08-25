@@ -1,5 +1,15 @@
 
 
+# val.pipeline 0.1.41
+
+- **User-facing knob for `install_suggestions`.** Adds a new
+  `toml_install_suggestions` argument to [val_pipeline()] and
+  [val_prep_pipeline()] that plumbs through to
+  [write_pipeline_toml()]. Default is `TRUE`, matching the 0.1.40
+  install-Suggests-by-default behaviour; end users can now flip it to
+  `FALSE` at the pipeline entry point without having to call
+  `write_pipeline_toml()` by hand. (#148)
+
 # val.pipeline 0.1.40
 
 - **`write_pipeline_toml()` now emits `install_suggestions = true`
