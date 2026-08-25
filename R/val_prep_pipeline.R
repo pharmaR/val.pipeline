@@ -31,6 +31,18 @@
 #'   or a named `character(1)` where the name is used as the alias
 #'   (e.g. `c(local = "https://...")`). `NULL` (default) leaves the
 #'   emitted repositories identical to `opt_repos`.
+#' @param toml_install_suggestions Logical(1). Forwarded to
+#'   [write_pipeline_toml()]. When `TRUE` (default), each dependency in
+#'   the emitted `pipeline.toml` is rendered as
+#'   `{ name = "pkg", install_suggestions = true }` so `rv` preinstalls
+#'   every package's `Suggests` alongside its hard deps. This is paired
+#'   with the Layer A `covr_env_vars:` default (`NOT_CRAN=true`) from
+#'   issue #146 so `testthat::skip_if_not_installed("someSuggest")`
+#'   guards resolve `TRUE` at coverage time instead of silently
+#'   skipping. Set to `FALSE` for the pre-0.1.39 lean install (hard
+#'   deps only), at the cost of lower `covr_coverage` on packages whose
+#'   tests exercise Suggests. See `?write_pipeline_toml` for the exact
+#'   toml rendering.
 #'
 #' @return A list of class `"val_prep"` containing:
 #' \describe{
@@ -81,6 +93,7 @@ val_prep_pipeline <- function(
   toml_path = NULL,
   toml_project_name = "val.pipeline run",
   toml_local_repo = NULL,
+  toml_install_suggestions = TRUE,
   config_path = NULL,
   freeze_opt_repos = FALSE
 ){
@@ -91,6 +104,9 @@ val_prep_pipeline <- function(
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
   stopifnot(is.logical(freeze_opt_repos), length(freeze_opt_repos) == 1L,
             !is.na(freeze_opt_repos))
+  stopifnot(is.logical(toml_install_suggestions),
+            length(toml_install_suggestions) == 1L,
+            !is.na(toml_install_suggestions))
   apply_verbose(verbose)
   configure_bioc_repositories_if_requested(quiet = TRUE)
   configure_riskmetric_offline_if_requested(quiet = TRUE)
@@ -242,6 +258,7 @@ val_prep_pipeline <- function(
     local_repo = toml_local_repo,
     r_version  = paste(R.Version()$major, R.Version()$minor, sep = "."),
     name       = toml_project_name,
+    install_suggestions = toml_install_suggestions,
     path       = toml_path
   )
   val_msg(paste0("\n--> Wrote pipeline toml with ",

@@ -81,6 +81,16 @@
 #'   was actually executed. `val_date` still governs the output
 #'   directory name and every `val_date` field written to metadata.
 #'   See #89.
+#' @param toml_install_suggestions Logical(1). Forwarded to
+#'   [val_prep_pipeline()] (and from there to [write_pipeline_toml()]).
+#'   When `TRUE` (default), the emitted `pipeline.toml` renders every
+#'   dependency as `{ name = "pkg", install_suggestions = true }` so
+#'   `rv` preinstalls each package's `Suggests`. This closes the gap
+#'   where `testthat::skip_if_not_installed("someSuggest")` guards
+#'   silently skip during the covr run — paired with the Layer A
+#'   `covr_env_vars:` (`NOT_CRAN=true`) default from issue #146.
+#'   Set to `FALSE` for the pre-0.1.39 lean install (hard deps only).
+#'   Ignored when `prep` is supplied (the toml is already written).
 #' @param propagate_libpaths Logical(1). Passed through to [val_build()];
 #'   see there for the full rationale. In short: when `TRUE` (default),
 #'   mirrors the current session's `.libPaths()` into `R_LIBS_SITE` so
@@ -154,6 +164,7 @@ val_pipeline <- function(
   config_path = NULL,
   workers = 1L,
   freeze_opt_repos = FALSE,
+  toml_install_suggestions = TRUE,
   propagate_libpaths = getOption("val.pipeline.propagate_libpaths", TRUE),
   mem_watchdog = TRUE,
   finalize = TRUE
@@ -165,6 +176,9 @@ val_pipeline <- function(
   stopifnot(inherits(as.Date(val_date), c("Date", "POSIXt")))
   stopifnot(is.logical(freeze_opt_repos), length(freeze_opt_repos) == 1L,
             !is.na(freeze_opt_repos))
+  stopifnot(is.logical(toml_install_suggestions),
+            length(toml_install_suggestions) == 1L,
+            !is.na(toml_install_suggestions))
   stopifnot(is.logical(finalize), length(finalize) == 1L, !is.na(finalize))
   if (!is.null(prep) && !inherits(prep, "val_prep")) {
     stop("`prep` must be a `val_prep` object returned by val_prep_pipeline().",
@@ -197,6 +211,7 @@ val_pipeline <- function(
       out             = out,
       opt_repos       = opt_repos,
       verbose         = verbose,
+      toml_install_suggestions = toml_install_suggestions,
       config_path     = config_path,
       freeze_opt_repos = freeze_opt_repos
     )

@@ -10,6 +10,7 @@ write_pipeline_toml(
   local_repo = NULL,
   r_version = paste(R.Version()$major, R.Version()$minor, sep = "."),
   name = "val.pipeline run",
+  install_suggestions = TRUE,
   path
 )
 }
@@ -41,6 +42,26 @@ Defaults to the current R major.minor
 
 \item{name}{Character(1) written under \verb{[project].name}. Defaults
 to \code{"val.pipeline run"}.}
+
+\item{install_suggestions}{Logical(1). When \code{TRUE} (the default),
+every dependency is rendered as an inline table
+\verb{\{ name = "pkg", install_suggestions = true \}} so \code{rv} installs
+the package \emph{and} its \code{Suggests} dependencies when materializing
+the pipeline snapshot. When \code{FALSE}, dependencies are rendered as
+bare strings (\code{"pkg"}), matching the pre-0.1.39 behaviour, and
+\code{rv} installs hard deps only.
+
+Defaulting to \code{TRUE} is intentional and paired with Layer A env-var
+normalization (issue #146): with \code{NOT_CRAN=true} set for the covr
+run, tests gated on \code{testthat::skip_if_not_installed("someSuggest")}
+need their Suggests present in the pipeline library or they still
+silently skip. Preinstalling Suggests via \code{rv} closes that gap
+before \code{val_build()} starts, at the cost of a heavier initial
+install. \code{rv} only accepts \code{install_suggestions} as a per-dependency
+field (no top-level toggle exists in the rv schema — verified in
+\code{a2-ai/rv/src/config.rs}), so \code{TRUE} here means every entry gets
+the field set individually. The resulting toml is longer but is
+what \code{rv} expects.}
 
 \item{path}{Character(1). Where to write the toml file.}
 }

@@ -19,6 +19,7 @@ val_prep_pipeline(
   toml_path = NULL,
   toml_project_name = "val.pipeline run",
   toml_local_repo = NULL,
+  toml_install_suggestions = TRUE,
   config_path = NULL,
   freeze_opt_repos = FALSE
 )
@@ -82,6 +83,19 @@ itself). Either an unnamed \code{character(1)} URL (aliased as \code{"local"})
 or a named \code{character(1)} where the name is used as the alias
 (e.g. \code{c(local = "https://...")}). \code{NULL} (default) leaves the
 emitted repositories identical to \code{opt_repos}.}
+
+\item{toml_install_suggestions}{Logical(1). Forwarded to
+\code{\link[=write_pipeline_toml]{write_pipeline_toml()}}. When \code{TRUE} (default), each dependency in
+the emitted \code{pipeline.toml} is rendered as
+\verb{\{ name = "pkg", install_suggestions = true \}} so \code{rv} preinstalls
+every package's \code{Suggests} alongside its hard deps. This is paired
+with the Layer A \verb{covr_env_vars:} default (\code{NOT_CRAN=true}) from
+issue #146 so \code{testthat::skip_if_not_installed("someSuggest")}
+guards resolve \code{TRUE} at coverage time instead of silently
+skipping. Set to \code{FALSE} for the pre-0.1.39 lean install (hard
+deps only), at the cost of lower \code{covr_coverage} on packages whose
+tests exercise Suggests. See \code{?write_pipeline_toml} for the exact
+toml rendering.}
 
 \item{config_path}{Optional path to a user-supplied \code{config.yml}.
 When provided, every internal \code{pull_config()} call made during this
