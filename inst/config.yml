@@ -75,6 +75,49 @@ default:
   # blow up build_decisions_df() with `subscript out of bounds` when it
   # tries to read a non-existent `cond` element off a bare string.
   bioc_initial_ref: remote
+  # Environment variables to set for the *final* `pkg_assess()` call in
+  # `val_pkg()` — the call that may include `assess_covr_coverage`.
+  # Wrapped via `withr::with_envvar()` so they are scoped to the
+  # assessment and never leak into the parent R session.
+  #
+  # Why: `covr::package_coverage()` does not set `NOT_CRAN=true`
+  # internally (verified against the installed covr namespace).
+  # `testthat::skip_on_cran()` therefore fires during our covr runs and
+  # silently drops a large slice of many packages' test suites, which
+  # is one of the primary reasons `val.pipeline` reports 40–60% coverage
+  # for packages whose GitHub badge reads > 90%. The three defaults
+  # below are the conservative minimum needed to unlock those tests
+  # without opting into flaky network / slow-integration suites:
+  #
+  #   * `NOT_CRAN=true` — unblocks `testthat::skip_on_cran()`, which is
+  #     the biggest single lever.
+  #   * `TESTTHAT=true` — matches what `testthat::test_check()` sets;
+  #     some packages gate helper setup on this.
+  #   * `_R_CHECK_FORCE_SUGGESTS_=false` — prevents R CMD check-style
+  #     hard failures when a Suggests dep isn't installed; downstream
+  #     tests may then use `skip_if_not_installed()` naturally.
+  #
+  # Two additional common opt-in knobs are scaffolded below so
+  # reviewers can flip them on without having to remember exact
+  # spellings — but ship *off* so behavior does not change silently:
+  #
+  #   * `NOT_ON_CRAN` — bespoke variant used by some packages that
+  #     guard tests with `nzchar(Sys.getenv("NOT_ON_CRAN"))`. Empty
+  #     string keeps those tests guarded off; flip to `"true"` to opt
+  #     in.
+  #   * `RUN_SLOW_TESTS` — common convention for expensive or
+  #     integration-only suites checked as `== "true"`. `"false"`
+  #     keeps them off; flip to `"true"` to opt in.
+  #
+  # Add further entries here without touching R code. Set the whole
+  # block to `~` (YAML null) or an empty map to disable the wrapper
+  # and inherit the parent session's env.
+  covr_env_vars:
+    NOT_CRAN: "true"
+    TESTTHAT: "true"
+    _R_CHECK_FORCE_SUGGESTS_: "false"
+    NOT_ON_CRAN: ""
+    RUN_SLOW_TESTS: "false"
   # Repo sources for which Posit Package Manager does *not* support
   # curated (allow-list) package lists, and therefore must be shipped
   # as blocklists instead. For each source listed here,

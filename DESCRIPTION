@@ -1,6 +1,6 @@
 Package: val.pipeline
 Title: Validation Pipeline Example
-Version: 0.1.38.9002
+Version: 0.1.40
 Authors@R: 
   c(
     person(
@@ -38,7 +38,6 @@ Suggests:
     memoise,
     ps,
     testthat (>= 3.0.0),
-    withr,
     future,
     future.apply
 Config/testthat/edition: 3
@@ -59,7 +58,8 @@ Imports:
     tibble,
     tidyr,
     tomledit,
-    tools
+    tools,
+    withr
 Remotes: 
     pharmaR/riskmetric,
     pharmaR/riskreports,

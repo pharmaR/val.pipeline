@@ -154,21 +154,28 @@ use. Do not check out, sync, or merge into `ac-dev`. If a stale local
 
 ## Version + NEWS bump per PR
 
-Every PR must include:
-1. **DESCRIPTION**: bump the fourth component of `Version` by 1
-   (e.g. `0.0.1.9001` → `0.0.1.9002`). Leave the first three components
-   alone — those advance on release via a dedicated release PR that also
-   updates the `# val.pipeline (development version)` heading in `NEWS.md`
-   to the new release number. The `.9NNN` is a per-PR counter, not
-   per-commit: if a single open PR gets multiple pushes, the bump only
-   happens once (on the first commit with user-visible or reviewer-visible
-   effect).
-2. **NEWS.md**: add one bullet under `# val.pipeline (development version)`
-   at the **bottom** of the existing list. Format: short imperative summary
-   of the user-visible change, ending with `(#<n>)` referencing the issue.
-   Match the voice of surrounding bullets. Skip only for changes with zero
-   user-visible / reviewer-visible effect (comment tweak, internal test
-   rename that ships no behavior). If unsure, add the entry.
+Every PR targeting `main` must include:
+1. **DESCRIPTION**: bump `Version` by **at minimum a patch release**
+   (e.g. `0.1.38` → `0.1.39`). Bug fixes, minor helpers, config
+   scaffolding = patch. New user-visible feature or new exported
+   function = minor bump (`0.1.39` → `0.2.0`). Breaking change to an
+   exported signature / config schema = major (`0.2.0` → `1.0.0`).
+   **Do not** use dev-release fourth-component bumps (`0.1.38.9001`,
+   `.9002`, ...); those are reserved for local WIP and must be
+   collapsed to a real release version before the PR opens. One PR =
+   one version bump, regardless of how many pushes it takes.
+2. **NEWS.md**: rename the top heading from
+   `# val.pipeline (development version)` to `# val.pipeline <newver>`
+   matching DESCRIPTION, and add one bullet under it summarizing the
+   change. Format: short imperative summary of the user-visible change,
+   ending with `(#<n>)` referencing the issue. Match the voice of
+   surrounding bullets. If a `# val.pipeline (development version)`
+   heading is already gone (a prior PR in the same release window
+   already renamed it), keep the existing release heading and append
+   your bullet to its list. Skip the bullet only for changes with zero
+   user-visible / reviewer-visible effect (comment tweak, internal
+   test rename that ships no behavior); still bump the version. If
+   unsure, add the entry.
 
 Do these in the same commit as (or immediately after) the code change,
 before opening/updating the PR.
