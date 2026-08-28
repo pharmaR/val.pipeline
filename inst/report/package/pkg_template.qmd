@@ -397,11 +397,16 @@ if (!is.null(.lic) && length(.lic) >= 1 && nzchar(as.character(.lic[[1]]))) {
 # on one line so it sits cleanly in a table cell.
 .rc <- d_riskmetric[["r_cmd_check"]]
 if (!riskreports::is_risk_error(.rc) && !is.null(names(.rc))) {
-  .append_row(
-    "R CMD check",
-    paste(stringr::str_to_title(names(.rc)), .rc, sep = " - ",
-          collapse = ", ")
-  )
+  # Defensive sanitizer: an unexpected multi-line value (e.g. a
+  # pkgbuild install-tool error string bleeding into the count
+  # vector) would embed `\n` / `|` into the cell and break the
+  # markdown table row parser downstream, which manifests as the
+  # rest of the document (including later sections) rendering
+  # inside table 2.1. Strip those before joining. See #155.
+  .rc_cell <- paste(stringr::str_to_title(names(.rc)), as.character(.rc),
+                    sep = " - ", collapse = ", ")
+  .rc_cell <- gsub("[\r\n|]+", " ", .rc_cell)
+  .append_row("R CMD check", .rc_cell)
 }
 
 # Remote checks — scalar string when available.
@@ -431,6 +436,23 @@ if (!riskreports::is_risk_error(.rmt) && length(.rmt) >= 1) {
   "Not calculated"
 }
 .append_row("Code coverage", .cov_display)
+
+# Dedupe against any pre-existing coverage row that `summary_table()`
+# emitted from the raw `covr_coverage` column with a different label
+# (typically the raw metric name "covr_coverage", sometimes without
+# the `%` suffix). Reported symptom: table 2.1 showing two coverage
+# rows -- one labelled "Code coverage" with `%`, one labelled
+# "covr_coverage" without. Keep the formatted "Code coverage" row
+# (just appended above) and drop any other row whose metric name
+# case-insensitively matches the covr_coverage family. See #155.
+.cov_row_dupes <- grepl("^covr[_ ]?coverage$",
+                       summary_data$Metric,
+                       ignore.case = TRUE) &
+                  summary_data$Metric != "Code coverage"
+if (any(.cov_row_dupes)) {
+  summary_data <- summary_data[!.cov_row_dupes, , drop = FALSE]
+  row.names(summary_data) <- NULL
+}
 
 # Reorder rows into a friendlier grouping:
 #   1. Downloads 1yr + Reverse dependencies (top)
@@ -620,29 +642,51 @@ cat(paste(.rdep_names, collapse = ", "), ".\n\n", sep = "")
 # package ships a `tests/testthat/` directory. Absent for auto-
 # accepted packages, tinytest / RUnit packages, and any older
 # `assessment.rds` file that predates this feature. The section
-# renders only when the attribute is present.
+# renders unconditionally now (#155) -- when no data is available
+# it explains why instead of being silently omitted.
 .skip <- attr(d_riskmetric, "covr_skip_report", exact = TRUE)
 .has_skip_report <- !is.null(.skip) &&
   is.list(.skip) && !is.null(.skip$totals) &&
-  is.numeric(.skip$totals$n_test)
+  is.numeric(.skip$totals$n_test) && .skip$totals$n_test > 0L
 ```
 
 
-```{r covr_skip_report_section, eval=.has_skip_report, results='asis'}
+```{r covr_skip_report_section, results='asis'}
 cat("## Test skip summary\n\n")
-cat(
-  "This summary is produced by running `testthat::test_dir()` on the",
-  "package source with the same environment-variable overrides",
-  "(`NOT_CRAN=true`, `TESTTHAT=true`, `_R_CHECK_FORCE_SUGGESTS_=false`;",
-  "see `inst/config.yml`) as the `covr_coverage` run above. It shows",
-  "which `test_that()` blocks were skipped and — where available — the",
-  "message passed to `testthat::skip*()`. A block that was skipped",
-  "here also contributed *nothing* to the `covr_coverage` percentage,",
-  "so a large `Skipped` bar is the most common explanation for a",
-  "package's val.pipeline coverage coming in materially lower than",
-  "the maintainer's GitHub badge (which typically runs on CI without",
-  "`NOT_CRAN` etc.).\n\n"
-)
+if (.has_skip_report) {
+  cat(
+    "This summary is produced by running `testthat::test_dir()` on the",
+    "package source with the same environment-variable overrides",
+    "(`NOT_CRAN=true`, `TESTTHAT=true`, `_R_CHECK_FORCE_SUGGESTS_=false`;",
+    "see `inst/config.yml`) as the `covr_coverage` run above. It shows",
+    "which `test_that()` blocks were skipped and — where available — the",
+    "message passed to `testthat::skip*()`. A block that was skipped",
+    "here also contributed *nothing* to the `covr_coverage` percentage,",
+    "so a large `Skipped` bar is the most common explanation for a",
+    "package's val.pipeline coverage coming in materially lower than",
+    "the maintainer's GitHub badge (which typically runs on CI without",
+    "`NOT_CRAN` etc.).\n\n"
+  )
+} else {
+  cat(
+    "No test skip report was captured for this package. This can happen",
+    "for any of the following reasons:\n\n",
+    "- The package auto-accepted on its primary metrics",
+    "(e.g. `downloads_1yr`), so `covr_coverage` was not part of the",
+    "final assessment pass and no test-suite run took place.\n",
+    "- The package's `covr_coverage` result was above the capture",
+    "threshold (default 65%, configurable via",
+    "`options(val.pipeline.covr_skip_report_threshold = ...)`; see",
+    "`inst/config.yml`) -- the report is only produced for packages",
+    "whose reported coverage falls below the Medium/Low cutoff so a",
+    "reviewer can see *why* it's low.\n",
+    "- The package doesn't use `{testthat}` (e.g. tinytest, RUnit,",
+    "or no test suite at all).\n",
+    "- Capture was disabled for the run via",
+    "`val_pipeline(capture_covr_skip_report = FALSE)` or",
+    "`covr_skip_report$capture: false` in the config.\n\n"
+  )
+}
 ```
 
 ```{r covr_skip_report_totals, eval=.has_skip_report}
@@ -661,11 +705,15 @@ cat(
     .t$n_test, .t$n_pass, .t$n_skip, .t$n_fail, .t$n_error, .t$n_warn
   )
 )
-.skip_totals_df$Percent <- ifelse(
-  .t$n_test > 0L,
-  sprintf("%.1f%%", 100 * .skip_totals_df$Count / .t$n_test),
-  "-"
-)
+# Vectorised percent column. `ifelse()` with a scalar condition
+# returns a length-1 result and then recycles across all rows via
+# the assignment, which produced "100.0%" for every row. Use a
+# plain `if` so the sprintf vector is preserved. See #155.
+.skip_totals_df$Percent <- if (.t$n_test > 0L) {
+  sprintf("%.1f%%", 100 * .skip_totals_df$Count / .t$n_test)
+} else {
+  rep("-", nrow(.skip_totals_df))
+}
 knitr::kable(.skip_totals_df, align = "lrr")
 ```
 
@@ -675,7 +723,9 @@ knitr::kable(.skip_totals_df, align = "lrr")
 # rate of the blocks that did run. It's an upper-bound approximation
 # (see ?covr_effective_coverage) — labelled as an estimate so
 # reviewers don't treat it as ground truth. NA when covr_coverage
-# itself errored or 100% of blocks were skipped.
+# itself errored or 100% of blocks were skipped. Rendered as its
+# own blockquote paragraph so it stands out from surrounding
+# tables. See #155.
 .cov_raw <- tryCatch(
   as.numeric(d_riskmetric$covr_coverage$totalcoverage),
   error = function(e) NA_real_
@@ -685,14 +735,31 @@ knitr::kable(.skip_totals_df, align = "lrr")
 .eff <- val.pipeline:::covr_effective_coverage(.cov_raw, .pct_skip)
 if (is.finite(.eff)) {
   cat(sprintf(
-    paste0("**Estimated effective `covr_coverage`: %.1f%%** ",
-           "(reported = %.1f%%; skipped test blocks = %.1f%%). ",
+    paste0("\n\n> **Estimated effective `covr_coverage`: %.1f%%**\n>\n",
+           "> Reported = %.1f%%; skipped test blocks = %.1f%%. ",
            "This is a rough upper-bound projection assuming skipped ",
            "blocks would have covered code at the average rate of ",
            "the blocks that ran. Not ground truth.\n\n"),
     .eff, .cov_raw, .pct_skip
   ))
 }
+```
+
+```{r covr_skip_report_reasons_intro, eval=.has_skip_report && nrow(.skip$top_reasons) > 0L, results='asis'}
+cat(
+  "The table below tallies the raw message strings passed to",
+  "`testthat::skip()` / `skip_if()` / `skip_on_cran()` / etc. by the",
+  "package's own test suite, ranked by how many `test_that()` blocks",
+  "each message accounted for. The wording is whatever the package",
+  "maintainer wrote — some messages are self-explanatory",
+  "(`\"On CRAN\"`, `\"internet required\"`), others reference the",
+  "package's private testing-depth machinery (e.g.",
+  "`\"testing depth 3 is below current testing specification 5\"`",
+  "from packages that gate slow tests behind an internal level knob),",
+  "and a few are placeholders (`\"TODO\"`). Treat this as a hint about",
+  "*where* coverage is being left on the table, not an authoritative",
+  "list of skip categories.\n\n"
+)
 ```
 
 ```{r covr_skip_report_reasons, eval=.has_skip_report && nrow(.skip$top_reasons) > 0L}
