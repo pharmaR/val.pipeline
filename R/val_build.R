@@ -656,6 +656,38 @@ val_build <- function(
     # sizes, timing dumps, etc.) matching serial-mode output.
     scipen_tier   <- getOption("scipen", 0L)
 
+    # `HOME` and friends do NOT cross the multisession boundary
+    # reliably: `future::multisession` boots workers via
+    # `parallel::makeClusterPSOCK()` which inherits the OS-level
+    # environment, but if `HOME` is unset in the parent's shell
+    # (e.g. RStudio Server sessions, some CI runners, systemd
+    # units) the worker starts with `Sys.getenv("HOME") == ""`.
+    # Any package-under-assessment whose install-time bootstrap
+    # expands `${HOME}/...` (basilisk -> pyenv is the canonical
+    # offender) then tries to create a directory under `/` and
+    # dies with "Permission denied" -- and if the install step
+    # is invoked via a system() call the whole worker can be
+    # left in a corrupted state. Hoist HOME + companion XDG /
+    # TMPDIR vars from the parent's R-level environment so the
+    # child at least sees whatever the parent resolved. See #153.
+    home_tier       <- Sys.getenv("HOME",            unset = "")
+    tmpdir_tier     <- Sys.getenv("TMPDIR",          unset = "")
+    xdg_cache_tier  <- Sys.getenv("XDG_CACHE_HOME",  unset = "")
+    xdg_data_tier   <- Sys.getenv("XDG_DATA_HOME",   unset = "")
+
+    # Cap native-code thread counts inside each worker. Without
+    # this, N workers each spawn `cores`-many OMP / BLAS threads
+    # and total concurrent threads = N * cores compete for the
+    # same glibc allocator; heavy BLAS workloads under assessment
+    # (e.g. packages exercising `benchmarkme` in tests) can then
+    # trip `free(): invalid next size (fast)` heap corruption.
+    # Default `"1"` is intentionally conservative; overridable
+    # via `options(val.pipeline.worker_omp_threads = "N")` for
+    # hosts with fewer workers than cores. See #153.
+    omp_threads_tier <- as.character(
+      getOption("val.pipeline.worker_omp_threads", "1")
+    )
+
     # Pre-filter already-assessed pkgs before dispatch. In parallel
     # mode there's no dep-skip state to update in-loop, so any pkg
     # whose `_meta.rds` is already on disk (and `replace = FALSE`)
@@ -732,6 +764,32 @@ val_build <- function(
     if (length(todo) > 0L) {
       future.apply::future_mapply(
         FUN = function(pkg, ver, pkg_cnt) {
+          # Restore HOME/XDG/TMPDIR so package install-time steps
+          # that resolve paths from these vars (basilisk -> pyenv,
+          # etc.) don't fall through to `/`. See #153.
+          if (nzchar(home_tier))      Sys.setenv(HOME            = home_tier)
+          if (nzchar(tmpdir_tier))    Sys.setenv(TMPDIR          = tmpdir_tier)
+          if (nzchar(xdg_cache_tier)) Sys.setenv(XDG_CACHE_HOME  = xdg_cache_tier)
+          if (nzchar(xdg_data_tier))  Sys.setenv(XDG_DATA_HOME   = xdg_data_tier)
+
+          # Cap native-code thread counts per worker to prevent
+          # `workers * cores` OMP/BLAS thread multiplication that
+          # can trip glibc heap corruption. See #153.
+          Sys.setenv(
+            OMP_NUM_THREADS           = omp_threads_tier,
+            OPENBLAS_NUM_THREADS      = omp_threads_tier,
+            MKL_NUM_THREADS           = omp_threads_tier,
+            RCPP_PARALLEL_NUM_THREADS = omp_threads_tier
+          )
+          if (requireNamespace("data.table", quietly = TRUE)) {
+            try(
+              data.table::setDTthreads(
+                suppressWarnings(as.integer(omp_threads_tier))
+              ),
+              silent = TRUE
+            )
+          }
+
           options(val.pipeline.verbose = verbose_tier)
           if (!is.null(config_path_tier)) {
             options(val.pipeline.config_path = config_path_tier)
