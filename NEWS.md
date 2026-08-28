@@ -25,7 +25,13 @@
   - **R CMD check summary cell hardened** against unexpected
     newline / `|` content that could break table 2.1's markdown row
     parser and cause subsequent report sections to render inside
-    it. (#155)
+    it.
+  - **Duplicate `covr_coverage` row removed.** Table 2.1 previously
+    sometimes showed two coverage rows -- one labelled `Code
+    coverage` (with `%`) added downstream and one labelled
+    `covr_coverage` (without `%`) emitted upstream by
+    `summary_table()`. The formatted `Code coverage` row is now
+    kept and any raw `covr_coverage`-labelled row is dropped. (#155)
 
 # val.pipeline 0.1.42
 

@@ -437,6 +437,23 @@ if (!riskreports::is_risk_error(.rmt) && length(.rmt) >= 1) {
 }
 .append_row("Code coverage", .cov_display)
 
+# Dedupe against any pre-existing coverage row that `summary_table()`
+# emitted from the raw `covr_coverage` column with a different label
+# (typically the raw metric name "covr_coverage", sometimes without
+# the `%` suffix). Reported symptom: table 2.1 showing two coverage
+# rows -- one labelled "Code coverage" with `%`, one labelled
+# "covr_coverage" without. Keep the formatted "Code coverage" row
+# (just appended above) and drop any other row whose metric name
+# case-insensitively matches the covr_coverage family. See #155.
+.cov_row_dupes <- grepl("^covr[_ ]?coverage$",
+                       summary_data$Metric,
+                       ignore.case = TRUE) &
+                  summary_data$Metric != "Code coverage"
+if (any(.cov_row_dupes)) {
+  summary_data <- summary_data[!.cov_row_dupes, , drop = FALSE]
+  row.names(summary_data) <- NULL
+}
+
 # Reorder rows into a friendlier grouping:
 #   1. Downloads 1yr + Reverse dependencies (top)
 #   2. Dependencies
