@@ -1,3 +1,18 @@
+# val.pipeline 0.1.43
+
+- **Harden multisession workers against environment starvation and
+  native-thread oversubscription.** `val_build.R` now propagates
+  `HOME`, `TMPDIR`, `XDG_CACHE_HOME`, and `XDG_DATA_HOME` across the
+  multisession boundary so package install-time steps that resolve
+  paths from `$HOME` (e.g. `basilisk`/`pyenv` bootstrap) no longer
+  hit `/.pyenv: Permission denied` inside workers. Also caps
+  `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`,
+  `RCPP_PARALLEL_NUM_THREADS`, and `data.table::setDTthreads()` to
+  `1` per worker (override with `options(val.pipeline.worker_omp_threads
+  = "N")`), preventing `workers × cores` thread multiplication that
+  can trigger `free(): invalid next size (fast)` glibc heap
+  corruption on BLAS-heavy tests. (#153)
+
 # val.pipeline 0.1.42
 
 - **`covr_skip_report`: surface which tests are being skipped and
