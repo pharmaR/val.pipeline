@@ -1,3 +1,32 @@
+# val.pipeline 0.1.44
+
+- **Per-package report: fix the covr skip-summary section.** Multiple
+  cleanups to the "Test skip summary" block in
+  `inst/report/package/pkg_template.qmd`:
+  - **Percentages fixed.** The totals table was showing `100.0%` for
+    every row because the `ifelse()` percentage expression collapsed
+    to a scalar on a scalar condition and then recycled across all
+    rows. Rewritten with `if`/`else` so per-row percentages render
+    correctly.
+  - **Estimated effective `covr_coverage`** now renders as its own
+    blockquote paragraph instead of inline text, so a reviewer
+    skimming the report can spot it at a glance.
+  - **Top skip reasons** table now leads with a one-sentence
+    explanation clarifying that the entries are the raw message
+    strings passed to `testthat::skip*()` by the package's own test
+    suite (so cryptic messages like `"testing depth 3 is below
+    current testing specification 5"` or `"TODO"` are the package
+    maintainer's wording, not something val.pipeline invented).
+  - **Section always renders.** Auto-accepted packages and any pkg
+    whose `covr_coverage` was above the capture threshold used to
+    omit the section entirely; it now emits the header plus a short
+    explanation of why the data wasn't captured (auto-accept, above
+    threshold, non-testthat, or capture disabled).
+  - **R CMD check summary cell hardened** against unexpected
+    newline / `|` content that could break table 2.1's markdown row
+    parser and cause subsequent report sections to render inside
+    it. (#155)
+
 # val.pipeline 0.1.42
 
 - **`covr_skip_report`: surface which tests are being skipped and
