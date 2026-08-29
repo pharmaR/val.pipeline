@@ -1,6 +1,117 @@
 
 
 
+#' Probe whether a directory is writable by the current process
+#'
+#' Tries to create (and immediately delete) a small probe file inside
+#' `dir`. Distinguishes real permission failures from "the directory
+#' doesn't exist yet" so callers can differentiate. Used as a
+#' pre-flight guard by [val_build()] so a run doesn't die 40 hours in
+#' with a cryptic assembler EACCES when the offending mount could
+#' have been named at startup. See #157.
+#'
+#' @param dir Character(1) path to test.
+#' @param create Logical(1). When `TRUE` and `dir` doesn't exist,
+#'   attempt to create it (mirrors the mkdir-if-missing pattern the
+#'   caller usually needs). Default `FALSE`.
+#'
+#' @return A list with elements `ok` (logical(1)) and `reason`
+#'   (character(1); `""` on success, otherwise `"missing"`,
+#'   `"eacces"`, `"enospc"`, `"erofs"`, or `"other: <message>"`).
+#'
+#' @keywords internal
+probe_writable_dir <- function(dir, create = FALSE) {
+  dir <- as.character(dir)[1]
+  if (!nzchar(dir)) {
+    return(list(ok = FALSE, reason = "empty path"))
+  }
+  if (!dir.exists(dir)) {
+    if (create) {
+      created <- suppressWarnings(
+        dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+      )
+      if (!isTRUE(created) && !dir.exists(dir)) {
+        return(list(ok = FALSE, reason = "cannot create"))
+      }
+    } else {
+      return(list(ok = FALSE, reason = "missing"))
+    }
+  }
+  probe <- tempfile(
+    pattern = ".val_pipeline_probe_",
+    tmpdir  = dir
+  )
+  res <- tryCatch(
+    {
+      con <- file(probe, open = "w")
+      on.exit(close(con), add = TRUE)
+      cat("ok\n", file = con)
+      TRUE
+    },
+    error   = function(e) conditionMessage(e),
+    warning = function(w) conditionMessage(w)
+  )
+  if (file.exists(probe)) {
+    suppressWarnings(file.remove(probe))
+  }
+  if (isTRUE(res)) {
+    return(list(ok = TRUE, reason = ""))
+  }
+  msg <- as.character(res)
+  reason <- if (grepl("Permission denied", msg, fixed = TRUE)) {
+    "eacces"
+  } else if (grepl("No space left on device", msg, fixed = TRUE)) {
+    "enospc"
+  } else if (grepl("Read-only file system", msg, fixed = TRUE)) {
+    "erofs"
+  } else {
+    paste0("other: ", msg)
+  }
+  list(ok = FALSE, reason = reason)
+}
+
+#' Assert every named directory is writable; `stop()` with a
+#' consolidated diagnostic naming every offender if not.
+#'
+#' @param dirs Named character vector; names describe the role of
+#'   each path (e.g. `c(val_dir = "/x", tempdir = "/tmp/Rtmp...")`).
+#' @param uid Optional character/integer of the current uid to
+#'   include in the error message.
+#' @param context Optional character(1) tag for the diagnostic (e.g.
+#'   `"parent"` or `"worker"`).
+#'
+#' @return `invisible(TRUE)` on success. On failure throws an error
+#'   of class `"val_pipeline_write_probe_failure"`.
+#'
+#' @keywords internal
+assert_writable_dirs <- function(dirs, uid = NULL, context = NULL) {
+  results <- lapply(unname(dirs), probe_writable_dir, create = FALSE)
+  ok      <- vapply(results, function(r) isTRUE(r$ok), logical(1))
+  if (all(ok)) return(invisible(TRUE))
+  reasons <- vapply(results[!ok], function(r) r$reason, character(1))
+  lines <- sprintf(
+    "  - %s: %s (reason: %s)",
+    names(dirs)[!ok],
+    unname(dirs)[!ok],
+    reasons
+  )
+  ctx_txt <- if (!is.null(context)) sprintf(" [%s]", context) else ""
+  uid_txt <- if (!is.null(uid)) sprintf(" (uid=%s)", uid) else ""
+  msg <- sprintf(
+    paste0("val.pipeline pre-flight write-probe failed%s%s. ",
+           "Refusing to proceed because at least one path required ",
+           "for package assessment is not writable by the current ",
+           "process. Offending paths:\n%s"),
+    ctx_txt, uid_txt, paste(lines, collapse = "\n")
+  )
+  cond <- structure(
+    class = c("val_pipeline_write_probe_failure", "error", "condition"),
+    list(message = msg, call = sys.call(-1))
+  )
+  stop(cond)
+}
+
+
 #' Resolve the effective config.yml path
 #'
 #' Internal helper used by [pull_config()] and the entry-point pipeline

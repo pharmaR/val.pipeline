@@ -316,6 +316,23 @@ val_build <- function(
   if(!dir.exists(r_dir)) dir.create(r_dir)
   if(!dir.exists(val_dir)) dir.create(val_dir)
   if(!dir.exists(assessed)) dir.create(assessed) # needed
+
+  # Pre-flight write probe. Verify every path we need to write to
+  # during assessment (val_dir, assessed/, tempdir(), and
+  # .libPaths()[1]) is actually writable by the current process
+  # BEFORE we spend hours on package downloads. Catches the common
+  # "shared val_dir under a read-only mount", "TMPDIR points to a
+  # dir that was cleaned up", and "libPaths()[1] on an NFS share
+  # with root_squash" classes upfront -- instead of surfacing as a
+  # cryptic assembler EACCES 40 hours in. See #157.
+  assert_writable_dirs(
+    c(val_dir     = val_dir,
+      assessed    = assessed,
+      tempdir     = tempdir(),
+      libpaths_1  = .libPaths()[1]),
+    uid     = as.character(Sys.info()[["effective_user"]]),
+    context = "parent"
+  )
   
   #
   # Save the config file to the val_dir for record keeping. Copies the
@@ -842,6 +859,29 @@ val_build <- function(
           val.pipeline::configure_riskmetric_offline_if_requested(
             quiet = TRUE
           )
+
+          # Per-worker write probe. `tempdir()` inside the worker
+          # resolves to this worker's own session-local temp tree,
+          # NOT the parent's; probe it here to catch mounts that
+          # silently reject writes for the worker's process (e.g.
+          # inherited TMPDIR pointing at a per-session dir the
+          # sweeper removed, NFS root_squash, tmpfs quota). Same
+          # rationale for .libPaths()[1] -- covr / riskmetric can
+          # target a different lib inside the worker than the
+          # parent. Log the resolved paths on first task so
+          # post-mortems can identify which mount was in play. See
+          # #157.
+          val.pipeline:::assert_writable_dirs(
+            c(tempdir    = tempdir(),
+              libpaths_1 = .libPaths()[1]),
+            uid     = as.character(Sys.info()[["effective_user"]]),
+            context = paste0("worker pid=", Sys.getpid())
+          )
+          val_msg(paste0(
+            "[worker pid=", Sys.getpid(), "] tempdir=", tempdir(),
+            "; libpaths_1=", .libPaths()[1]),
+            min_level = "verbose")
+
           assess_one(pkg, ver, pkg_cnt,
                      is_dep_skip = FALSE,
                      failed_snapshot = character(0))
