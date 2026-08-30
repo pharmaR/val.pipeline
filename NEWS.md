@@ -1,3 +1,19 @@
+# val.pipeline 0.1.46
+
+- **Pre-flight write probe.** `val_build()` now verifies that
+  `val_dir`, `assessed/`, `tempdir()`, and `.libPaths()[1]` are all
+  writable by the current process before dispatching any package
+  assessments; every multisession worker re-probes `tempdir()` and
+  `.libPaths()[1]` at task start (they can differ from the parent).
+  Refuses to proceed with a clear diagnostic naming every offending
+  path plus the effective uid, instead of surfacing hours later as a
+  cryptic assembler EACCES like `can't create simple.o: Permission
+  denied` when a package under assessment hits a read-only mount.
+  Also emits the resolved per-worker `tempdir()` / `.libPaths()[1]`
+  at the verbose log tier so post-mortems can identify which mount
+  was in play. New helpers `probe_writable_dir()` and
+  `assert_writable_dirs()`. (#157)
+
 # val.pipeline 0.1.45
 
 - **Harden multisession workers against environment starvation and
