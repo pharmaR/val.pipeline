@@ -1,3 +1,27 @@
+# val.pipeline 0.1.47
+
+- **Isolate `capture_covr_skip_report()` in a subprocess and add a
+  package skip list.** The follow-on `testthat::test_dir()` run
+  introduced in #150 exposed val.pipeline to native crashes in a
+  package's own test suite (some packages ship hand-rolled OpenMP
+  loops that bypass our worker-side `OMP_NUM_THREADS` caps and can
+  trip glibc `free(): invalid next size (fast)` heap corruption).
+  `capture_covr_skip_report()` now runs the `test_dir()` call inside
+  a `callr::r()` child process by default (`subprocess = TRUE`); a
+  native crash there kills only the child, the worker survives, and
+  the affected package simply gets `covr_skip_report = NULL`.
+  Gracefully falls back to in-process when `callr` isn't installed.
+  Also adds a new `covr_skip_report$skip_pkgs:` field to
+  `inst/config.yml` (belt-and-suspenders: skip child spin-up for
+  packages known to crash), overridable via
+  `options(val.pipeline.covr_skip_report_skip_pkgs = c(...))`.
+  Seeded with `np` (Nonparametric Kernel Smoothing Methods for
+  Mixed Data Types) which reliably tripped the crash on the
+  2026-08-29 run. Adds `callr` to `Suggests` and emits a
+  `val_msg()` naming the offending package source when the child
+  process fails, so operators can distinguish a native crash from
+  ordinary missing skip-report data. (#159)
+
 # val.pipeline 0.1.46
 
 - **Pre-flight write probe.** `val_build()` now verifies that

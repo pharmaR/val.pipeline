@@ -18,6 +18,13 @@ A list with elements:
 \item{threshold}{Numeric(1) on 0-100 scale. Capture runs for
 pkgs whose raw covr_coverage came in below this cutoff. Set
 to \code{100} to capture for every non-auto-accept pkg.}
+\item{skip_pkgs}{Character vector of package names for which
+capture is unconditionally short-circuited (returned \code{NULL}
+without invoking the subprocess). Used to belt-and-suspenders
+package whose test suites are known to crash the child
+process; the \code{subprocess = TRUE} isolation already keeps such
+crashes from taking the worker down, but skipping the child
+spin-up + test-dir walk is still cheaper. Empty by default.}
 }
 }
 \description{
@@ -25,8 +32,10 @@ Reads the \verb{default: covr_skip_report:} block from \code{inst/config.yml}
 (or the caller-supplied \code{config_path}), applies R-option overrides
 set by \code{\link[=val_pipeline]{val_pipeline()}}
 (\code{val.pipeline.capture_covr_skip_report},
-\code{val.pipeline.covr_skip_report_threshold}), validates the shape,
-and returns a two-element list \code{list(capture, threshold)}.
+\code{val.pipeline.covr_skip_report_threshold},
+\code{val.pipeline.covr_skip_report_skip_pkgs}), validates the shape,
+and returns a three-element list
+\code{list(capture, threshold, skip_pkgs)}.
 }
 \details{
 The R-option layer is what lets a user pass

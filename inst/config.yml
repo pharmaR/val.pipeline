@@ -141,15 +141,31 @@ default:
   #     non-auto-accept pkg (i.e. every pkg that actually executed
   #     `assess_covr_coverage`).
   #
-  #   Both keys can be overridden per run via the
-  #   `capture_covr_skip_report` / `covr_skip_report_threshold` args
-  #   on `val_pipeline()`; the args set R options that
-  #   `pull_covr_skip_report_config()` consults before falling back
-  #   to this block.
+  #   skip_pkgs: character vector of package names to
+  #     unconditionally skip capture for. Belt-and-suspenders for
+  #     packages whose test suites are known to crash the child
+  #     process (e.g. via hand-rolled OpenMP loops that bypass
+  #     `OMP_NUM_THREADS`). `capture_covr_skip_report()` already
+  #     isolates the `testthat::test_dir()` run in a `callr::r()`
+  #     subprocess so a native crash there kills only the child,
+  #     but skipping the child spin-up entirely on a known
+  #     offender is still meaningfully cheaper. Seeded with `np`
+  #     (Nonparametric Kernel Smoothing Methods for Mixed Data
+  #     Types) which reliably tripped glibc `free(): invalid next
+  #     size (fast)` heap corruption on the 2026-08-29 run. See
+  #     #159.
+  #
+  #   All three keys can be overridden per run via
+  #   `capture_covr_skip_report`, `covr_skip_report_threshold`, and
+  #   the corresponding R option
+  #   `val.pipeline.covr_skip_report_skip_pkgs` (no `val_pipeline()`
+  #   arg for the skip list yet -- edit the config to change it).
   # ------------------------------------------------------------------
   covr_skip_report:
     capture: true
     threshold: 65
+    skip_pkgs:
+      - np
   # Repo sources for which Posit Package Manager does *not* support
   # curated (allow-list) package lists, and therefore must be shipped
   # as blocklists instead. For each source listed here,

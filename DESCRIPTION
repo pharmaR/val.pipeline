@@ -1,6 +1,6 @@
 Package: val.pipeline
 Title: Validation Pipeline Example
-Version: 0.1.46
+Version: 0.1.47
 Authors@R: 
   c(
     person(
@@ -35,6 +35,7 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Suggests: 
     BiocManager,
+    callr,
     memoise,
     ps,
     future,

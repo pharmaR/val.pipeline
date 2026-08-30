@@ -541,6 +541,18 @@ val_pkg <- function(
       should_capture <- !auto_accepted && skip_cfg$capture &&
         isTRUE(is.finite(coverage_val) &&
                coverage_val < skip_cfg$threshold)
+      if (should_capture && pkg %in% skip_cfg$skip_pkgs) {
+        # Belt-and-suspenders: subprocess isolation in
+        # `capture_covr_skip_report()` already prevents a crashing
+        # child from taking down the worker, but skipping the
+        # child spin-up + full test_dir() walk on packages known to
+        # crash is still meaningfully cheaper. See #159.
+        val_msg(paste0("\n-->", pkg_v,
+          " skipping covr_skip_report (pkg on config ",
+          "`covr_skip_report$skip_pkgs` list).\n"),
+          min_level = "normal")
+        should_capture <- FALSE
+      }
       if (should_capture) {
         val_msg(paste0("\n-->", pkg_v,
           " capturing covr_skip_report (coverage=",

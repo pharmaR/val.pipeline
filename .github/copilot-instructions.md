@@ -289,3 +289,15 @@ over completeness.
   can be `NA_character_` (not `character(0)`) when a pkg has no deps —
   `intersect(NA_character_, x)` returns `character(0)` so the helper is
   safe, but any custom loop must guard against NA.
+
+- #159 covr_skip_report subprocess isolation — `R/utils.R`, `R/val_pkg.R`,
+  `inst/config.yml`. Fact: some CRAN pkgs (e.g. `np`) set OMP thread counts
+  inside their C code, bypassing `OMP_NUM_THREADS`; worker thread caps don't
+  reach them and their `testthat::test_dir()` run can trip glibc
+  `free(): invalid next size (fast)`. `capture_covr_skip_report()` now
+  defaults to `subprocess = TRUE` (callr::r) so a native crash kills only
+  the child; also a config `covr_skip_report$skip_pkgs` list skips the
+  spin-up entirely (seeded with `np`). Trap: pass the impl func by value to
+  `callr::r(func = ...)` — do NOT reference `val.pipeline:::` inside the
+  child, or `devtools::load_all()` sessions and any un-installed run will
+  fail because the child has a fresh libPaths without val.pipeline.
