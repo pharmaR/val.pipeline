@@ -17,7 +17,10 @@
   `options(val.pipeline.covr_skip_report_skip_pkgs = c(...))`.
   Seeded with `np` (Nonparametric Kernel Smoothing Methods for
   Mixed Data Types) which reliably tripped the crash on the
-  2026-08-29 run. (#159)
+  2026-08-29 run. Adds `callr` to `Suggests` and emits a
+  `val_msg()` naming the offending package source when the child
+  process fails, so operators can distinguish a native crash from
+  ordinary missing skip-report data. (#159)
 
 # val.pipeline 0.1.46
 

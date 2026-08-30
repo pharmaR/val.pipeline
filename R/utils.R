@@ -598,8 +598,10 @@ pull_covr_env_vars <- function(config_path = NULL) {
 #' (or the caller-supplied `config_path`), applies R-option overrides
 #' set by [val_pipeline()]
 #' (`val.pipeline.capture_covr_skip_report`,
-#' `val.pipeline.covr_skip_report_threshold`), validates the shape,
-#' and returns a two-element list `list(capture, threshold)`.
+#' `val.pipeline.covr_skip_report_threshold`,
+#' `val.pipeline.covr_skip_report_skip_pkgs`), validates the shape,
+#' and returns a three-element list
+#' `list(capture, threshold, skip_pkgs)`.
 #'
 #' The R-option layer is what lets a user pass
 #' `val_pipeline(capture_covr_skip_report = FALSE)` at the entry point
@@ -833,7 +835,20 @@ capture_covr_skip_report <- function(pkg_source_path,
         show     = FALSE,
         spinner  = FALSE
       ),
-      error = function(e) NULL
+      error = function(e) {
+        # Emit a visible marker so operators can distinguish a
+        # child-side crash (native segfault, timeout, glibc heap
+        # corruption, etc.) from a package that legitimately had no
+        # skip-report data. `basename()` names the offending pkg
+        # source dir; the child's own conditionMessage() usually has
+        # the class name of the failure (callr wraps it).
+        val_msg(sprintf(
+          "capture_covr_skip_report subprocess failed for %s: %s",
+          basename(pkg_source_path),
+          conditionMessage(e)
+        ))
+        NULL
+      }
     ))
   }
 

@@ -4,7 +4,12 @@
 \alias{capture_covr_skip_report}
 \title{Capture a \code{testthat} Skip Report for a Package Source}
 \usage{
-capture_covr_skip_report(pkg_source_path, env_vars = character(0))
+capture_covr_skip_report(
+  pkg_source_path,
+  env_vars = character(0),
+  subprocess = TRUE,
+  timeout = Inf
+)
 }
 \arguments{
 \item{pkg_source_path}{Character(1). Path to an extracted package
@@ -15,6 +20,20 @@ set for the test run via \code{\link[withr:with_envvar]{withr::with_envvar()}}. 
 output of \code{\link[=pull_covr_env_vars]{pull_covr_env_vars()}} so the standalone testthat run
 sees the same env as the covr run and reports the same skip
 population. Empty by default.}
+
+\item{subprocess}{Logical(1). When \code{TRUE} (default), the actual
+\code{testthat::test_dir()} call is run inside a \code{callr::r()} child
+process so a native crash in the package's own tests (e.g.
+glibc heap corruption from a package's uncapped OpenMP loops)
+kills only the child; the worker survives and this pkg simply
+gets \code{covr_skip_report = NULL}. Set to \code{FALSE} to run in-process
+(mostly useful for tests). Falls back to in-process automatically
+if the \code{callr} package isn't installed. See #159.}
+
+\item{timeout}{Numeric(1). Passed through to \code{callr::r(timeout=)}.
+\code{Inf} (default) means no timeout; set a finite value to bound
+worst-case wall-clock cost of a stuck child. Ignored when
+\code{subprocess = FALSE}.}
 }
 \value{
 \code{NULL} on any failure, otherwise a list with two elements:
