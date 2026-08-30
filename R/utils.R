@@ -616,6 +616,13 @@ pull_covr_env_vars <- function(config_path = NULL) {
 #'   \item{threshold}{Numeric(1) on 0-100 scale. Capture runs for
 #'     pkgs whose raw covr_coverage came in below this cutoff. Set
 #'     to `100` to capture for every non-auto-accept pkg.}
+#'   \item{skip_pkgs}{Character vector of package names for which
+#'     capture is unconditionally short-circuited (returned `NULL`
+#'     without invoking the subprocess). Used to belt-and-suspenders
+#'     package whose test suites are known to crash the child
+#'     process; the `subprocess = TRUE` isolation already keeps such
+#'     crashes from taking the worker down, but skipping the child
+#'     spin-up + test-dir walk is still cheaper. Empty by default.}
 #' }
 #'
 #' @keywords internal
@@ -625,16 +632,19 @@ pull_covr_skip_report_config <- function(config_path = NULL) {
     rule_type = "default",
     config_path = config_path
   )
-  capture <- raw$capture %||% TRUE
+  capture   <- raw$capture %||% TRUE
   threshold <- raw$threshold %||% 65
+  skip_pkgs <- raw$skip_pkgs %||% character(0)
 
   # R-option overrides win over config. val_pipeline() sets these on
   # entry (only when the user actually passed a value) and restores
   # them on exit.
   opt_capture <- getOption("val.pipeline.capture_covr_skip_report", NULL)
   opt_thresh  <- getOption("val.pipeline.covr_skip_report_threshold", NULL)
-  if (!is.null(opt_capture)) capture <- opt_capture
+  opt_skip    <- getOption("val.pipeline.covr_skip_report_skip_pkgs", NULL)
+  if (!is.null(opt_capture)) capture   <- opt_capture
   if (!is.null(opt_thresh))  threshold <- opt_thresh
+  if (!is.null(opt_skip))    skip_pkgs <- opt_skip
 
   if (!is.logical(capture) || length(capture) != 1L || is.na(capture)) {
     stop("`covr_skip_report$capture` must be TRUE or FALSE; got ",
@@ -647,7 +657,16 @@ pull_covr_skip_report_config <- function(config_path = NULL) {
          "[0, 100]; got ", format(threshold), ".",
          call. = FALSE)
   }
-  list(capture = capture, threshold = threshold)
+  # skip_pkgs: accept a character vector or NULL; coerce empty/NA
+  # inputs to character(0) so downstream `%in%` checks are trivially
+  # false.
+  if (is.null(skip_pkgs)) skip_pkgs <- character(0)
+  if (!is.character(skip_pkgs)) {
+    stop("`covr_skip_report$skip_pkgs` must be a character vector; got ",
+         format(skip_pkgs), ".", call. = FALSE)
+  }
+  skip_pkgs <- skip_pkgs[!is.na(skip_pkgs) & nzchar(skip_pkgs)]
+  list(capture = capture, threshold = threshold, skip_pkgs = skip_pkgs)
 }
 
 # (Sentinel removed; no longer needed — threshold is always numeric.)
@@ -725,6 +744,18 @@ covr_effective_coverage <- function(coverage_pct, pct_skip) {
 #'   output of [pull_covr_env_vars()] so the standalone testthat run
 #'   sees the same env as the covr run and reports the same skip
 #'   population. Empty by default.
+#' @param subprocess Logical(1). When `TRUE` (default), the actual
+#'   `testthat::test_dir()` call is run inside a `callr::r()` child
+#'   process so a native crash in the package's own tests (e.g.
+#'   glibc heap corruption from a package's uncapped OpenMP loops)
+#'   kills only the child; the worker survives and this pkg simply
+#'   gets `covr_skip_report = NULL`. Set to `FALSE` to run in-process
+#'   (mostly useful for tests). Falls back to in-process automatically
+#'   if the `callr` package isn't installed. See #159.
+#' @param timeout Numeric(1). Passed through to `callr::r(timeout=)`.
+#'   `Inf` (default) means no timeout; set a finite value to bound
+#'   worst-case wall-clock cost of a stuck child. Ignored when
+#'   `subprocess = FALSE`.
 #'
 #' @return `NULL` on any failure, otherwise a list with two elements:
 #'   \describe{
@@ -752,7 +783,9 @@ covr_effective_coverage <- function(coverage_pct, pct_skip) {
 #'
 #' @export
 capture_covr_skip_report <- function(pkg_source_path,
-                                     env_vars = character(0)) {
+                                     env_vars   = character(0),
+                                     subprocess = TRUE,
+                                     timeout    = Inf) {
   # `tests/testthat/` presence is the sole gate. `test_dir()` needs
   # this directory to bootstrap, and its absence is the fast path for
   # tinytest / RUnit / no-tests packages that we deliberately don't
@@ -768,6 +801,57 @@ capture_covr_skip_report <- function(pkg_source_path,
   if (length(env_vars) > 0L && is.null(names(env_vars))) {
     stop("`env_vars` must be a named character vector.", call. = FALSE)
   }
+
+  # Subprocess isolation. `capture_covr_skip_report()` runs a
+  # package's own `testthat::test_dir()` a second time in the worker
+  # process (first pass was covr-instrumented; this pass is not).
+  # Some CRAN/BioC packages ship native code with hand-rolled OpenMP
+  # / pthread that bypasses our worker-side `OMP_NUM_THREADS` caps
+  # and can trip glibc `free(): invalid next size (fast)` heap
+  # corruption on heavy alloc/free churn -- taking the whole worker
+  # (and via future_mapply, sometimes the whole run) down with them.
+  # `np` is the reference case, see #159.
+  #
+  # Running the test_dir() in a `callr::r()` child means a native
+  # crash kills only the child; the worker survives, val_build
+  # continues, and this pkg simply gets `covr_skip_report = NULL`.
+  # `callr` is a transitive dep of testthat/covr so it's virtually
+  # always installed; the requireNamespace() gate falls back to
+  # in-process when it isn't.
+  if (subprocess && requireNamespace("callr", quietly = TRUE)) {
+    # Pass the impl function directly by value to callr::r() so the
+    # child doesn't need val.pipeline installed on its libPaths (also
+    # matters during devtools::load_all() development). The child
+    # still needs `testthat` and `withr`, but those are already in
+    # Imports of val.pipeline so any host that has us has them too.
+    return(tryCatch(
+      callr::r(
+        func = .capture_covr_skip_report_impl,
+        args = list(pkg_source_path = pkg_source_path,
+                    env_vars        = env_vars),
+        timeout  = timeout,
+        show     = FALSE,
+        spinner  = FALSE
+      ),
+      error = function(e) NULL
+    ))
+  }
+
+  .capture_covr_skip_report_impl(pkg_source_path, env_vars)
+}
+
+#' In-process implementation of the skip-report capture
+#'
+#' Extracted from [capture_covr_skip_report()] so `callr::r()` can
+#' invoke the body in a subprocess without recursing back through
+#' the isolation front door. Not exported; direct callers should use
+#' [capture_covr_skip_report()].
+#'
+#' @inheritParams capture_covr_skip_report
+#' @keywords internal
+.capture_covr_skip_report_impl <- function(pkg_source_path,
+                                           env_vars = character(0)) {
+  tests_dir <- file.path(pkg_source_path, "tests", "testthat")
 
   results <- tryCatch({
     withr::with_envvar(
