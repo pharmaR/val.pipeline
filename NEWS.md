@@ -1,3 +1,22 @@
+# val.pipeline 0.1.48
+
+- **Defensive Code coverage row in per-package reports.** The
+  Code coverage row in the summary metric table (and the
+  effective-coverage blockquote) are now wrapped in `tryCatch()`,
+  so a mal-shaped `covr_coverage` field on the assessment object
+  can no longer bleed a raw error like *"Invalid index: field name
+  'covr_coverage' not found"* into the rendered PDF/HTML. On error
+  the row falls back to `Not calculated` and a small note is
+  emitted beneath the metric table naming the field + underlying
+  error message. Also works around a bug in
+  `riskreports::is_risk_error()` that returned `FALSE` for a real
+  `pkg_metric_error` when the object also inherited `simpleError`
+  (this had been surfacing riskmetric's raw
+  `"object 'res' not found"` message as if it were the coverage
+  percentage). Missing `covr_coverage` fields on stubbed
+  assessments now carry the fuller `pkg_metric_covr_coverage`
+  class chain that a real riskmetric error would have. (#161)
+
 # val.pipeline 0.1.47
 
 - **Isolate `capture_covr_skip_report()` in a subprocess and add a

@@ -301,3 +301,17 @@ over completeness.
   `callr::r(func = ...)` — do NOT reference `val.pipeline:::` inside the
   child, or `devtools::load_all()` sessions and any un-installed run will
   fail because the child has a fresh libPaths without val.pipeline.
+
+- #161 report covr_coverage row hardening — `inst/report/package/pkg_template.qmd`.
+  Fact: `riskreports::is_risk_error()` short-circuits `FALSE` for a
+  `pkg_metric_error` that also inherits `simpleError` (its first
+  `is(x, "simpleError")` branch matches before the `pkg_metric_error`
+  branch), so any real riskmetric assessor exception (e.g. `covr_coverage`
+  emitting "object 'res' not found") bypasses the "Not calculated"
+  fallback and the raw error message ends up rendered as if it were
+  the coverage percent. Trap: don't rely on `is_risk_error()` alone in
+  the template — check `inherits(x, "pkg_metric_error")` directly. All
+  covr_coverage row-append + effective-coverage-note blocks are now
+  wrapped in `tryCatch()` with a `.field_error_notes` bucket rendered
+  as a follow-on blockquote so a mal-shaped field is visible but no
+  longer aborts the render.
