@@ -535,7 +535,27 @@ val_pkg <- function(
       #     capture for every non-auto-accept pkg.
       # See #150.
       skip_cfg <- pull_covr_skip_report_config()
-      cov_raw <- pkg_assessment$covr_coverage$totalcoverage %e% NA_real_
+      # `pkg_assessment` is a fresh vctrs `list_of_pkg_metric` here
+      # (its saved-and-reloaded siblings lose the `ptype` attr, but
+      # this in-memory one still carries it). vctrs' `$` and `[[`
+      # methods for `list_of` are strict: reading a name that isn't
+      # in the object throws
+      # `Invalid index: field name 'covr_coverage' not found`
+      # rather than returning NULL. That's exactly the shape of
+      # `pkg_assessment` in the auto_accepted / remote_only branches,
+      # where `assess_covr_coverage` was intentionally dropped from
+      # the metric set — so a plain `pkg_assessment$covr_coverage`
+      # would abort the whole `val_pkg()` call before the coverage
+      # value could even be checked. Bypass the vctrs `$` method
+      # with `.subset2()` (which delegates straight to the
+      # underlying list) and get NULL when the field is absent.
+      # See #161.
+      cov_metric <- .subset2(pkg_assessment, "covr_coverage")
+      cov_raw <- if (is.list(cov_metric)) {
+        cov_metric$totalcoverage %e% NA_real_
+      } else {
+        NA_real_
+      }
       coverage_val <- if (is.null(cov_raw)) NA_real_ else
         suppressWarnings(as.numeric(cov_raw))[1]
       should_capture <- !auto_accepted && skip_cfg$capture &&
