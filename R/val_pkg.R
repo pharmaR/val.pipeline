@@ -535,29 +535,9 @@ val_pkg <- function(
       #     capture for every non-auto-accept pkg.
       # See #150.
       skip_cfg <- pull_covr_skip_report_config()
-      # `pkg_assessment` is a fresh vctrs `list_of_pkg_metric` here
-      # (its saved-and-reloaded siblings lose the `ptype` attr, but
-      # this in-memory one still carries it). vctrs' `$` and `[[`
-      # methods for `list_of` are strict: reading a name that isn't
-      # in the object throws
-      # `Invalid index: field name 'covr_coverage' not found`
-      # rather than returning NULL. That's exactly the shape of
-      # `pkg_assessment` in the auto_accepted / remote_only branches,
-      # where `assess_covr_coverage` was intentionally dropped from
-      # the metric set — so a plain `pkg_assessment$covr_coverage`
-      # would abort the whole `val_pkg()` call before the coverage
-      # value could even be checked. Bypass the vctrs `$` method
-      # with `.subset2()` (which delegates straight to the
-      # underlying list) and get NULL when the field is absent.
-      # See #161.
-      cov_metric <- .subset2(pkg_assessment, "covr_coverage")
-      cov_raw <- if (is.list(cov_metric)) {
-        cov_metric$totalcoverage %e% NA_real_
-      } else {
-        NA_real_
-      }
-      coverage_val <- if (is.null(cov_raw)) NA_real_ else
-        suppressWarnings(as.numeric(cov_raw))[1]
+      # Safe covr_coverage lookup — see pkg_assessment_covr_pct()
+      # for the vctrs-strict-subset rationale (#161).
+      coverage_val <- pkg_assessment_covr_pct(pkg_assessment)
       should_capture <- !auto_accepted && skip_cfg$capture &&
         isTRUE(is.finite(coverage_val) &&
                coverage_val < skip_cfg$threshold)
@@ -943,9 +923,12 @@ val_pkg <- function(
     # for this pkg, tests dir missing, etc.). See
     # `covr_effective_coverage()` in R/utils.R. Issue #150 follow-up.
     covr_effective_coverage = {
-      cov_v <- pkg_assessment$covr_coverage$totalcoverage %e% NA_real_
-      cov_v <- if (is.null(cov_v)) NA_real_ else
-        suppressWarnings(as.numeric(cov_v))[1]
+      # Safe covr_coverage lookup — see pkg_assessment_covr_pct().
+      # The reuse_init / remote_only path bypasses the skip_cfg
+      # block above, so meta_list is the first covr access for
+      # those pkgs; a plain `pkg_assessment$covr_coverage` here
+      # would trip the same vctrs strict-subset error (#161).
+      cov_v <- pkg_assessment_covr_pct(pkg_assessment)
       pct_v <- if (is.null(covr_skip_report) ||
                    covr_skip_report$totals$n_test == 0L) NA_real_
                else 100 * covr_skip_report$totals$n_skip /

@@ -596,7 +596,23 @@ if (length(.field_error_notes) > 0L) {
       "config group (e.g. `remote_only`) that never runs the metric,",
       "or the underlying `riskmetric` assessor errored upstream.\n>\n")
   for (nm in names(.field_error_notes)) {
-    cat(sprintf("> - `%s`: %s\n", nm, .field_error_notes[[nm]]))
+    # Sanitize the captured error message before dumping into an
+    # `asis` chunk. `conditionMessage(e)` can originate from
+    # arbitrary assessed-package code and could contain newlines
+    # (which would escape the blockquote and split the note) or
+    # raw HTML/typst markup (which the pandoc-html / typst
+    # writer would happily emit as live tags). Collapse
+    # whitespace and neutralize the four HTML meta characters
+    # that matter for the HTML render. See #161 review followup.
+    .raw <- as.character(.field_error_notes[[nm]])
+    if (length(.raw) == 0L || is.na(.raw)) .raw <- ""
+    .msg <- gsub("[[:space:]]+", " ", .raw)
+    .msg <- gsub("&", "&amp;", .msg, fixed = TRUE)
+    .msg <- gsub("<", "&lt;",  .msg, fixed = TRUE)
+    .msg <- gsub(">", "&gt;",  .msg, fixed = TRUE)
+    .msg <- gsub("`", "'",     .msg, fixed = TRUE)
+    if (nchar(.msg) > 240L) .msg <- paste0(substr(.msg, 1, 237), "...")
+    cat(sprintf("> - `%s`: %s\n", nm, .msg))
   }
   cat("\n")
 }

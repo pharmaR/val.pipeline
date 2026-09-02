@@ -1,32 +1,14 @@
 # val.pipeline 0.1.48
 
-- **Defensive Code coverage row in per-package reports + `val_pkg()`
-  covr_coverage lookup.** The Code coverage row in the summary
-  metric table (and the effective-coverage blockquote) are now
-  wrapped in `tryCatch()`, so a mal-shaped `covr_coverage` field
-  on the assessment object can no longer bleed a raw error like
-  *"Invalid index: field name 'covr_coverage' not found"* into
-  the rendered PDF/HTML. On error the row falls back to
-  `Not calculated` and a small note is emitted beneath the metric
-  table naming the field + underlying error message. The
-  underlying source of that error was actually inside
-  `val_pkg()`'s covr_skip_report gate: on a fresh in-memory
-  `list_of_pkg_metric`, the vctrs `$` method is strict and
-  throws that exact message when reading a field that isn't in
-  the object — exactly the shape of the assessment in the
-  `auto_accepted` / `remote_only` branches, which drop
-  `assess_covr_coverage` from the metric set on purpose. Swapped
-  to `.subset2()` (bypasses the vctrs method, returns NULL for
-  missing fields) and added an `is.list()` guard before the
-  inner `$totalcoverage` access so a `pkg_metric_na` atomic
-  scalar can't retrigger the same class of error. Also works
-  around a bug in `riskreports::is_risk_error()` that returned
-  `FALSE` for a real `pkg_metric_error` when the object also
-  inherited `simpleError` (this had been surfacing riskmetric's
-  raw `"object 'res' not found"` message as if it were the
-  coverage percentage). Missing `covr_coverage` fields on stubbed
-  assessments now carry the fuller `pkg_metric_covr_coverage`
-  class chain that a real riskmetric error would have. (#161)
+- Harden coverage reporting when `covr_coverage` is missing or
+  malformed (e.g. auto-accepted / `remote_only` packages whose
+  metric set intentionally drops `assess_covr_coverage`, or an
+  upstream `pkg_metric_error` from `riskmetric`). `val_pkg()` and
+  the per-package report template now extract the coverage percent
+  through a strict-subset-safe helper, the Code coverage row falls
+  back to `Not calculated` on failure, and the underlying assessor
+  error is surfaced as an in-report note beneath the summary
+  metric table instead of aborting the render. (#161)
 
 # val.pipeline 0.1.47
 
