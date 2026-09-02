@@ -1,3 +1,15 @@
+# val.pipeline 0.1.48
+
+- **Echo `R_LIBS_SITE` back after mirroring `.libPaths()` in
+  `val_build()`.** The `propagate_libpaths = TRUE` branch already
+  logs that it mirrored the parent session's library search path
+  into `R_LIBS_SITE` for subprocess visibility, but didn't show
+  what value was actually written. Follow-on `val_msg()` now
+  prints `Sys.getenv("R_LIBS_SITE")` so operators can eyeball the
+  ground-truth env-var value a spawned Rscript will inherit
+  (rather than the R-side `.libPaths()`, which subprocesses do
+  not see directly). (#163)
+
 # val.pipeline 0.1.47
 
 - **Isolate `capture_covr_skip_report()` in a subprocess and add a

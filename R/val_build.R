@@ -224,6 +224,13 @@ val_build <- function(
     val_msg(paste0("--> Mirrored .libPaths() into R_LIBS_SITE for ",
                    "subprocess visibility (r_cmd_check, covr_coverage, ...).\n"),
             min_level = "normal")
+    # Echo the resolved env var back so operators can eyeball what
+    # child processes will actually see. Sys.getenv() reads the
+    # process env directly (not the R-side .libPaths()), so this
+    # is the ground-truth view a spawned Rscript would inherit.
+    val_msg(paste0("    R_LIBS_SITE = ",
+                   Sys.getenv("R_LIBS_SITE", unset = "<unset>"), "\n"),
+            min_level = "normal")
   }
 
   # Route pull_config() at any depth to the user-supplied config, if any.
