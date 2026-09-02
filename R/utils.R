@@ -710,6 +710,45 @@ covr_effective_coverage <- function(coverage_pct, pct_skip) {
 }
 
 
+#' Safely Extract `covr_coverage$totalcoverage` from a Package Assessment
+#'
+#' `pkg_assessment` is a `vctrs::list_of_pkg_metric` immediately after
+#' `riskmetric::pkg_assess()`, and vctrs' `$` / `[[` methods on that
+#' class are strict: reading a name that isn't in the object throws
+#' `Invalid index: field name 'covr_coverage' not found` rather than
+#' returning `NULL`. That's the exact shape auto-accepted and
+#' remote-only packages produce, since `val_pkg()` intentionally drops
+#' `assess_covr_coverage` from their metric set to save compute — so a
+#' plain `pkg_assessment$covr_coverage$totalcoverage` aborts the whole
+#' `val_pkg()` call before the value can even be checked.
+#'
+#' This helper bypasses the vctrs method with `.subset2()`, guards the
+#' inner `$totalcoverage` access (a `pkg_metric_na` atomic scalar
+#' would trigger a different "`$` operator is invalid for atomic
+#' vectors" error), coerces to numeric, and returns a length-1 numeric
+#' or `NA_real_`. Use anywhere in `val_pkg()` that needs to read the
+#' coverage percent — do NOT reach into `pkg_assessment$covr_coverage`
+#' directly.
+#'
+#' @param pkg_assessment A `list_of_pkg_metric` as returned by
+#'   [riskmetric::pkg_assess()] (post-[strip_recording()]).
+#'
+#' @return Numeric(1) on 0-100 scale, or `NA_real_` when the field is
+#'   absent, mal-shaped, or errored.
+#'
+#' @keywords internal
+pkg_assessment_covr_pct <- function(pkg_assessment) {
+  cov_metric <- .subset2(pkg_assessment, "covr_coverage")
+  cov_raw <- if (is.list(cov_metric)) {
+    cov_metric$totalcoverage %e% NA_real_
+  } else {
+    NA_real_
+  }
+  if (is.null(cov_raw)) return(NA_real_)
+  suppressWarnings(as.numeric(cov_raw))[1]
+}
+
+
 #' Capture a `testthat` Skip Report for a Package Source
 #'
 #' Runs `testthat::test_dir()` on `<pkg_source_path>/tests/testthat/`

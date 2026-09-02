@@ -69,10 +69,28 @@ required_fields <- c("r_cmd_check", "license", "remote_checks", "covr_coverage")
 # Missing fields
 missing_fields <- setdiff(required_fields, names(d_riskmetric))
 
-# Assign default error structure for missing fields to avoid errors
+# Assign default error structure for missing fields to avoid errors.
+# `covr_coverage` gets the fuller class chain that riskmetric would
+# have emitted for a real covr failure (so downstream `is_risk_error`
+# / dispatch code that keys off `pkg_metric_covr_coverage` behaves
+# consistently whether the field was truly missing or errored
+# upstream). See #161.
+.covr_class <- c("pkg_metric_error", "pkg_metric_condition",
+                 "pkg_metric_covr_coverage", "pkg_metric")
 for (field in missing_fields) {
-  d_riskmetric[[field]] <- structure(NA, class = c("pkg_metric_error", "pkg_metric"))
+  cls <- if (identical(field, "covr_coverage")) {
+    .covr_class
+  } else {
+    c("pkg_metric_error", "pkg_metric")
+  }
+  d_riskmetric[[field]] <- structure(NA, class = cls)
 }
+# Bucket for in-report notes about fields that errored during
+# rendering (populated below by the Code coverage row append).
+# Emitted as a prose paragraph beneath the summary metric table
+# so a reviewer can distinguish "genuinely Not calculated" from
+# "row was suppressed because a field lookup threw". See #161.
+.field_error_notes <- character(0)
 ```
 
 ```{r context, results='asis'}
@@ -419,22 +437,42 @@ if (!riskreports::is_risk_error(.rmt) && length(.rmt) >= 1) {
 # section used to compute (percent for numeric metrics, raw text
 # otherwise) and expose it as a metric-table row. When the metric
 # is unavailable, still render the row with "Not calculated" so the
-# reader knows coverage was considered.
-.cov <- d_riskmetric[["covr_coverage"]]
-.cov_scalar <- if (is.list(.cov)) {
-  if (!is.null(.cov$totalcoverage)) .cov$totalcoverage else .cov[[1]]
-} else {
-  .cov
-}
-.cov_display <- if (!riskreports::is_risk_error(.cov) &&
-                    !is.null(.cov_scalar) && length(.cov_scalar) == 1 &&
-                    !is.na(.cov_scalar) &&
-                    (is.numeric(.cov_scalar) || is.character(.cov_scalar))) {
-  if (is.numeric(.cov_scalar)) sprintf("%.2f%%", .cov_scalar)
-  else as.character(.cov_scalar)
-} else {
+# reader knows coverage was considered. The whole block is wrapped
+# in tryCatch() so that a downstream failure (e.g. a slot access
+# on a mal-shaped `covr_coverage` object that emits
+# "Invalid index: field name 'covr_coverage' not found") can't
+# blow up the entire render. On error we still emit the row (with
+# "Not calculated") and register a note under the metric table
+# naming the failure. See #161.
+.cov_display <- tryCatch({
+  .cov <- d_riskmetric[["covr_coverage"]]
+  # `riskreports::is_risk_error()` has a bug: for a `pkg_metric_error`
+  # that also inherits `simpleError` (the usual shape when riskmetric
+  # captured a real assessor exception like "object 'res' not found"),
+  # its first `is(x, "simpleError")` branch returns FALSE, so the
+  # object escapes the error path and its `$message` string ends up
+  # rendered as if it were the coverage value. Key off the class
+  # directly here instead. See #161.
+  .cov_is_err <- inherits(.cov, "pkg_metric_error") ||
+    isTRUE(riskreports::is_risk_error(.cov))
+  .cov_scalar <- if (is.list(.cov)) {
+    if (!is.null(.cov$totalcoverage)) .cov$totalcoverage else .cov[[1]]
+  } else {
+    .cov
+  }
+  if (!.cov_is_err &&
+      !is.null(.cov_scalar) && length(.cov_scalar) == 1 &&
+      !is.na(.cov_scalar) &&
+      (is.numeric(.cov_scalar) || is.character(.cov_scalar))) {
+    if (is.numeric(.cov_scalar)) sprintf("%.2f%%", .cov_scalar)
+    else as.character(.cov_scalar)
+  } else {
+    "Not calculated"
+  }
+}, error = function(e) {
+  .field_error_notes[["covr_coverage"]] <<- conditionMessage(e)
   "Not calculated"
-}
+})
 .append_row("Code coverage", .cov_display)
 
 # Dedupe against any pre-existing coverage row that `summary_table()`
@@ -541,6 +579,42 @@ if (isTRUE(is_html)) {
 )
 } else {
   knitr::kable(summary_data)
+}
+```
+
+```{r field_error_notes, results='asis'}
+# In-report footnote for any field whose lookup threw during row
+# building (currently only `covr_coverage`, see the tryCatch above).
+# Emitted as a small blockquote directly under the summary metric
+# table so a reviewer can distinguish "genuinely Not calculated"
+# from "row was suppressed because a field lookup errored". See
+# #161.
+if (length(.field_error_notes) > 0L) {
+  cat("\n> **Note:** the following field(s) could not be read from the",
+      "assessment object; their metric rows above default to",
+      "'Not calculated'. This typically means the package was in a",
+      "config group (e.g. `remote_only`) that never runs the metric,",
+      "or the underlying `riskmetric` assessor errored upstream.\n>\n")
+  for (nm in names(.field_error_notes)) {
+    # Sanitize the captured error message before dumping into an
+    # `asis` chunk. `conditionMessage(e)` can originate from
+    # arbitrary assessed-package code and could contain newlines
+    # (which would escape the blockquote and split the note) or
+    # raw HTML/typst markup (which the pandoc-html / typst
+    # writer would happily emit as live tags). Collapse
+    # whitespace and neutralize the four HTML meta characters
+    # that matter for the HTML render. See #161 review followup.
+    .raw <- as.character(.field_error_notes[[nm]])
+    if (length(.raw) == 0L || is.na(.raw)) .raw <- ""
+    .msg <- gsub("[[:space:]]+", " ", .raw)
+    .msg <- gsub("&", "&amp;", .msg, fixed = TRUE)
+    .msg <- gsub("<", "&lt;",  .msg, fixed = TRUE)
+    .msg <- gsub(">", "&gt;",  .msg, fixed = TRUE)
+    .msg <- gsub("`", "'",     .msg, fixed = TRUE)
+    if (nchar(.msg) > 240L) .msg <- paste0(substr(.msg, 1, 237), "...")
+    cat(sprintf("> - `%s`: %s\n", nm, .msg))
+  }
+  cat("\n")
 }
 ```
 
@@ -727,7 +801,7 @@ knitr::kable(.skip_totals_df, align = "lrr")
 # own blockquote paragraph so it stands out from surrounding
 # tables. See #155.
 .cov_raw <- tryCatch(
-  as.numeric(d_riskmetric$covr_coverage$totalcoverage),
+  suppressWarnings(as.numeric(d_riskmetric$covr_coverage$totalcoverage)),
   error = function(e) NA_real_
 )
 .cov_raw <- if (length(.cov_raw) == 0L) NA_real_ else .cov_raw[1]

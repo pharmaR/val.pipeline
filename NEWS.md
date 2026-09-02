@@ -1,5 +1,14 @@
 # val.pipeline 0.1.48
 
+- Harden coverage reporting when `covr_coverage` is missing or
+  malformed (e.g. auto-accepted / `remote_only` packages whose
+  metric set intentionally drops `assess_covr_coverage`, or an
+  upstream `pkg_metric_error` from `riskmetric`). `val_pkg()` and
+  the per-package report template now extract the coverage percent
+  through a strict-subset-safe helper, the Code coverage row falls
+  back to `Not calculated` on failure, and the underlying assessor
+  error is surfaced as an in-report note beneath the summary
+  metric table instead of aborting the render. (#161)
 - **Echo `R_LIBS_SITE` back after mirroring `.libPaths()` in
   `val_build()`.** The `propagate_libpaths = TRUE` branch already
   logs that it mirrored the parent session's library search path
