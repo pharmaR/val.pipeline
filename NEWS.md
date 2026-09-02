@@ -9,6 +9,15 @@
   back to `Not calculated` on failure, and the underlying assessor
   error is surfaced as an in-report note beneath the summary
   metric table instead of aborting the render. (#161)
+- **Echo `R_LIBS_SITE` back after mirroring `.libPaths()` in
+  `val_build()`.** The `propagate_libpaths = TRUE` branch already
+  logs that it mirrored the parent session's library search path
+  into `R_LIBS_SITE` for subprocess visibility, but didn't show
+  what value was actually written. Follow-on `val_msg()` now
+  prints `Sys.getenv("R_LIBS_SITE")` so operators can eyeball the
+  ground-truth env-var value a spawned Rscript will inherit
+  (rather than the R-side `.libPaths()`, which subprocesses do
+  not see directly). (#163)
 
 # val.pipeline 0.1.47
 
