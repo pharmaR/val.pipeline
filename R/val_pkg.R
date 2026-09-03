@@ -828,10 +828,7 @@ val_pkg <- function(
   # A leftover `.render_<pkg>_<ver>/` from a crashed render would
   # otherwise cause `quarto::quarto_render()` to fail with the
   # opaque "Error running quarto CLI from R". See #165.
-  pkg_render_dir <- tempfile(
-    pattern = paste0(".render_", pkg_v, "_"),
-    tmpdir = reports
-  )
+  pkg_render_dir <- pkg_render_scratch_dir(reports, pkg_v)
   dir.create(pkg_render_dir, showWarnings = FALSE, recursive = TRUE)
   on.exit(unlink(pkg_render_dir, recursive = TRUE, force = TRUE),
           add = TRUE)

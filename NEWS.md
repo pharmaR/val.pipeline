@@ -1,3 +1,12 @@
+# val.pipeline 0.1.50
+
+- Factor the per-invocation report scratch dir into a small
+  `pkg_render_scratch_dir()` helper and add regression tests
+  covering repeated allocation and coexistence with a stale
+  legacy `.render_<pkg>_<ver>/` directory. Also drop an
+  unrelated `data.table` entry that had crept into `renv.lock`.
+  (#166)
+
 # val.pipeline 0.1.49
 
 - Give each `val_pkg()` invocation a per-invocation scratch render
