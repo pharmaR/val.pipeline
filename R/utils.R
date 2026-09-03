@@ -2634,3 +2634,30 @@ write_qualified_pkg_lists <- function(
 
   invisible(written)
 }
+
+#' Allocate a unique scratch render directory under `reports/`
+#'
+#' Returns a fresh, not-yet-existing path of the form
+#' `<reports>/.render_<pkg_v>_<random>` for a single `val_pkg()`
+#' report render. Uses [tempfile()] so repeated allocations for the
+#' same `(reports, pkg_v)` pair produce distinct paths, and a stale
+#' legacy `.render_<pkg_v>/` directory left behind by a crashed prior
+#' render never collides with a new allocation. Caller is responsible
+#' for creating and cleaning up the directory.
+#'
+#' @param reports Character(1). Path to the shared `reports/`
+#'   directory. Must already exist (or be creatable by the caller).
+#' @param pkg_v Character(1). Package identifier of the form
+#'   `<pkg>_<version>`, used as a human-readable prefix.
+#'
+#' @return Character(1). Absolute path to a not-yet-existing scratch
+#'   directory under `reports`.
+#'
+#' @keywords internal
+#' @noRd
+pkg_render_scratch_dir <- function(reports, pkg_v) {
+  tempfile(
+    pattern = paste0(".render_", pkg_v, "_"),
+    tmpdir = reports
+  )
+}

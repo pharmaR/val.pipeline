@@ -820,7 +820,15 @@ val_pkg <- function(
   # copy the produced output(s) back into the shared `reports/`
   # afterwards. The parent workflow already indexes reports by their
   # pkg/version filename, so the final layout is unchanged.
-  pkg_render_dir <- file.path(reports, paste0(".render_", pkg_v))
+  #
+  # Also use a per-invocation unique subdir (via `tempfile()` under
+  # `reports/`) so re-running the same package a second time — or
+  # cleaning up after a prior run that was killed before its
+  # `on.exit()` fired — never collides with a stale scratch tree.
+  # A leftover `.render_<pkg>_<ver>/` from a crashed render would
+  # otherwise cause `quarto::quarto_render()` to fail with the
+  # opaque "Error running quarto CLI from R". See #165.
+  pkg_render_dir <- pkg_render_scratch_dir(reports, pkg_v)
   dir.create(pkg_render_dir, showWarnings = FALSE, recursive = TRUE)
   on.exit(unlink(pkg_render_dir, recursive = TRUE, force = TRUE),
           add = TRUE)
