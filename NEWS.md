@@ -1,3 +1,14 @@
+# val.pipeline 0.1.49
+
+- Give each `val_pkg()` invocation a per-invocation scratch render
+  directory (`tempfile()` under `reports/`) instead of a fixed
+  `.render_<pkg>_<ver>/` path. Re-running the same package back-to-
+  back, or recovering after a prior run that was killed before its
+  `on.exit()` cleanup fired, no longer collides with a stale scratch
+  tree — which had been surfacing as the opaque
+  `Error running quarto CLI from R` from `quarto::quarto_render()`.
+  (#165)
+
 # val.pipeline 0.1.48
 
 - Harden coverage reporting when `covr_coverage` is missing or
