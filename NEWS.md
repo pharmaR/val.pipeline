@@ -1,3 +1,19 @@
+# val.pipeline 0.1.51
+
+- Prepend a discovered `pandoc` directory to `PATH` for the final
+  `assess_covr_coverage` run (via new `resolve_covr_pandoc_dir()`
+  + `pull_covr_path_env()` helpers, scoped to the same
+  `withr::with_envvar()` block that already applies
+  `pull_covr_env_vars()`). Fixes a class of silent
+  `covr_coverage` under-reporting on packages whose testthat
+  suites drive `rmarkdown::render()` / `logrx::axecute()` — those
+  test files abort in setup without pandoc, and `riskmetric`'s
+  error-tolerant covr adapter silently drops their coverage.
+  Auto-detects a bundled Quarto pandoc; overridable via
+  `VAL_PIPELINE_PANDOC_DIR`, `RSTUDIO_PANDOC`, or the new
+  `covr_pandoc_dir:` config key. No-op when a system pandoc is
+  already on `PATH`. (#167)
+
 # val.pipeline 0.1.50
 
 - Factor the per-invocation report scratch dir into a small

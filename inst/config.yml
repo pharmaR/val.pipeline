@@ -119,6 +119,26 @@ default:
     NOT_ON_CRAN: ""
     RUN_SLOW_TESTS: "false"
   # ------------------------------------------------------------------
+  # covr_pandoc_dir:
+  #   Explicit override for the directory that should be prepended to
+  #   `PATH` for the `assess_covr_coverage` run, so packages whose
+  #   tests drive `rmarkdown::render()` / `logrx::axecute()` don't
+  #   silently lose coverage when the host lacks `pandoc`. See #167.
+  #
+  #   Leave empty (default) to let `resolve_covr_pandoc_dir()`
+  #   auto-detect, in this order:
+  #     1. `Sys.which("pandoc")` (already on PATH -> no-op),
+  #     2. env var `VAL_PIPELINE_PANDOC_DIR`,
+  #     3. this config key,
+  #     4. env var `RSTUDIO_PANDOC`,
+  #     5. a pandoc bundled inside an installed Quarto
+  #        (`<quarto>/../tools/<arch>/pandoc`, or the highest-versioned
+  #        `/opt/quarto/*/bin/tools/*/pandoc`).
+  #
+  #   Set to the absolute directory containing a `pandoc` binary
+  #   (not the binary path itself) to pin a specific install.
+  covr_pandoc_dir: ""
+  # ------------------------------------------------------------------
   # covr_skip_report:
   #   Controls when `val_pkg()` captures a per-package testthat skip
   #   report alongside `assess_covr_coverage`. The extra

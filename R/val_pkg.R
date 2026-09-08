@@ -496,7 +496,17 @@ val_pkg <- function(
           # just covr_coverage) is deliberate — the env vars are
           # harmless to the other metrics, and this avoids the need to
           # split the pkg_assess() call into two runs.
-          new = pull_covr_env_vars(),
+          #
+          # Layer B PATH augmentation for pandoc (issue #167). Test
+          # files that drive `rmarkdown::render()` / `logrx::axecute()`
+          # abort in setup when `pandoc` isn't on PATH, and
+          # riskmetric's error-tolerant covr adapter silently loses
+          # their coverage contribution. `pull_covr_path_env()` is a
+          # no-op when `pandoc` is already on PATH; otherwise it
+          # prepends a discovered pandoc dir (RSTUDIO_PANDOC, a
+          # bundled Quarto pandoc, or an explicit config/env
+          # override — see `resolve_covr_pandoc_dir()`).
+          new = c(pull_covr_env_vars(), pull_covr_path_env()),
           code = pkg_ref |>
             # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
             riskmetric::pkg_assess(assessments = assess_metrics)
