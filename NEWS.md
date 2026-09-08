@@ -1,3 +1,24 @@
+# val.pipeline 0.1.53
+
+- **Log the `propagate_libpaths` mirror confirmation to the
+  persistent run log, not just the console.** `val_build()` emits
+  two `val_msg()` lines after mirroring `.libPaths()` into
+  `R_LIBS_SITE` (`--> Mirrored .libPaths() into R_LIBS_SITE ...`
+  and `    R_LIBS_SITE = ...`), but they were previously fired
+  BEFORE `init_val_log()` activated the log-file tee, so the
+  on-disk `val_pipeline.log` started with the `=== val_build() @
+  ...` header and gave no evidence of what `R_LIBS_SITE` a run
+  actually mirrored. Days later, an operator triaging an
+  anomalous `covr_coverage` or `r_cmd_check_errors == NA` cohort
+  couldn't verify from the log alone whether propagation ran or
+  what libpaths were in play. Moved the propagate block to
+  immediately after `options(val.pipeline.log_file = log_file)`
+  (still before workers spawn so `R_LIBS_SITE` reaches PSOCK
+  children). Added a top-level-body ordering assertion in
+  `test-propagate-libpaths.R` so a future refactor that
+  re-inverts the order fails testthat instead of silently
+  restoring the blind spot. (#171)
+
 # val.pipeline 0.1.50
 
 - Factor the per-invocation report scratch dir into a small
