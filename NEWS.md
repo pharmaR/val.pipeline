@@ -1,3 +1,19 @@
+# val.pipeline 0.1.52
+
+- Surface a coverage caveat in the per-package report when a
+  package's `Suggests:` dependencies aren't installed at
+  assessment time. `val_pkg()` now attaches
+  `attr(pkg_assessment, "covr_caveat")` with two vectors:
+  `silent_skip_pkgs` (deps that are BOTH missing AND referenced
+  by a `testthat::skip_if_not_installed()` call under `tests/`,
+  so at least one `test_that()` block silently dropped from the
+  covr run) and `missing_suggests` (the broader population).
+  The report template renders a new "Coverage caveat" section
+  beneath the test-skip summary listing both sets, giving
+  reviewers a concrete explanation for the common gap between
+  our `covr_coverage` number and the maintainer's README badge.
+  (#169)
+
 # val.pipeline 0.1.50
 
 - Factor the per-invocation report scratch dir into a small

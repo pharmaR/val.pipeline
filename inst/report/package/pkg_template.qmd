@@ -844,6 +844,83 @@ knitr::kable(.reasons_df, align = "lr")
 ```
 
 
+```{r covr_caveat_prep, include=FALSE}
+# Missing-Suggests coverage caveat (val.pipeline issue #169).
+# `val_pkg()` attaches `attr(pkg_assessment, "covr_caveat")` whenever
+# the final assessment pass included `assess_covr_coverage`, regardless
+# of the reported coverage percent. The attribute is a named list with
+# two character vectors:
+#
+#   * `missing_suggests` -- every `Suggests:` dep from DESCRIPTION that
+#     was NOT installed on `.libPaths()` at assessment time. Broad
+#     population -- these MAY have depressed coverage (via
+#     `library()`-in-setup, non-guarded tests, vignette runs, etc.)
+#     but the link isn't provable from source alone.
+#
+#   * `silent_skip_pkgs` -- the strict subset of `missing_suggests`
+#     that also appears inside a
+#     `testthat::skip_if_not_installed("<pkg>")` call somewhere under
+#     `tests/`. Every entry here is GUARANTEED to have quietly
+#     dropped at least one `test_that()` block from the coverage run.
+#
+# Absent for auto-accepted packages and any assessment.rds that
+# predates #169. When BOTH vectors are empty the caveat isn't
+# attached at all, so this section short-circuits.
+.caveat <- attr(d_riskmetric, "covr_caveat", exact = TRUE)
+.covr_caveat_vec <- function(x) if (is.null(x)) character(0) else x
+.has_covr_caveat <- !is.null(.caveat) && is.list(.caveat) &&
+  (length(.covr_caveat_vec(.caveat$missing_suggests)) > 0L ||
+   length(.covr_caveat_vec(.caveat$silent_skip_pkgs)) > 0L)
+```
+
+```{r covr_caveat_section, eval=.has_covr_caveat, results='asis'}
+.miss   <- .covr_caveat_vec(.caveat$missing_suggests)
+.silent <- .covr_caveat_vec(.caveat$silent_skip_pkgs)
+
+cat("## Coverage caveat: missing Suggests\n\n")
+cat(
+  "The `covr_coverage` percent above was measured against this host's",
+  "installed library. `Suggests:` dependencies that aren't on",
+  "`.libPaths()` at assessment time can silently depress coverage --",
+  "most commonly by triggering",
+  "`testthat::skip_if_not_installed(\"<pkg>\")` inside a `test_that()`",
+  "block, which drops the whole block from the covr run with no error",
+  "and no entry in the `Test skip summary` above unless the block also",
+  "ran a `testthat::skip*()` call the harness could record.\n\n"
+)
+
+if (length(.silent) > 0L) {
+  cat(
+    "**Guaranteed silent skips (", length(.silent),
+    "):** every package below is BOTH missing on this host AND",
+    "referenced by a `skip_if_not_installed()` call under `tests/`,",
+    "so at least one `test_that()` block silently dropped from the",
+    "covr run for each:\n\n", sep = ""
+  )
+  cat(paste0("- `", .silent, "`", collapse = "\n"), "\n\n", sep = "")
+}
+
+.broad <- setdiff(.miss, .silent)
+if (length(.broad) > 0L) {
+  cat(
+    "**Also missing (", length(.broad),
+    "):** listed in `Suggests:` but not explicitly guarded by a",
+    "`skip_if_not_installed()` in `tests/`. These MAY still have",
+    "depressed coverage via vignette runs, examples, or non-guarded",
+    "test setup blocks -- absence of a skip guard just means the",
+    "link isn't provable from source:\n\n", sep = ""
+  )
+  cat(paste0("- `", .broad, "`", collapse = "\n"), "\n\n", sep = "")
+}
+
+cat(
+  "Reproducing the maintainer's CI number (typically closer to their",
+  "`README` badge) usually requires installing at least the",
+  "guaranteed-silent-skip set above and re-running.\n\n"
+)
+```
+
+
 # Installation environment
 
 

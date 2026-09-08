@@ -749,6 +749,201 @@ pkg_assessment_covr_pct <- function(pkg_assessment) {
 }
 
 
+#' List `Suggests:` deps not installed on the current `.libPaths()`
+#'
+#' Silent covr under-reporting vector #3 (after `skip_on_cran()`,
+#' neutralized via `covr_env_vars:`, and riskmetric's error-tolerant
+#' covr adapter): a `testthat::skip_if_not_installed("pkg")` call
+#' fires quietly when `pkg` isn't on `.libPaths()`, taking the whole
+#' `test_that()` block with it and dropping the covered code path's
+#' coverage contribution to zero with no signal for the reviewer.
+#' This helper is the "broad" probe used by [val_pkg()] to surface
+#' the raw population of at-risk deps; see also
+#' [test_skip_if_not_installed_refs()] for the narrower "will
+#' definitely fire" subset. See #169.
+#'
+#' Reads the package's `DESCRIPTION` from `pkg_source_path` (the
+#' same tarball-extracted source directory used everywhere else in
+#' `val_pkg()`), splits the `Suggests:` field, strips any version
+#' constraint (`(>= 1.2.0)`), and returns the names that don't
+#' resolve via [find.package()]. Base packages listed in Suggests
+#' (a rarity but possible) are treated the same as any other name —
+#' `find.package("methods")` succeeds and they're excluded.
+#'
+#' Returns `character(0)` when no `DESCRIPTION` is found, when the
+#' `Suggests:` field is absent, or when every listed dep is
+#' installed. Callers should treat a zero-length result as "no
+#' caveat to surface", not an error.
+#'
+#' @param pkg_source_path Character(1). Absolute path to an
+#'   extracted package source tree (the parent of the tarball's
+#'   `DESCRIPTION`).
+#'
+#' @return Character vector of missing Suggests package names, in
+#'   the same order they appear in `DESCRIPTION`. Zero-length if
+#'   nothing to surface.
+#'
+#' @keywords internal
+#' @noRd
+missing_suggests_for_pkg <- function(pkg_source_path) {
+  if (!is.character(pkg_source_path) || length(pkg_source_path) != 1L ||
+      !nzchar(pkg_source_path) || !dir.exists(pkg_source_path)) {
+    return(character(0))
+  }
+  desc_file <- file.path(pkg_source_path, "DESCRIPTION")
+  if (!file.exists(desc_file)) return(character(0))
+
+  desc <- tryCatch(read.dcf(desc_file), error = function(e) NULL)
+  if (is.null(desc) || !("Suggests" %in% colnames(desc))) {
+    return(character(0))
+  }
+
+  raw <- desc[1L, "Suggests"]
+  if (is.na(raw) || !nzchar(raw)) return(character(0))
+
+  # Strip version constraints like "(>= 1.2.0)" and split on commas +
+  # embedded whitespace/newlines.
+  entries <- unlist(strsplit(gsub("\\s*\\([^)]*\\)", "", raw), "[,\\s]+",
+                             perl = TRUE))
+  entries <- trimws(entries)
+  entries <- entries[nzchar(entries)]
+  if (length(entries) == 0L) return(character(0))
+
+  installed <- vapply(entries, is_pkg_installed, logical(1))
+  unname(entries[!installed])
+}
+
+
+#' Test whether a package is installed on the current `.libPaths()`
+#'
+#' Trivial wrapper around [find.package()] used by
+#' [missing_suggests_for_pkg()]. Exists as its own function purely
+#' so tests can stub it via [testthat::local_mocked_bindings()] —
+#' mocking `find.package` directly doesn't work because it's an
+#' imported base binding, not a val.pipeline namespace binding.
+#'
+#' @param pkg Character(1). Package name.
+#'
+#' @return Logical(1).
+#'
+#' @keywords internal
+#' @noRd
+is_pkg_installed <- function(pkg) {
+  length(find.package(pkg, quiet = TRUE)) > 0L
+}
+
+
+#' Extract packages referenced by `skip_if_not_installed("...")` in tests
+#'
+#' Narrows the [missing_suggests_for_pkg()] population to the subset
+#' actually gating a `test_that()` block via
+#' `testthat::skip_if_not_installed("<pkg>")`. Any name returned
+#' here that isn't installed is *guaranteed* to fire a silent skip
+#' at test time — the strongest possible signal for the covr
+#' caveat. See #169.
+#'
+#' Implementation is intentionally a text grep, not an AST walk:
+#' the pattern is unambiguous, the false-positive rate is
+#' vanishingly small (nobody writes
+#' `skip_if_not_installed("...")` in a comment expecting it to be
+#' inert), and an AST walk would need to `parse()` every test file
+#' in every source tree just to catch a case that doesn't happen.
+#' Handles both single- and double-quoted first args and tolerates
+#' `testthat::` qualifiers.
+#'
+#' Scans `tests/**/*.R` — testthat and non-testthat layouts both
+#' land under `tests/`, so a single recursive glob covers every
+#' shape we support.
+#'
+#' @param pkg_source_path Character(1). Absolute path to an
+#'   extracted package source tree.
+#'
+#' @return Character vector of unique referenced package names,
+#'   sorted. Zero-length if no `tests/` dir, no `.R` files, or no
+#'   references.
+#'
+#' @keywords internal
+#' @noRd
+test_skip_if_not_installed_refs <- function(pkg_source_path) {
+  if (!is.character(pkg_source_path) || length(pkg_source_path) != 1L ||
+      !nzchar(pkg_source_path) || !dir.exists(pkg_source_path)) {
+    return(character(0))
+  }
+  tests_dir <- file.path(pkg_source_path, "tests")
+  if (!dir.exists(tests_dir)) return(character(0))
+
+  test_files <- list.files(tests_dir, pattern = "\\.R$",
+                           recursive = TRUE, full.names = TRUE,
+                           ignore.case = TRUE)
+  if (length(test_files) == 0L) return(character(0))
+
+  # (?:testthat::)? qualifier, then skip_if_not_installed, then the
+  # opening paren + optional whitespace, then the first quoted arg.
+  # Both quote styles.
+  pat <- '(?:testthat::)?skip_if_not_installed\\s*\\(\\s*["\']([^"\']+)["\']'
+
+  hits <- character(0)
+  for (f in test_files) {
+    lines <- tryCatch(readLines(f, warn = FALSE, encoding = "UTF-8"),
+                      error = function(e) character(0))
+    if (length(lines) == 0L) next
+    m <- regmatches(lines, regexec(pat, lines, perl = TRUE))
+    for (mm in m) {
+      if (length(mm) >= 2L) hits <- c(hits, mm[[2L]])
+    }
+  }
+  sort(unique(hits))
+}
+
+
+#' Package a covr coverage caveat for surfacing in the per-package report
+#'
+#' Composes the two probes ([missing_suggests_for_pkg()] and
+#' [test_skip_if_not_installed_refs()]) into a small named list
+#' shaped for direct consumption by the per-package
+#' `{riskreports}` template. Called from [val_pkg()] whenever the
+#' final assessment pass included `assess_covr_coverage`,
+#' regardless of the resulting coverage number — the caveat is
+#' useful even on packages that came in high (it lets a reviewer
+#' say "yes, coverage would be even higher if X, Y were
+#' installed"). See #169.
+#'
+#' The `silent_skip_pkgs` slot is the intersection of the two
+#' probes: packages that are BOTH missing on `.libPaths()` AND
+#' referenced inside a `skip_if_not_installed()` call in the
+#' package's tests. Entries here are guaranteed to have dropped
+#' coverage on this host; entries in `missing_suggests` but not
+#' `silent_skip_pkgs` might still have (vignettes, examples, non-
+#' skip-guarded tests calling `library(...)` in setup) but the
+#' link isn't provable from the source alone.
+#'
+#' Returns `NULL` when both probes return empty — the report
+#' template treats `NULL` as "nothing to surface" and omits the
+#' callout entirely, which is the desired behavior for a package
+#' whose Suggests are all installed.
+#'
+#' @param pkg_source_path Character(1). Absolute path to an
+#'   extracted package source tree.
+#'
+#' @return Named list with elements `missing_suggests` (character)
+#'   and `silent_skip_pkgs` (character), or `NULL` if both are
+#'   empty.
+#'
+#' @keywords internal
+#' @noRd
+compose_covr_caveat <- function(pkg_source_path) {
+  missing_s <- missing_suggests_for_pkg(pkg_source_path)
+  skip_refs <- test_skip_if_not_installed_refs(pkg_source_path)
+  silent    <- intersect(skip_refs, missing_s)
+  if (length(missing_s) == 0L && length(silent) == 0L) return(NULL)
+  list(
+    missing_suggests = missing_s,
+    silent_skip_pkgs = silent
+  )
+}
+
+
+
 #' Capture a `testthat` Skip Report for a Package Source
 #'
 #' Runs `testthat::test_dir()` on `<pkg_source_path>/tests/testthat/`

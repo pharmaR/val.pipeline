@@ -570,6 +570,25 @@ val_pkg <- function(
           attr(pkg_assessment, "covr_skip_report") <- covr_skip_report
         }
       }
+
+      # Coverage caveat — proactive companion to `covr_skip_report`
+      # (issue #169). The skip report only fires when covr came in
+      # below the capture threshold and only surfaces raw testthat
+      # `Reason:` strings after the fact; the caveat runs
+      # unconditionally on the non-auto-accept branch, is essentially
+      # free (a DESCRIPTION read + a grep across `tests/`), and pins
+      # the exact `Suggests:` deps that either are silently gating a
+      # `skip_if_not_installed()` block on this host
+      # (`silent_skip_pkgs`) or are broadly missing and *might* be
+      # contributing to a lower-than-expected coverage number
+      # (`missing_suggests`). `NULL` when both probes come back empty
+      # so the report template can omit the callout entirely.
+      covr_caveat <- compose_covr_caveat(
+        pkg_source_path = file.path(sourced, pkg)
+      )
+      if (!is.null(covr_caveat)) {
+        attr(pkg_assessment, "covr_caveat") <- covr_caveat
+      }
     }
     
   
