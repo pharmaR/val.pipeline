@@ -954,7 +954,14 @@ val_build <- function(
           # parent. Log the resolved paths on first task so
           # post-mortems can identify which mount was in play. See
           # #157.
-          val.pipeline:::assert_writable_dirs(
+          # Bare name (rather than `val.pipeline:::`) so R CMD check
+          # doesn't flag an unnecessary `:::` on an internal object
+          # (#175). Works because future.apply's globals detection
+          # boots the val.pipeline namespace on each PSOCK worker
+          # before deserializing this closure -- the same mechanism
+          # that lets `assess_one` / `val_msg` below resolve via
+          # bare name.
+          assert_writable_dirs(
             c(tempdir    = tempdir(),
               libpaths_1 = .libPaths()[1]),
             uid     = as.character(Sys.info()[["effective_user"]]),

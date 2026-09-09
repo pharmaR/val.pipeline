@@ -1,3 +1,26 @@
+# val.pipeline 0.1.58
+
+- **Clean up R CMD check WARNINGs and the Windows-only test error
+  surfaced by CI on #174.** Three CRAN-hygiene fixes plus one
+  cross-platform correctness fix, no behavioral change to the
+  pipeline. (1) `data.table` and `vctrs` added to Suggests -- the
+  former is used via `requireNamespace()` in `val_build()`'s
+  worker-thread cap (`R/val_build.R:884`), the latter via
+  `vctrs::list_of` in `tests/testthat/test-pkg_assessment_covr_pct.R`
+  to reconstruct riskmetric's assessment object shape. (2) The
+  `val.pipeline:::assert_writable_dirs(...)` call in the worker
+  closure (`R/val_build.R:957`) switched to a bare name -- the
+  namespace is already booted on each PSOCK worker by
+  future.apply's globals detection (that's how `assess_one` and
+  `val_msg` resolve there), so the `:::` was unnecessary and
+  R CMD check flagged it. (3) `probe_writable_dir()` now closes
+  the connection *before* attempting `file.remove()`; the previous
+  `on.exit(close(con))` ordering fired the close after the remove,
+  so on Windows the still-open file handle silently blocked the
+  removal and left a `.val_pipeline_probe_*` file behind --
+  breaking the `test-write_probe.R` "probe file should be cleaned
+  up" assertion. (#175)
+
 # val.pipeline 0.1.57
 
 - **Propagate a valid `HOME` into covr's test child so pandoc-using
