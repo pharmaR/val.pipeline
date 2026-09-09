@@ -39,8 +39,6 @@
   highest-versioned Quarto selection, the directory-named-`pandoc`
   edge case, and the empty-PATH guard. (#167)
 
-# val.pipeline 0.1.51
-
 - Prepend a discovered `pandoc` directory to `PATH` for the final
   `assess_covr_coverage` run (via new `resolve_covr_pandoc_dir()`
   + `pull_covr_path_env()` helpers, scoped to the same
