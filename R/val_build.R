@@ -207,32 +207,6 @@ val_build <- function(
   configure_bioc_repositories_if_requested(quiet = TRUE)
   configure_riskmetric_offline_if_requested(quiet = TRUE)
 
-  # Mirror the parent session's .libPaths() into R_LIBS_SITE so every
-  # subprocess spawned by riskmetric (rcmdcheck::rcmdcheck for the
-  # r_cmd_check metric, covr::package_coverage for covr_coverage, ...)
-  # sees the same library search order. A fresh R subprocess does NOT
-  # inherit interactive .libPaths() from the parent — it rebuilds its
-  # search order from R_LIBS_SITE / R_LIBS_USER / R_LIBS + site
-  # defaults. Without this mirror, an operator who pointed .libPaths()
-  # at an rv-provisioned library (typical for the val.pipeline "install
-  # via rv" flow) sees ~65% of packages come back with r_cmd_check_
-  # errors/_warnings == NA because R CMD check can't find their deps.
-  # Restored on exit via withr::local_envvar. See #99.
-  if (isTRUE(propagate_libpaths)) {
-    new_r_libs_site <- paste(.libPaths(), collapse = .Platform$path.sep)
-    withr::local_envvar(c(R_LIBS_SITE = new_r_libs_site))
-    val_msg(paste0("--> Mirrored .libPaths() into R_LIBS_SITE for ",
-                   "subprocess visibility (r_cmd_check, covr_coverage, ...).\n"),
-            min_level = "normal")
-    # Echo the resolved env var back so operators can eyeball what
-    # child processes will actually see. Sys.getenv() reads the
-    # process env directly (not the R-side .libPaths()), so this
-    # is the ground-truth view a spawned Rscript would inherit.
-    val_msg(paste0("    R_LIBS_SITE = ",
-                   Sys.getenv("R_LIBS_SITE", unset = "<unset>"), "\n"),
-            min_level = "normal")
-  }
-
   # Route pull_config() at any depth to the user-supplied config, if any.
   old_cfg <- options()["val.pipeline.config_path"]
   on.exit(options(old_cfg), add = TRUE)
@@ -369,7 +343,41 @@ val_build <- function(
   )
   old_log_opts <- options(val.pipeline.log_file = log_file)
   on.exit(options(old_log_opts), add = TRUE)
-  
+
+  # Mirror the parent session's .libPaths() into R_LIBS_SITE so every
+  # subprocess spawned by riskmetric (rcmdcheck::rcmdcheck for the
+  # r_cmd_check metric, covr::package_coverage for covr_coverage, ...)
+  # sees the same library search order. A fresh R subprocess does NOT
+  # inherit interactive .libPaths() from the parent — it rebuilds its
+  # search order from R_LIBS_SITE / R_LIBS_USER / R_LIBS + site
+  # defaults. Without this mirror, an operator who pointed .libPaths()
+  # at an rv-provisioned library (typical for the val.pipeline "install
+  # via rv" flow) sees ~65% of packages come back with r_cmd_check_
+  # errors/_warnings == NA because R CMD check can't find their deps.
+  # Restored on exit via withr::local_envvar. See #99.
+  #
+  # Deliberately placed AFTER `options(val.pipeline.log_file = ...)` so
+  # the `val_msg()` confirmation lines tee to the persistent log (not
+  # just the console) — earlier positions were console-only, leaving
+  # operators unable to verify from the log alone what libpaths a run
+  # actually mirrored. Still runs BEFORE `future::plan(multisession)`
+  # spawns workers, so `R_LIBS_SITE` is in the parent process env when
+  # PSOCK workers inherit it. See #171.
+  if (isTRUE(propagate_libpaths)) {
+    new_r_libs_site <- paste(.libPaths(), collapse = .Platform$path.sep)
+    withr::local_envvar(c(R_LIBS_SITE = new_r_libs_site))
+    val_msg(paste0("--> Mirrored .libPaths() into R_LIBS_SITE for ",
+                   "subprocess visibility (r_cmd_check, covr_coverage, ...).\n"),
+            min_level = "normal")
+    # Echo the resolved env var back so operators can eyeball what
+    # child processes will actually see. Sys.getenv() reads the
+    # process env directly (not the R-side .libPaths()), so this
+    # is the ground-truth view a spawned Rscript would inherit.
+    val_msg(paste0("    R_LIBS_SITE = ",
+                   Sys.getenv("R_LIBS_SITE", unset = "<unset>"), "\n"),
+            min_level = "normal")
+  }
+
   #
   # ---- Build pkg bundles ----
   #
