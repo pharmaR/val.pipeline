@@ -246,7 +246,7 @@ val_pipeline_report <- function(
   if (is.null(subtitle)) {
     subtitle <- paste0(
       "R ", paste(r_vers, collapse = ", "),
-      " \u2014 ",
+      " -- ",
       paste(val_dates, collapse = ", ")
     )
   }

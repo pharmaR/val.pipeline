@@ -344,8 +344,8 @@ cat("The 'pre-filter step' runs `riskmetric`'s `remote_reduce` rules over ",
     "the entire candidate universe (using recent remote metrics stored in ",
     "`{riskscore}`) to identify ",
     "packages worth running a full assessment on. Only packages ",
-    "categorised as **Low** risk here \u2014 plus any explicitly ",
-    "allow-listed in the `pass_primary` config \u2014 proceed to ",
+    "categorised as **Low** risk here -- plus any explicitly ",
+    "allow-listed in the `pass_primary` config -- proceed to ",
     "`val_build()`.\n\n", sep = "")
 ```
 
@@ -472,7 +472,7 @@ if (is_html) {
       "but did not qualify for a full assessment run (either their ",
       "pre-filter risk was above `Low`, or they were absent from the ",
       "`pass_primary` allow-list). Their raw metric values are shown for ",
-      "context \u2014 these are the reasons `val_build()` never opened ",
+      "context -- these are the reasons `val_build()` never opened ",
       "them.\n\n", sep = "")
 } else {
   cat(format(n_dropped_ap, big.mark = ","),

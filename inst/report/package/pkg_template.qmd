@@ -688,7 +688,7 @@ cat(sprintf("This package has %s first-order dependenc%s:\n\n",
 .deps_show <- .deps_df
 names(.deps_show) <- c("Package", "Type")[seq_len(ncol(.deps_show))]
 if ("Type" %in% names(.deps_show)) {
-  .deps_show$Type[is.na(.deps_show$Type) | !nzchar(.deps_show$Type)] <- "—"
+  .deps_show$Type[is.na(.deps_show$Type) | !nzchar(.deps_show$Type)] <- "--"
 }
 print(knitr::kable(.deps_show, row.names = FALSE))
 cat("\n\n")
@@ -733,7 +733,7 @@ if (.has_skip_report) {
     "package source with the same environment-variable overrides",
     "(`NOT_CRAN=true`, `TESTTHAT=true`, `_R_CHECK_FORCE_SUGGESTS_=false`;",
     "see `inst/config.yml`) as the `covr_coverage` run above. It shows",
-    "which `test_that()` blocks were skipped and — where available — the",
+    "which `test_that()` blocks were skipped and -- where available -- the",
     "message passed to `testthat::skip*()`. A block that was skipped",
     "here also contributed *nothing* to the `covr_coverage` percentage,",
     "so a large `Skipped` bar is the most common explanation for a",
@@ -825,7 +825,7 @@ cat(
   "`testthat::skip()` / `skip_if()` / `skip_on_cran()` / etc. by the",
   "package's own test suite, ranked by how many `test_that()` blocks",
   "each message accounted for. The wording is whatever the package",
-  "maintainer wrote — some messages are self-explanatory",
+  "maintainer wrote -- some messages are self-explanatory",
   "(`\"On CRAN\"`, `\"internet required\"`), others reference the",
   "package's private testing-depth machinery (e.g.",
   "`\"testing depth 3 is below current testing specification 5\"`",
