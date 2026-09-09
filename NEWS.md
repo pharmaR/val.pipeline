@@ -16,7 +16,13 @@
   is already set to a non-empty value and otherwise resolves a
   valid dir (`path.expand("~")` → `tempdir()` fallback), and layered
   it into `val_pkg`'s two covr call sites (main `pkg_assess()` +
-  `capture_covr_skip_report()`). (#173)
+  `capture_covr_skip_report()`). `val_build()` also emits a
+  one-shot confirmation line at run start reporting the resolved
+  pandoc dir (or a warning when no dir was found) and the HOME
+  state (either the value inherited from the parent, or the
+  fallback dir being injected), so post-run triage against
+  `val_pipeline.log` can confirm both were in place without
+  having to rerun any diagnostics. (#173)
 
 # val.pipeline 0.1.56
 
