@@ -558,7 +558,9 @@ val_build <- function(
               depends_direct  = NA_character_,
               suggests_direct = NA_character_,
               rev_deps = NA_character_,
-              assessment_runtime = list(txt = NA_character_, mins = NA)
+              assessment_runtime = list(txt = NA_character_, mins = NA),
+              assess_mins = NA_real_,
+              skip_report_mins = NA_real_
             )
             tryCatch(saveRDS(err_meta, pkg_meta_file),
                      error = function(e3) invisible(NULL))
@@ -673,7 +675,9 @@ val_build <- function(
         depends_direct  = if(identical(depends_direct,  character(0))) NA_character_ else depends_direct,
         suggests_direct = if(identical(suggests_direct, character(0))) NA_character_ else suggests_direct,
         rev_deps = NA_character_,
-        assessment_runtime = list(txt = NA_character_, mins = NA)
+        assessment_runtime = list(txt = NA_character_, mins = NA),
+        assess_mins = NA_real_,
+        skip_report_mins = NA_real_
       )
       saveRDS(pkg_meta, pkg_meta_file)
       val_msg("\n-->", pkg_v,"meta bundle saved.\n", min_level = "verbose")

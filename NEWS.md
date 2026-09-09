@@ -1,3 +1,21 @@
+# val.pipeline 0.1.59
+
+- **Break out per-phase runtime in the summary report's "Slowest
+  packages" table.** Instead of a single `Runtime` column, the table
+  now shows three: **Assess** (the `pkg_assess()` initial + final
+  passes, i.e. covr time), **Skip report** (the
+  `capture_covr_skip_report()` `testthat::test_dir()` replay time,
+  `-` when the phase didn't fire), and **Total** (existing
+  wall-clock). Lets operators distinguish covr-heavy packages
+  (candidates for `remote_only`) from skip-report-heavy packages
+  (candidates for `covr_skip_report$skip_pkgs` in `inst/config.yml`)
+  at a glance. Plumbed by adding `assess_mins` and
+  `skip_report_mins` scalars to the per-package meta bundle in
+  `val_pkg()` (populated from the existing `val_time_block()` map)
+  and to the dep-skip / error meta bundles in `val_build()` so
+  `val_finalize()` binds aligned columns onto `qual_metadata.rds`.
+  Template guards against older bundles missing the fields. (#177)
+
 # val.pipeline 0.1.58
 
 - **Clean up R CMD check WARNINGs and the Windows-only test error

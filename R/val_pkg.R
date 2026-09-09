@@ -961,6 +961,36 @@ val_pkg <- function(
     suggests_direct = if(identical(suggests_direct, character(0))) NA_character_ else suggests_direct,
     rev_deps = if(is.null(pkg_assessment$reverse_dependencies)) NA_character_ else pkg_assessment$reverse_dependencies |> as.vector(),
     assessment_runtime = list(txt = ass_mins_txt, mins = ass_mins),
+    # Phase-level runtime breakdown (issue #177). Populated from the
+    # per-phase timings map so the summary report's "Slowest packages"
+    # table can distinguish `pkg_assess()` cost from the extra
+    # `capture_covr_skip_report()` `testthat::test_dir()` replay:
+    #   * `assess_mins` — `assess_initial` + `assess_final` phases (the
+    #     two `pkg_assess()` calls; `assess_final` drives
+    #     `covr::package_coverage()`). Slow here => `remote_only`
+    #     candidate.
+    #   * `skip_report_mins` — the `skip_report` phase. Only fires when
+    #     `capture_covr_skip_report()` re-ran `testthat::test_dir()`
+    #     to attribute a below-threshold coverage. `NA_real_` when the
+    #     phase didn't run. Slow here (relative to `assess_mins`) =>
+    #     `covr_skip_report$skip_pkgs` candidate in `inst/config.yml`.
+    # `assessment_runtime$mins` above is the total wall-clock
+    # (includes download / untar / decision / report emission), so the
+    # summary template just renders these two as the breakdown and
+    # keeps `assessment_runtime_mins` as "Total". See
+    # `val_time_block()` in R/verbosity.R for the underlying
+    # accounting.
+    assess_mins = {
+      t <- get_pkg_timings()
+      secs <- sum(unlist(t[c("assess_initial", "assess_final")]),
+                  na.rm = TRUE)
+      if (isTRUE(secs > 0)) secs / 60 else NA_real_
+    },
+    skip_report_mins = {
+      t <- get_pkg_timings()
+      if (!is.null(t[["skip_report"]])) sum(t[["skip_report"]]) / 60
+      else NA_real_
+    },
     # Testthat skip report scalars (issue #150). Populated when
     # `assess_covr_coverage` was included in the final pass (i.e.
     # `!auto_accepted`) and the package ships a `tests/testthat/`

@@ -825,21 +825,51 @@ if (length(rt) > 0L) {
 ## Slowest packages
 
 Sourced as the 50 slowest per-package assessments; use the page-size
-control to browse fewer rows at a time.
+control to browse fewer rows at a time. Columns break the wall-clock
+runtime into two components so operators can decide how to reclaim it:
+
+- **Assess** — the two `pkg_assess()` calls (initial + final).
+  `assess_final` runs `covr::package_coverage()`, so this is the covr
+  cost. Slow here => candidate for `remote_only` (skip the local
+  covr pass entirely).
+- **Skip report** — the `capture_covr_skip_report()` phase. Only
+  fires when a package's `covr_coverage` came in below threshold and
+  the report re-runs `testthat::test_dir()` in a subprocess to
+  attribute skip reasons. Slow here (relative to **Assess**) =>
+  candidate for `covr_skip_report$skip_pkgs` in `inst/config.yml`.
+- **Total** — wall-clock end-to-end (`assessment_runtime_mins`).
 
 ```{r slowest-pkgs}
 if (length(rt) > 0L) {
-  slow_df <- qual_metadata |>
-    dplyr::mutate(runtime_mins = as.numeric(assessment_runtime_mins)) |>
-    dplyr::filter(!is.na(runtime_mins)) |>
-    dplyr::arrange(dplyr::desc(runtime_mins)) |>
+  # Older `qual_metadata.rds` files (pre-#177) won't have the phase
+  # breakdown scalars -- back-fill with NA so the transmute below is
+  # column-safe regardless of vintage. Report still degrades to the
+  # single-column "Runtime" behavior when neither field is present.
+  slow_src <- qual_metadata
+  if (!"assess_mins" %in% names(slow_src))
+    slow_src$assess_mins <- NA_real_
+  if (!"skip_report_mins" %in% names(slow_src))
+    slow_src$skip_report_mins <- NA_real_
+
+  slow_df <- slow_src |>
+    dplyr::mutate(
+      total_mins       = as.numeric(assessment_runtime_mins),
+      assess_mins_num  = suppressWarnings(as.numeric(assess_mins)),
+      skip_mins_num    = suppressWarnings(as.numeric(skip_report_mins))
+    ) |>
+    dplyr::filter(!is.na(total_mins)) |>
+    dplyr::arrange(dplyr::desc(total_mins)) |>
     dplyr::slice_head(n = 50) |>
     dplyr::transmute(
       Package = pkg,
       Version = ver,
       `Final decision` = as.character(final_decision),
-      Runtime = vapply(runtime_mins, format_hm, character(1)),
-      `Runtime (mins)` = round(runtime_mins, 2)
+      Assess       = vapply(assess_mins_num, format_hm, character(1)),
+      `Skip report` = vapply(skip_mins_num,   format_hm, character(1)),
+      Total        = vapply(total_mins,      format_hm, character(1)),
+      `Assess (mins)`      = round(assess_mins_num, 2),
+      `Skip report (mins)` = round(skip_mins_num, 2),
+      `Total (mins)`       = round(total_mins, 2)
     )
   itable(slow_df, default_page_size = 10)
 } else {
