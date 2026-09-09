@@ -322,6 +322,52 @@ get_pkg_timings <- function() {
 }
 
 
+#' Extract per-phase runtime minutes from the `val_time_block()` store
+#'
+#' Helpers that pull specific phase totals out of the map returned by
+#' [get_pkg_timings()] and convert them from seconds to minutes.
+#' Factored out of [val_pkg()]'s `meta_list` construction so tests
+#' exercise the same expressions that populate the meta bundle
+#' (rather than a hand-copied duplicate) -- see the #178 review.
+#'
+#' * `pkg_assess_mins()` sums the `assess_initial` + `assess_final`
+#'   phases (the two `riskmetric::pkg_assess()` calls). Returns
+#'   `NA_real_` when neither phase fired (e.g. the `reuse_init` /
+#'   `remote_only` short-circuits in [val_build()], or a failure
+#'   before the initial assessment).
+#' * `pkg_skip_report_mins()` returns the `skip_report` phase total
+#'   (the `capture_covr_skip_report()` `testthat::test_dir()` replay)
+#'   or `NA_real_` when the phase didn't fire (skip-report disabled,
+#'   coverage above threshold, or the package is in
+#'   `covr_skip_report$skip_pkgs`).
+#'
+#' Both helpers take an already-materialised timings map (rather than
+#' calling [get_pkg_timings()] themselves) so a single val_pkg()
+#' meta_list construction only pulls the option once. Tests may pass
+#' a hand-built map for controlled input.
+#'
+#' @param timings Named list of numeric vectors, shaped like the
+#'   output of [get_pkg_timings()]. Missing / non-list input coerces
+#'   to `list()` (both helpers then return `NA_real_`).
+#' @return Numeric(1) minutes, or `NA_real_`.
+#' @keywords internal
+pkg_assess_mins <- function(timings) {
+  if (!is.list(timings)) return(NA_real_)
+  secs <- sum(unlist(timings[c("assess_initial", "assess_final")]),
+              na.rm = TRUE)
+  if (isTRUE(secs > 0)) secs / 60 else NA_real_
+}
+
+#' @rdname pkg_assess_mins
+#' @keywords internal
+pkg_skip_report_mins <- function(timings) {
+  if (!is.list(timings) || is.null(timings[["skip_report"]])) {
+    return(NA_real_)
+  }
+  sum(timings[["skip_report"]]) / 60
+}
+
+
 #' Emit a one-line-per-package summary at the "minimal" tier
 #'
 #' Formats a compact "\code{   [decision]  <pkg> v<ver>  (elapsed)}"

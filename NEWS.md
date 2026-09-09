@@ -1,3 +1,41 @@
+# val.pipeline 0.1.59
+
+- **Fix `<U+2014>` fallback in the summary report subtitle and a few
+  other body strings on C-locale sessions.** When `LC_CTYPE=C` (the
+  default on many workbench-job runners), any `\u2014` (em dash)
+  built inside R and then written to a "native" text connection ---
+  Quarto's YAML params file, `knitr::kable()`, `cat()` output ---
+  can't be encoded and R substitutes the literal `<U+2014>` marker.
+  All six R-emitted em-dash sites (subtitle in
+  `val_pipeline_report()`, two `cat()` blocks in the summary
+  template's pre-filter section, two `cat()` blocks in the package
+  template's covr-skip and skip-messages preambles, and the
+  `Type == NA/""` placeholder in the package-template first-order-
+  deps table) now emit ASCII `---`, which pandoc's smart-punctuation
+  pass renders back to a real em dash in HTML/PDF output regardless
+  of locale (`--` alone would render as an en dash, not em dash, so
+  `---` is the right ASCII pre-image). Markdown body text in the
+  `.qmd` templates (never round-tripped through R) is unchanged.
+  (#177)
+
+- **Break out per-phase runtime in the summary report's "Slowest
+  packages" table.** Instead of a single `Runtime` column, the table
+  now shows three: **Assess** (the `pkg_assess()` initial + final
+  passes; on the slow tail this is almost always covr time, but
+  auto-accepted final passes drop `assess_covr_coverage` so it is
+  not universally covr), **Skip report** (the
+  `capture_covr_skip_report()` `testthat::test_dir()` replay time,
+  `-` when the phase didn't fire), and **Total** (existing
+  wall-clock). Lets operators distinguish covr-heavy packages
+  (candidates for `remote_only`) from skip-report-heavy packages
+  (candidates for `covr_skip_report$skip_pkgs` in `inst/config.yml`)
+  at a glance. Plumbed by adding `assess_mins` and
+  `skip_report_mins` scalars to the per-package meta bundle in
+  `val_pkg()` (populated from the existing `val_time_block()` map)
+  and to the dep-skip / error meta bundles in `val_build()` so
+  `val_finalize()` binds aligned columns onto `qual_metadata.rds`.
+  Template guards against older bundles missing the fields. (#177)
+
 # val.pipeline 0.1.58
 
 - **Clean up R CMD check WARNINGs and the Windows-only test error
