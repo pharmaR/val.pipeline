@@ -1,3 +1,23 @@
+# val.pipeline 0.1.57
+
+- **Propagate a valid `HOME` into covr's test child so pandoc-using
+  packages don't silently under-report coverage in headless
+  workbench-job / cron / container contexts.** Pandoc refuses to
+  launch when `HOME` is unset and `rmarkdown::pandoc_available()`
+  surfaces that refusal as an R error rather than a clean `FALSE`,
+  which manifests as a *test error* (not a `skip()`) inside covr's
+  `R CMD BATCH --vanilla` child. Test errors don't register in
+  `capture_covr_skip_report()`'s `top_reasons` table, so the
+  coverage delta appears completely unattributed — concretely,
+  `logrx` came in at 90% from an interactive RStudio session and
+  59.9% from an identical `val_build("logrx")` call launched as a
+  Posit Workbench Local Job. Added a `pull_covr_home_env()` sibling
+  to `pull_covr_path_env()` that returns `character(0)` when `HOME`
+  is already set to a non-empty value and otherwise resolves a
+  valid dir (`path.expand("~")` → `tempdir()` fallback), and layered
+  it into `val_pkg`'s two covr call sites (main `pkg_assess()` +
+  `capture_covr_skip_report()`). (#173)
+
 # val.pipeline 0.1.56
 
 - **Log the `propagate_libpaths` mirror confirmation to the

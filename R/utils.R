@@ -775,6 +775,72 @@ pull_covr_path_env <- function(config_path = NULL) {
 }
 
 
+#' Compose the `HOME` env-var entry that keeps pandoc happy in headless jobs
+#'
+#' Pandoc refuses to launch when `HOME` is unset — it fails with
+#' `"The 'HOME' environment variable must be set before running
+#' Pandoc."` before any `--version` / `--data-dir` handling. Because
+#' `rmarkdown::pandoc_available()` calls pandoc via
+#' `with_pandoc_safe_environment()`, this refusal surfaces as an R
+#' *error* (not a clean `FALSE`), which in turn causes every
+#' rmarkdown-touching test file in the assessed package to error
+#' during setup during covr's `R CMD BATCH --vanilla` child. Those
+#' errors don't register as `testthat::skip()`s in our
+#' `capture_covr_skip_report()` totals, so ~30 percentage points of
+#' coverage can silently vanish (concretely: `logrx` was 90% in an
+#' interactive RStudio session and 59.9% in a Posit Workbench Local
+#' Job launched from the same driver script). See #173.
+#'
+#' Interactive RStudio sessions inherit `HOME` from the login shell.
+#' Workbench Local Jobs, cron-launched sessions, container entry
+#' points that call `env -i`, and CI runners that scrub the parent
+#' environment do not — and that's the exact universe of
+#' non-interactive contexts we care about. This helper returns a
+#' one-element named character vector suitable for splicing into
+#' the `new =` argument of [withr::with_envvar()], and is a no-op
+#' (empty vector) when `HOME` is already set to a non-empty value.
+#'
+#' Resolution order when `HOME` is unset:
+#' 1. `path.expand("~")` — on POSIX, R falls back to `getpwuid()`
+#'    when `HOME` is unset, so this usually yields a real home dir
+#'    (e.g. `/home/aclark02`) without us having to parse
+#'    `/etc/passwd` ourselves.
+#' 2. `tempdir()` — last-resort valid dir; pandoc only needs `HOME`
+#'    to point at *something* usable, not the user's real home.
+#'
+#' Callers should splice this alongside [pull_covr_env_vars()] and
+#' [pull_covr_path_env()]:
+#'
+#' ```
+#' withr::with_envvar(
+#'   new  = c(
+#'     pull_covr_env_vars(),
+#'     pull_covr_path_env(),
+#'     pull_covr_home_env()
+#'   ),
+#'   code = ...
+#' )
+#' ```
+#'
+#' @return Named character(1) `c(HOME = "<dir>")` or `character(0)`.
+#'
+#' @keywords internal
+#' @noRd
+pull_covr_home_env <- function() {
+  home <- Sys.getenv("HOME", unset = "")
+  if (nzchar(home)) return(character(0))
+  # path.expand("~") consults HOME first, then getpwuid() on POSIX.
+  # Wrap defensively -- on locked-down containers even the passwd
+  # lookup can fail, in which case we fall back to tempdir().
+  guess <- tryCatch(path.expand("~"), error = function(e) "")
+  if (!is.character(guess) || !nzchar(guess) || identical(guess, "~") ||
+      !dir.exists(guess)) {
+    guess <- tempdir()
+  }
+  stats::setNames(guess, "HOME")
+}
+
+
 #' Resolve the effective `covr_skip_report` configuration for the
 #' current run
 #'
