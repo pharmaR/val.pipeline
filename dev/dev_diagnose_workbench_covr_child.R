@@ -141,17 +141,29 @@ res <- withr::with_envvar(
   new = c(
     R_LIBS_SITE = new_r_libs_site,
     val.pipeline:::pull_covr_env_vars(),
-    val.pipeline:::pull_covr_path_env()
+    val.pipeline:::pull_covr_path_env(),
+    # #173: `pull_covr_home_env()` is the fix this diagnostic
+    # motivated, so include it here to mirror val_pkg's actual
+    # `with_envvar()` block. Without it, `rmarkdown::pandoc_available()`
+    # in the parent-side probe below can *error* (not return FALSE)
+    # in headless workbench-job contexts where HOME is unset, and
+    # the whole script blows up before ever reaching the child
+    # fingerprint the diagnostic is meant to capture.
+    val.pipeline:::pull_covr_home_env()
   ),
   code = {
     # Confirm what the parent sees INSIDE with_envvar (this is what the
     # covr child inherits from).
     cat("Inside with_envvar():\n")
     cat("  PATH             = ", Sys.getenv("PATH"),        "\n", sep = "")
+    cat("  HOME             = ", Sys.getenv("HOME", unset = "<unset>"), "\n", sep = "")
     cat("  RSTUDIO_PANDOC   = ", Sys.getenv("RSTUDIO_PANDOC", unset = "<unset>"), "\n", sep = "")
     cat("  R_LIBS_SITE      = ", Sys.getenv("R_LIBS_SITE"),  "\n", sep = "")
     cat("  Sys.which(pandoc)= ", Sys.which("pandoc"),        "\n", sep = "")
-    cat("  pandoc_available = ", rmarkdown::pandoc_available(), "\n", sep = "")
+    cat("  pandoc_available = ",
+        tryCatch(rmarkdown::pandoc_available(),
+                 error = function(e) paste("<err>", conditionMessage(e))),
+        "\n", sep = "")
 
     # This is exactly what riskmetric's pkg_ref_cache.covr_coverage.pkg_source does.
     expr <- bquote(tools::testInstalledPackage(.("logrx"), types = "tests"))

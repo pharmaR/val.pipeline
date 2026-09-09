@@ -393,7 +393,23 @@ val_build <- function(
   # this line to confirm both were set up correctly for the run.
   pandoc_dir <- tryCatch(resolve_covr_pandoc_dir(),
                          error = function(e) character(0))
-  if (length(pandoc_dir) == 0L) {
+  # `resolve_covr_pandoc_dir()` returns `character(0)` in TWO
+  # semantically opposite cases: (a) success -- pandoc is already
+  # on PATH so no augmentation is needed; and (b) failure -- no
+  # candidate could be located anywhere. Interpreting the empty
+  # vector as failure would emit a "NO pandoc dir resolved"
+  # warning every time an interactive RStudio session (with
+  # pandoc already on PATH) or a container with pandoc baked in
+  # runs the pipeline, which is exactly the healthy case. So
+  # peek at `Sys.which("pandoc")` first to disambiguate.
+  pandoc_on_path <- unname(Sys.which("pandoc"))
+  if (nzchar(pandoc_on_path)) {
+    val_msg(paste0("--> Pandoc discovery: already on PATH at '",
+                   pandoc_on_path,
+                   "' (covr's R CMD BATCH child will inherit it). ",
+                   "See #167.\n"),
+            min_level = "normal")
+  } else if (length(pandoc_dir) == 0L) {
     val_msg(paste0("--> Pandoc discovery: NO pandoc dir resolved. ",
                    "Packages that render R Markdown in their tests ",
                    "(e.g. logrx, officer) may under-report coverage. ",

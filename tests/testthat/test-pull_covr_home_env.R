@@ -22,7 +22,7 @@ test_that("pull_covr_home_env() returns a valid dir when HOME is unset", {
   })
 })
 
-test_that("pull_covr_home_env() is a no-op when HOME is empty (belt-and-suspenders)", {
+test_that("pull_covr_home_env() returns a valid dir when HOME is empty string", {
   # Empty-string HOME behaves like unset for our purposes -- we
   # still need to provide a valid dir.
   withr::with_envvar(new = c(HOME = ""), {
