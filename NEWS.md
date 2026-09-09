@@ -1,4 +1,4 @@
-# val.pipeline 0.1.53
+# val.pipeline 0.1.56
 
 - **Log the `propagate_libpaths` mirror confirmation to the
   persistent run log, not just the console.** `val_build()` emits
@@ -18,6 +18,61 @@
   `test-propagate-libpaths.R` so a future refactor that
   re-inverts the order fails testthat instead of silently
   restoring the blind spot. (#171)
+
+# val.pipeline 0.1.55
+
+- Surface a coverage caveat in the per-package report when a
+  package's `Suggests:` dependencies aren't installed at
+  assessment time. `val_pkg()` now attaches
+  `attr(pkg_assessment, "covr_caveat")` with two vectors:
+  `silent_skip_pkgs` (deps that are BOTH missing AND referenced
+  by a `testthat::skip_if_not_installed()` call under `tests/`)
+  and `missing_suggests` (the broader population). The
+  per-package report renders a new "Coverage caveat" section
+  beneath the test-skip summary, and the values also propagate
+  into `qual_metadata.rds` as two list-columns
+  (`covr_caveat_missing_suggests`,
+  `covr_caveat_silent_skip_pkgs`) so the summary report can
+  aggregate a cohort-level "Missing Suggests" table without
+  reading every `_assessments.rds` artifact.
+
+  Language relaxed in response to the review of the initial
+  patch: the `silent_skip_pkgs` intersection is described as
+  "likely" / "at-risk" rather than "guaranteed" in the roxygen,
+  the per-package report, and the summary report. The detector
+  is a text grep and can match commented-out or unreachable
+  `skip_if_not_installed()` calls, so treat the number as a
+  strong signal, not proof. (#169)
+
+# val.pipeline 0.1.54
+
+- Harden the `#167` pandoc-on-PATH resolver against Copilot review
+  findings: reject overrides whose `pandoc` entry is a directory
+  rather than a file; normalize `Sys.which("quarto")` before
+  probing its sibling `tools/` dir so a symlink on PATH doesn't
+  send discovery to the wrong tree; match `pandoc.exe` in the
+  Quarto probes on Windows; skip the `PATH` separator when the
+  inherited PATH is empty so covr's test child doesn't accidentally
+  pick up executables from its working dir; and pass the
+  pandoc-augmented PATH into `capture_covr_skip_report()` so the
+  skip-count subprocess sees the same environment as the main
+  covr run. Adds tests for the config-backed override, the
+  highest-versioned Quarto selection, the directory-named-`pandoc`
+  edge case, and the empty-PATH guard. (#167)
+
+- Prepend a discovered `pandoc` directory to `PATH` for the final
+  `assess_covr_coverage` run (via new `resolve_covr_pandoc_dir()`
+  + `pull_covr_path_env()` helpers, scoped to the same
+  `withr::with_envvar()` block that already applies
+  `pull_covr_env_vars()`). Fixes a class of silent
+  `covr_coverage` under-reporting on packages whose testthat
+  suites drive `rmarkdown::render()` / `logrx::axecute()` — those
+  test files abort in setup without pandoc, and `riskmetric`'s
+  error-tolerant covr adapter silently drops their coverage.
+  Auto-detects a bundled Quarto pandoc; overridable via
+  `VAL_PIPELINE_PANDOC_DIR`, `RSTUDIO_PANDOC`, or the new
+  `covr_pandoc_dir:` config key. No-op when a system pandoc is
+  already on `PATH`. (#167)
 
 # val.pipeline 0.1.50
 

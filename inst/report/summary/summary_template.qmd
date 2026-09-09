@@ -1080,6 +1080,115 @@ if (nrow(top_skippers) > 0L) {
 }
 ```
 
+## Missing Suggests (covr coverage caveat)
+
+Proactive companion to the skip summary above (see #169 and its
+review follow-up). For each non-auto-accepted package `val_pkg()`
+scans `DESCRIPTION`'s `Suggests:` against `installed.packages()`
+on the assessment host and records two vectors on
+`qual_metadata`:
+
+- **`covr_caveat_missing_suggests`** — every `Suggests:` dep that
+  isn't installed at assessment time. Any of these can silently
+  depress `covr_coverage` via vignette runs, examples, or non-
+  skip-guarded test setup.
+- **`covr_caveat_silent_skip_pkgs`** — the strict subset of the
+  above that is ALSO referenced by a
+  `testthat::skip_if_not_installed("<pkg>")` call under
+  `tests/`. These are the strongest signal for a silent covr
+  drop, but the detector is a text grep, so it can also match
+  commented-out example calls or unreachable conditionals —
+  treat the number as "likely," not "guaranteed."
+
+Missing columns are backfilled with empty list-cols so historical
+`qual_metadata.rds` files predating this feature still render.
+
+```{r covr-caveat-backfill, eval = TRUE, echo = FALSE}
+for (col in c("covr_caveat_missing_suggests",
+              "covr_caveat_silent_skip_pkgs")) {
+  if (!col %in% names(qual_metadata)) {
+    qual_metadata[[col]] <- vector("list", nrow(qual_metadata))
+  }
+}
+# A row "has caveat data" if either list-col slot is non-null and
+# non-empty. Purely for the eval gate below; the per-row tallies
+# handle NULL slots directly.
+.caveat_len <- function(v) {
+  vapply(v, function(x) {
+    if (is.null(x)) 0L
+    else if (is.character(x)) length(x)
+    else 0L
+  }, integer(1))
+}
+qual_metadata$.n_missing_suggests <-
+  .caveat_len(qual_metadata$covr_caveat_missing_suggests)
+qual_metadata$.n_silent_skip <-
+  .caveat_len(qual_metadata$covr_caveat_silent_skip_pkgs)
+has_covr_caveat <- any(qual_metadata$.n_missing_suggests > 0L) ||
+                   any(qual_metadata$.n_silent_skip > 0L)
+```
+
+```{r covr-caveat-distribution, eval = has_covr_caveat}
+caveat_tbl <- tibble::tibble(
+  Bucket = c(
+    "0 missing Suggests",
+    "1-2 missing",
+    "3-5 missing",
+    "6-10 missing",
+    "11+ missing",
+    "(any) with at least 1 likely silent skip"
+  ),
+  Packages = c(
+    sum(qual_metadata$.n_missing_suggests == 0L),
+    sum(qual_metadata$.n_missing_suggests >= 1L &
+        qual_metadata$.n_missing_suggests <= 2L),
+    sum(qual_metadata$.n_missing_suggests >= 3L &
+        qual_metadata$.n_missing_suggests <= 5L),
+    sum(qual_metadata$.n_missing_suggests >= 6L &
+        qual_metadata$.n_missing_suggests <= 10L),
+    sum(qual_metadata$.n_missing_suggests >= 11L),
+    sum(qual_metadata$.n_silent_skip > 0L)
+  )
+) |>
+  dplyr::mutate(Percent = sprintf("%.1f%%", 100 * Packages / nrow(qual_metadata)))
+kable(caveat_tbl, align = "lrr")
+```
+
+```{r covr-caveat-top-offenders, eval = has_covr_caveat}
+# Top 25 packages ranked by likely-silent-skip count (strongest
+# signal), breaking ties on total missing Suggests. Filter to
+# packages with at least one item in either bucket so the table
+# reflects only actionable rows.
+caveat_top <- qual_metadata |>
+  dplyr::filter(.data$.n_missing_suggests > 0L |
+                .data$.n_silent_skip > 0L) |>
+  dplyr::transmute(
+    Package = .data$pkg,
+    Version = .data$ver,
+    `Likely silent skips`  = as.integer(.data$.n_silent_skip),
+    `Missing Suggests`     = as.integer(.data$.n_missing_suggests),
+    `Silent-skip pkgs` = vapply(
+      .data$covr_caveat_silent_skip_pkgs,
+      function(v) if (is.null(v) || length(v) == 0L) "-"
+                  else paste(v, collapse = ", "),
+      character(1)
+    )
+  ) |>
+  dplyr::arrange(
+    dplyr::desc(.data$`Likely silent skips`),
+    dplyr::desc(.data$`Missing Suggests`)
+  ) |>
+  utils::head(25)
+
+if (nrow(caveat_top) > 0L) {
+  itable(caveat_top, default_page_size = 10)
+} else {
+  cat("No packages had any missing Suggests on this host at",
+      "assessment time. `covr_coverage` should reflect the",
+      "maintainer's own CI number for every package in the cohort.\n")
+}
+```
+
 ## R CMD check outcomes
 
 ```{r rcmd-check, eval = has_assessments && all(c("r_cmd_check_errors","r_cmd_check_warnings") %in% names(qa))}

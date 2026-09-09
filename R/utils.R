@@ -591,6 +591,190 @@ pull_covr_env_vars <- function(config_path = NULL) {
 }
 
 
+#' Locate a `pandoc` binary to expose to the covr assessment run
+#'
+#' Some packages' testthat suites (e.g. anything exercising
+#' `rmarkdown::render()`, `knitr::knit()`, or `logrx::axecute()`)
+#' abort in `setup` when `pandoc` isn't on `PATH`. Because
+#' `riskmetric`'s covr adapter deliberately swallows test-file
+#' errors (`type = "none"` + a hand-rolled `code =` — see
+#' `riskmetric:::pkg_ref_cache.covr_coverage.pkg_source`), the whole
+#' file's covered-line contribution silently drops to 0 and
+#' `covr_coverage` comes in tens of pp below what the same package's
+#' own CI reports. See #167.
+#'
+#' This helper returns the directory that should be prepended to
+#' `PATH` for the covr run, using the first of these that resolves:
+#'
+#' 1. If `pandoc` is already on `PATH` — return `character(0)`
+#'    (nothing to augment; caller applies no PATH change).
+#' 2. `Sys.getenv("VAL_PIPELINE_PANDOC_DIR")` — explicit user escape
+#'    hatch. Validated the same way the config value is (must
+#'    contain a `pandoc`/`pandoc.exe` regular file); an override
+#'    that points at a non-existent dir, a dir with no pandoc, or a
+#'    subdirectory happening to be named `pandoc` silently falls
+#'    through to the next probe rather than surfacing a broken PATH
+#'    later.
+#' 3. Config `default: covr_pandoc_dir:` (see `inst/config.yml`).
+#' 4. `Sys.getenv("RSTUDIO_PANDOC")` — the convention RStudio uses
+#'    to point R sessions at its bundled pandoc, honored by
+#'    `rmarkdown`/`knitr`. If set and contains a `pandoc`
+#'    executable, return it.
+#' 5. The pandoc that ships inside Quarto. Two probes, in order:
+#'      * `../tools/<arch>/pandoc` relative to `Sys.which("quarto")`,
+#'      * `Sys.glob("/opt/quarto/*/bin/tools/*/pandoc")` (Linux
+#'        Posit-Team default install layout — falls back to the
+#'        highest-versioned match).
+#' 6. Otherwise `character(0)`; the caller should proceed
+#'    unaugmented and covr_coverage will simply come in low, as it
+#'    does today.
+#'
+#' The function never mutates the parent session's env — it only
+#' resolves a path string. `val_pkg()` composes it into the same
+#' `withr::with_envvar()` block that already applies
+#' [pull_covr_env_vars()].
+#'
+#' @param config_path Character(1) or `NULL`. Passed straight through
+#'   to [pull_config()]; the same resolution rules apply.
+#'
+#' @return Character(1) directory path suitable for prepending to
+#'   `PATH`, or `character(0)` if pandoc is already available or no
+#'   candidate could be located.
+#'
+#' @keywords internal
+#' @noRd
+resolve_covr_pandoc_dir <- function(config_path = NULL) {
+  # 1. Already on PATH -> nothing to do.
+  if (nzchar(Sys.which("pandoc"))) {
+    return(character(0))
+  }
+
+  is_pandoc_dir <- function(dir) {
+    if (!is.character(dir) || length(dir) != 1L || !nzchar(dir)) return(FALSE)
+    exe <- file.path(dir, if (.Platform$OS.type == "windows") "pandoc.exe" else "pandoc")
+    # Require a regular file, not a directory happening to be named
+    # `pandoc` -- otherwise a bogus override survives here and the
+    # caller ends up prepending a dir whose "executable" can't
+    # actually be exec'd.
+    file.exists(exe) && !dir.exists(exe)
+  }
+
+  # 2. Explicit env-var override.
+  ov_env <- Sys.getenv("VAL_PIPELINE_PANDOC_DIR", unset = "")
+  if (nzchar(ov_env) && is_pandoc_dir(ov_env)) return(ov_env)
+
+  # 3. Config override.
+  ov_cfg <- tryCatch(
+    pull_config(val = "covr_pandoc_dir", rule_type = "default",
+                config_path = config_path),
+    error = function(e) NULL
+  )
+  if (!is.null(ov_cfg) && length(ov_cfg) == 1L &&
+      is.character(ov_cfg) && nzchar(ov_cfg) && is_pandoc_dir(ov_cfg)) {
+    return(as.character(ov_cfg))
+  }
+
+  # 4. RSTUDIO_PANDOC.
+  rs <- Sys.getenv("RSTUDIO_PANDOC", unset = "")
+  if (nzchar(rs) && is_pandoc_dir(rs)) return(rs)
+
+  # 5a. Quarto binary sibling: `<quarto>/../tools/<arch>/pandoc`.
+  #     `Sys.which("quarto")` returns whatever's on PATH, which is
+  #     often a symlink into the real install root (e.g.
+  #     `/usr/local/bin/quarto` -> `/opt/quarto/1.8/bin/quarto`);
+  #     without `normalizePath()` the `tools/` glob below searches
+  #     under the symlink's directory (`/usr/local/bin/tools`)
+  #     instead of Quarto's install tree. On Windows the pandoc
+  #     binary is `pandoc.exe`, so match that too.
+  q_raw <- Sys.which("quarto")
+  if (nzchar(q_raw)) {
+    q <- tryCatch(normalizePath(q_raw, mustWork = FALSE),
+                  error = function(e) q_raw)
+    q_bin <- dirname(q)
+    p_exe <- if (.Platform$OS.type == "windows") "pandoc.exe" else "pandoc"
+    cand <- Sys.glob(file.path(q_bin, "tools", "*", p_exe))
+    cand <- cand[file.exists(cand)]
+    if (length(cand)) return(dirname(cand[1]))
+  }
+
+  # 5b. Posit-Team default layout: /opt/quarto/<ver>/bin/tools/<arch>/pandoc.
+  #    Pick the highest-versioned match so we don't get stuck on an old
+  #    installation. Probe path is exposed via an option so tests can
+  #    disable it without depending on the host filesystem, or point
+  #    it at a temp-tree emulation. The version-extraction regex is
+  #    intentionally structural (pulls the segment two levels above
+  #    `pandoc`, i.e. `<ver>/bin/tools/<arch>/pandoc`) so a test can
+  #    reuse it under `tempdir()` without depending on `/opt/quarto`.
+  probe_glob <- getOption(
+    "val.pipeline.quarto_pandoc_probe_glob",
+    if (.Platform$OS.type == "windows")
+      "/opt/quarto/*/bin/tools/*/pandoc.exe"
+    else
+      "/opt/quarto/*/bin/tools/*/pandoc"
+  )
+  if (is.character(probe_glob) && length(probe_glob) == 1L && nzchar(probe_glob)) {
+    cand <- Sys.glob(probe_glob)
+    cand <- cand[file.exists(cand)]
+    if (length(cand)) {
+      vers <- sub(".*/([^/]+)/bin/tools/[^/]+/pandoc(\\.exe)?$", "\\1", cand)
+      ord <- order(numeric_version(vers, strict = FALSE), decreasing = TRUE)
+      return(dirname(cand[ord[1]]))
+    }
+  }
+
+  # 6. Give up quietly.
+  character(0)
+}
+
+
+#' Compose the `PATH` env-var entry that exposes a resolved pandoc dir
+#'
+#' Thin wrapper around [resolve_covr_pandoc_dir()] that returns a
+#' single-element named character vector suitable for merging into
+#' the `new =` argument of [withr::with_envvar()]: the resolved
+#' pandoc dir is prepended to the current `PATH` (respecting
+#' `.Platform$path.sep`), or `character(0)` is returned when no
+#' augmentation is needed. See #167.
+#'
+#' Callers should splice this alongside [pull_covr_env_vars()]:
+#'
+#' ```
+#' withr::with_envvar(
+#'   new  = c(pull_covr_env_vars(), pull_covr_path_env()),
+#'   code = ...
+#' )
+#' ```
+#'
+#' The wrapper is a no-op (empty vector) whenever `pandoc` is
+#' already on `PATH`, so it's safe to unconditionally include it in
+#' every covr assessment call site.
+#'
+#' @inheritParams resolve_covr_pandoc_dir
+#'
+#' @return Named character(1) `c(PATH = "<pandoc_dir>:<old PATH>")`
+#'   or `character(0)`.
+#'
+#' @keywords internal
+#' @noRd
+pull_covr_path_env <- function(config_path = NULL) {
+  dir <- resolve_covr_pandoc_dir(config_path = config_path)
+  if (length(dir) == 0L) return(character(0))
+  old_path <- Sys.getenv("PATH")
+  # Don't paste a bare separator on an empty PATH -- POSIX shells and
+  # some `execvp()` implementations interpret an empty PATH component
+  # as "the current working directory", which would silently make
+  # covr's test child pick up whatever executables live in the test
+  # cwd. This is only a real risk when the parent has an unset/empty
+  # PATH (rare in production but easy to hit in restricted test
+  # harnesses), but the guard is essentially free.
+  new_path <- if (nzchar(old_path))
+    paste(dir, old_path, sep = .Platform$path.sep)
+  else
+    dir
+  stats::setNames(new_path, "PATH")
+}
+
+
 #' Resolve the effective `covr_skip_report` configuration for the
 #' current run
 #'
@@ -747,6 +931,211 @@ pkg_assessment_covr_pct <- function(pkg_assessment) {
   if (is.null(cov_raw)) return(NA_real_)
   suppressWarnings(as.numeric(cov_raw))[1]
 }
+
+
+#' List `Suggests:` deps not installed on the current `.libPaths()`
+#'
+#' Silent covr under-reporting vector #3 (after `skip_on_cran()`,
+#' neutralized via `covr_env_vars:`, and riskmetric's error-tolerant
+#' covr adapter): a `testthat::skip_if_not_installed("pkg")` call
+#' fires quietly when `pkg` isn't on `.libPaths()`, taking the whole
+#' `test_that()` block with it and dropping the covered code path's
+#' coverage contribution to zero with no signal for the reviewer.
+#' This helper is the "broad" probe used by [val_pkg()] to surface
+#' the raw population of at-risk deps; see also
+#' [test_skip_if_not_installed_refs()] for the narrower "will
+#' definitely fire" subset. See #169.
+#'
+#' Reads the package's `DESCRIPTION` from `pkg_source_path` (the
+#' same tarball-extracted source directory used everywhere else in
+#' `val_pkg()`), splits the `Suggests:` field, strips any version
+#' constraint (`(>= 1.2.0)`), and returns the names that don't
+#' resolve via [find.package()]. Base packages listed in Suggests
+#' (a rarity but possible) are treated the same as any other name —
+#' `find.package("methods")` succeeds and they're excluded.
+#'
+#' Returns `character(0)` when no `DESCRIPTION` is found, when the
+#' `Suggests:` field is absent, or when every listed dep is
+#' installed. Callers should treat a zero-length result as "no
+#' caveat to surface", not an error.
+#'
+#' @param pkg_source_path Character(1). Absolute path to an
+#'   extracted package source tree (the parent of the tarball's
+#'   `DESCRIPTION`).
+#'
+#' @return Character vector of missing Suggests package names, in
+#'   the same order they appear in `DESCRIPTION`. Zero-length if
+#'   nothing to surface.
+#'
+#' @keywords internal
+#' @noRd
+missing_suggests_for_pkg <- function(pkg_source_path) {
+  if (!is.character(pkg_source_path) || length(pkg_source_path) != 1L ||
+      !nzchar(pkg_source_path) || !dir.exists(pkg_source_path)) {
+    return(character(0))
+  }
+  desc_file <- file.path(pkg_source_path, "DESCRIPTION")
+  if (!file.exists(desc_file)) return(character(0))
+
+  desc <- tryCatch(read.dcf(desc_file), error = function(e) NULL)
+  if (is.null(desc) || !("Suggests" %in% colnames(desc))) {
+    return(character(0))
+  }
+
+  raw <- desc[1L, "Suggests"]
+  if (is.na(raw) || !nzchar(raw)) return(character(0))
+
+  # Strip version constraints like "(>= 1.2.0)" and split on commas +
+  # embedded whitespace/newlines.
+  entries <- unlist(strsplit(gsub("\\s*\\([^)]*\\)", "", raw), "[,\\s]+",
+                             perl = TRUE))
+  entries <- trimws(entries)
+  entries <- entries[nzchar(entries)]
+  if (length(entries) == 0L) return(character(0))
+
+  installed <- vapply(entries, is_pkg_installed, logical(1))
+  unname(entries[!installed])
+}
+
+
+#' Test whether a package is installed on the current `.libPaths()`
+#'
+#' Trivial wrapper around [find.package()] used by
+#' [missing_suggests_for_pkg()]. Exists as its own function purely
+#' so tests can stub it via [testthat::local_mocked_bindings()] —
+#' mocking `find.package` directly doesn't work because it's an
+#' imported base binding, not a val.pipeline namespace binding.
+#'
+#' @param pkg Character(1). Package name.
+#'
+#' @return Logical(1).
+#'
+#' @keywords internal
+#' @noRd
+is_pkg_installed <- function(pkg) {
+  length(find.package(pkg, quiet = TRUE)) > 0L
+}
+
+
+#' Extract packages referenced by `skip_if_not_installed("...")` in tests
+#'
+#' Narrows the [missing_suggests_for_pkg()] population to the subset
+#' referenced by a `testthat::skip_if_not_installed("<pkg>")` call
+#' anywhere under `tests/`. When one of these names *is* missing on
+#' the current host, it is a strong signal that a `test_that()`
+#' block silently dropped from the covr run -- but not a guarantee:
+#' the scanner is a text grep, so it also matches commented-out
+#' example calls, string literals, helper bodies that never
+#' executed on this run, and calls behind unreachable conditionals.
+#' Downstream consumers (report, NEWS, docstrings) should describe
+#' the intersection with `missing_suggests` as "likely" / "at-risk"
+#' rather than "guaranteed". See #169 and its follow-up review.
+#'
+#' Implementation is intentionally a text grep, not an AST walk:
+#' the pattern is unambiguous, an AST walk would need to `parse()`
+#' every test file in every source tree, and the residual false-
+#' positive rate is small enough that the downstream reporting
+#' just needs to word its claims accordingly.
+#' Handles both single- and double-quoted first args and tolerates
+#' `testthat::` qualifiers.
+#'
+#' Scans `tests/**/*.R` — testthat and non-testthat layouts both
+#' land under `tests/`, so a single recursive glob covers every
+#' shape we support.
+#'
+#' @param pkg_source_path Character(1). Absolute path to an
+#'   extracted package source tree.
+#'
+#' @return Character vector of unique referenced package names,
+#'   sorted. Zero-length if no `tests/` dir, no `.R` files, or no
+#'   references.
+#'
+#' @keywords internal
+#' @noRd
+test_skip_if_not_installed_refs <- function(pkg_source_path) {
+  if (!is.character(pkg_source_path) || length(pkg_source_path) != 1L ||
+      !nzchar(pkg_source_path) || !dir.exists(pkg_source_path)) {
+    return(character(0))
+  }
+  tests_dir <- file.path(pkg_source_path, "tests")
+  if (!dir.exists(tests_dir)) return(character(0))
+
+  test_files <- list.files(tests_dir, pattern = "\\.R$",
+                           recursive = TRUE, full.names = TRUE,
+                           ignore.case = TRUE)
+  if (length(test_files) == 0L) return(character(0))
+
+  # (?:testthat::)? qualifier, then skip_if_not_installed, then the
+  # opening paren + optional whitespace, then the first quoted arg.
+  # Both quote styles.
+  pat <- '(?:testthat::)?skip_if_not_installed\\s*\\(\\s*["\']([^"\']+)["\']'
+
+  hits <- character(0)
+  for (f in test_files) {
+    lines <- tryCatch(readLines(f, warn = FALSE, encoding = "UTF-8"),
+                      error = function(e) character(0))
+    if (length(lines) == 0L) next
+    m <- regmatches(lines, regexec(pat, lines, perl = TRUE))
+    for (mm in m) {
+      if (length(mm) >= 2L) hits <- c(hits, mm[[2L]])
+    }
+  }
+  sort(unique(hits))
+}
+
+
+#' Package a covr coverage caveat for surfacing in the per-package report
+#'
+#' Composes the two probes ([missing_suggests_for_pkg()] and
+#' [test_skip_if_not_installed_refs()]) into a small named list
+#' shaped for direct consumption by the per-package
+#' `{riskreports}` template. Called from [val_pkg()] whenever the
+#' final assessment pass included `assess_covr_coverage`,
+#' regardless of the resulting coverage number — the caveat is
+#' useful even on packages that came in high (it lets a reviewer
+#' say "yes, coverage would be even higher if X, Y were
+#' installed"). See #169.
+#'
+#' The `silent_skip_pkgs` slot is the intersection of the two
+#' probes: packages that are BOTH missing on `.libPaths()` AND
+#' referenced inside a `skip_if_not_installed()` call in the
+#' package's tests. This is the strongest signal for a silent
+#' coverage drop we can derive from source alone, but it is not a
+#' guarantee -- the scanner in
+#' [test_skip_if_not_installed_refs()] is a text grep and can
+#' match commented-out example calls, string literals, and
+#' unreachable conditional branches. Report/NEWS wording should
+#' therefore say "likely" or "at-risk" rather than "guaranteed".
+#' Entries in `missing_suggests` but not `silent_skip_pkgs` might
+#' also have depressed coverage (vignettes, examples, non-skip-
+#' guarded tests calling `library(...)` in setup) but the link
+#' isn't provable from the source alone.
+#'
+#' Returns `NULL` when both probes return empty — the report
+#' template treats `NULL` as "nothing to surface" and omits the
+#' callout entirely, which is the desired behavior for a package
+#' whose Suggests are all installed.
+#'
+#' @param pkg_source_path Character(1). Absolute path to an
+#'   extracted package source tree.
+#'
+#' @return Named list with elements `missing_suggests` (character)
+#'   and `silent_skip_pkgs` (character), or `NULL` if both are
+#'   empty.
+#'
+#' @keywords internal
+#' @noRd
+compose_covr_caveat <- function(pkg_source_path) {
+  missing_s <- missing_suggests_for_pkg(pkg_source_path)
+  skip_refs <- test_skip_if_not_installed_refs(pkg_source_path)
+  silent    <- intersect(skip_refs, missing_s)
+  if (length(missing_s) == 0L && length(silent) == 0L) return(NULL)
+  list(
+    missing_suggests = missing_s,
+    silent_skip_pkgs = silent
+  )
+}
+
 
 
 #' Capture a `testthat` Skip Report for a Package Source
