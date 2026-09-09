@@ -513,7 +513,16 @@ val_pkg <- function(
           # prepends a discovered pandoc dir (RSTUDIO_PANDOC, a
           # bundled Quarto pandoc, or an explicit config/env
           # override — see `resolve_covr_pandoc_dir()`).
-          new = c(pull_covr_env_vars(), pull_covr_path_env()),
+          # `pull_covr_home_env()` guarantees `HOME` is set for the
+          # same rmarkdown-touching tests: pandoc *errors out* when
+          # `HOME` is unset (as it is in Posit Workbench Local Jobs,
+          # cron sessions, and many container entry points), and
+          # `rmarkdown::pandoc_available()` surfaces that as an R
+          # error rather than a clean FALSE — which shows up as a
+          # test error, not a skip, and silently drops coverage.
+          # See #173.
+          new = c(pull_covr_env_vars(), pull_covr_path_env(),
+                  pull_covr_home_env()),
           code = pkg_ref |>
             # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
             riskmetric::pkg_assess(assessments = assess_metrics)
@@ -590,7 +599,11 @@ val_pkg <- function(
             # via `c()` puts pull_covr_path_env()'s PATH entry
             # after the covr_env_vars block, matching the ordering
             # `withr::with_envvar()` uses in the main call site.
-            env_vars        = c(pull_covr_env_vars(), pull_covr_path_env())
+            # `pull_covr_home_env()` guarantees `HOME` is set for
+            # the same reason — pandoc errors on unset HOME in
+            # headless workbench-job contexts (#173).
+            env_vars        = c(pull_covr_env_vars(), pull_covr_path_env(),
+                                pull_covr_home_env())
           )
         )
         if (!is.null(covr_skip_report)) {
