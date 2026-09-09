@@ -1,3 +1,28 @@
+# val.pipeline 0.1.55
+
+- Surface a coverage caveat in the per-package report when a
+  package's `Suggests:` dependencies aren't installed at
+  assessment time. `val_pkg()` now attaches
+  `attr(pkg_assessment, "covr_caveat")` with two vectors:
+  `silent_skip_pkgs` (deps that are BOTH missing AND referenced
+  by a `testthat::skip_if_not_installed()` call under `tests/`)
+  and `missing_suggests` (the broader population). The
+  per-package report renders a new "Coverage caveat" section
+  beneath the test-skip summary, and the values also propagate
+  into `qual_metadata.rds` as two list-columns
+  (`covr_caveat_missing_suggests`,
+  `covr_caveat_silent_skip_pkgs`) so the summary report can
+  aggregate a cohort-level "Missing Suggests" table without
+  reading every `_assessments.rds` artifact.
+
+  Language relaxed in response to the review of the initial
+  patch: the `silent_skip_pkgs` intersection is described as
+  "likely" / "at-risk" rather than "guaranteed" in the roxygen,
+  the per-package report, and the summary report. The detector
+  is a text grep and can match commented-out or unreachable
+  `skip_if_not_installed()` calls, so treat the number as a
+  strong signal, not proof. (#169)
+
 # val.pipeline 0.1.54
 
 - Harden the `#167` pandoc-on-PATH resolver against Copilot review
@@ -13,8 +38,6 @@
   covr run. Adds tests for the config-backed override, the
   highest-versioned Quarto selection, the directory-named-`pandoc`
   edge case, and the empty-PATH guard. (#167)
-
-# val.pipeline 0.1.51
 
 - Prepend a discovered `pandoc` directory to `PATH` for the final
   `assess_covr_coverage` run (via new `resolve_covr_pandoc_dir()`

@@ -449,6 +449,13 @@ val_pkg <- function(
     # can reference `covr_skip_report` without a branch-order
     # dependency.
     covr_skip_report <- NULL
+    # Same rationale for the missing-Suggests covr caveat (#169):
+    # only populated on the non-auto-accept branch, but meta_list
+    # unconditionally references it downstream, so declare NULL at
+    # the outer scope. Auto-accepted / remote-only / reuse-init
+    # rows therefore land with two NULL list-column slots -- exactly
+    # what val_finalize()'s list-col wrap already expects.
+    covr_caveat <- NULL
 
     if (reuse_init) {
       pkg_assessment <- init_pkg_assessment
@@ -589,6 +596,25 @@ val_pkg <- function(
         if (!is.null(covr_skip_report)) {
           attr(pkg_assessment, "covr_skip_report") <- covr_skip_report
         }
+      }
+
+      # Coverage caveat — proactive companion to `covr_skip_report`
+      # (issue #169). The skip report only fires when covr came in
+      # below the capture threshold and only surfaces raw testthat
+      # `Reason:` strings after the fact; the caveat runs
+      # unconditionally on the non-auto-accept branch, is essentially
+      # free (a DESCRIPTION read + a grep across `tests/`), and pins
+      # the exact `Suggests:` deps that either are silently gating a
+      # `skip_if_not_installed()` block on this host
+      # (`silent_skip_pkgs`) or are broadly missing and *might* be
+      # contributing to a lower-than-expected coverage number
+      # (`missing_suggests`). `NULL` when both probes come back empty
+      # so the report template can omit the callout entirely.
+      covr_caveat <- compose_covr_caveat(
+        pkg_source_path = file.path(sourced, pkg)
+      )
+      if (!is.null(covr_caveat)) {
+        attr(pkg_assessment, "covr_caveat") <- covr_caveat
       }
     }
     
@@ -968,6 +994,21 @@ val_pkg <- function(
     # capture" block above. NULL for pkgs with a real decision. See
     # #124.
     assessment_gaps = assessment_gaps,
+    # Missing-Suggests covr caveat (issue #169 review). Two
+    # character vectors (empty when nothing to surface) so a cohort
+    # summary can aggregate across packages without having to
+    # readRDS() each `<pkg>_assessments.rds` artifact. These are the
+    # same two vectors attached as `attr(pkg_assessment,
+    # "covr_caveat")` for the per-package report; storing them on
+    # the meta bundle too lets val_finalize() thread them into
+    # `qual_metadata.rds` as list-columns for the cohort view. NULL
+    # (rather than `character(0)`) for the auto-accepted / remote-
+    # only / reuse-init population, matching how covr_skip_report
+    # scalars are NA_ for those pkgs. See #169.
+    covr_caveat_missing_suggests = if (is.null(covr_caveat))
+      NULL else covr_caveat$missing_suggests,
+    covr_caveat_silent_skip_pkgs = if (is.null(covr_caveat))
+      NULL else covr_caveat$silent_skip_pkgs,
     # Per-phase elapsed seconds captured via val_time_block() around
     # the fat blocks (download, untar, assess_initial, assess_final,
     # decision, report). Named list; each value is a numeric vector
