@@ -1,3 +1,35 @@
+# val.pipeline 0.1.54
+
+- Harden the `#167` pandoc-on-PATH resolver against Copilot review
+  findings: reject overrides whose `pandoc` entry is a directory
+  rather than a file; normalize `Sys.which("quarto")` before
+  probing its sibling `tools/` dir so a symlink on PATH doesn't
+  send discovery to the wrong tree; match `pandoc.exe` in the
+  Quarto probes on Windows; skip the `PATH` separator when the
+  inherited PATH is empty so covr's test child doesn't accidentally
+  pick up executables from its working dir; and pass the
+  pandoc-augmented PATH into `capture_covr_skip_report()` so the
+  skip-count subprocess sees the same environment as the main
+  covr run. Adds tests for the config-backed override, the
+  highest-versioned Quarto selection, the directory-named-`pandoc`
+  edge case, and the empty-PATH guard. (#167)
+
+# val.pipeline 0.1.51
+
+- Prepend a discovered `pandoc` directory to `PATH` for the final
+  `assess_covr_coverage` run (via new `resolve_covr_pandoc_dir()`
+  + `pull_covr_path_env()` helpers, scoped to the same
+  `withr::with_envvar()` block that already applies
+  `pull_covr_env_vars()`). Fixes a class of silent
+  `covr_coverage` under-reporting on packages whose testthat
+  suites drive `rmarkdown::render()` / `logrx::axecute()` — those
+  test files abort in setup without pandoc, and `riskmetric`'s
+  error-tolerant covr adapter silently drops their coverage.
+  Auto-detects a bundled Quarto pandoc; overridable via
+  `VAL_PIPELINE_PANDOC_DIR`, `RSTUDIO_PANDOC`, or the new
+  `covr_pandoc_dir:` config key. No-op when a system pandoc is
+  already on `PATH`. (#167)
+
 # val.pipeline 0.1.50
 
 - Factor the per-invocation report scratch dir into a small

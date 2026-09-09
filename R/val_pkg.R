@@ -496,7 +496,17 @@ val_pkg <- function(
           # just covr_coverage) is deliberate — the env vars are
           # harmless to the other metrics, and this avoids the need to
           # split the pkg_assess() call into two runs.
-          new = pull_covr_env_vars(),
+          #
+          # Layer B PATH augmentation for pandoc (issue #167). Test
+          # files that drive `rmarkdown::render()` / `logrx::axecute()`
+          # abort in setup when `pandoc` isn't on PATH, and
+          # riskmetric's error-tolerant covr adapter silently loses
+          # their coverage contribution. `pull_covr_path_env()` is a
+          # no-op when `pandoc` is already on PATH; otherwise it
+          # prepends a discovered pandoc dir (RSTUDIO_PANDOC, a
+          # bundled Quarto pandoc, or an explicit config/env
+          # override — see `resolve_covr_pandoc_dir()`).
+          new = c(pull_covr_env_vars(), pull_covr_path_env()),
           code = pkg_ref |>
             # dplyr::as_tibble() |> # no tibbles allowed for stip or riskreports
             riskmetric::pkg_assess(assessments = assess_metrics)
@@ -563,7 +573,17 @@ val_pkg <- function(
         covr_skip_report <- val_time_block("skip_report",
           capture_covr_skip_report(
             pkg_source_path = file.path(sourced, pkg),
-            env_vars        = pull_covr_env_vars()
+            # Include the same pandoc-PATH augmentation the main
+            # covr run got (#167 review): capture_covr_skip_report()
+            # runs `testthat::test_dir()` in a subprocess, and any
+            # test file that renders an .Rmd or calls
+            # `logrx::axecute()` will error in setup without pandoc
+            # on PATH — muting or silently skipping the very tests
+            # that drove the caveat in the first place. Composing
+            # via `c()` puts pull_covr_path_env()'s PATH entry
+            # after the covr_env_vars block, matching the ordering
+            # `withr::with_envvar()` uses in the main call site.
+            env_vars        = c(pull_covr_env_vars(), pull_covr_path_env())
           )
         )
         if (!is.null(covr_skip_report)) {
