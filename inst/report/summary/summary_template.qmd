@@ -344,8 +344,8 @@ cat("The 'pre-filter step' runs `riskmetric`'s `remote_reduce` rules over ",
     "the entire candidate universe (using recent remote metrics stored in ",
     "`{riskscore}`) to identify ",
     "packages worth running a full assessment on. Only packages ",
-    "categorised as **Low** risk here -- plus any explicitly ",
-    "allow-listed in the `pass_primary` config -- proceed to ",
+    "categorised as **Low** risk here --- plus any explicitly ",
+    "allow-listed in the `pass_primary` config --- proceed to ",
     "`val_build()`.\n\n", sep = "")
 ```
 
@@ -472,7 +472,7 @@ if (is_html) {
       "but did not qualify for a full assessment run (either their ",
       "pre-filter risk was above `Low`, or they were absent from the ",
       "`pass_primary` allow-list). Their raw metric values are shown for ",
-      "context -- these are the reasons `val_build()` never opened ",
+      "context --- these are the reasons `val_build()` never opened ",
       "them.\n\n", sep = "")
 } else {
   cat(format(n_dropped_ap, big.mark = ","),
@@ -825,52 +825,77 @@ if (length(rt) > 0L) {
 ## Slowest packages
 
 Sourced as the 50 slowest per-package assessments; use the page-size
-control to browse fewer rows at a time. Columns break the wall-clock
-runtime into two components so operators can decide how to reclaim it:
+control to browse fewer rows at a time. Columns break the elapsed-
+through-assessment runtime into two components so operators can
+decide how to reclaim it:
 
-- **Assess** — the two `pkg_assess()` calls (initial + final).
-  `assess_final` runs `covr::package_coverage()`, so this is the covr
-  cost. Slow here => candidate for `remote_only` (skip the local
-  covr pass entirely).
+- **Assess** — the two `pkg_assess()` calls (initial + final). For
+  non-auto-accepted packages the final pass drives
+  `covr::package_coverage()`, so on the slow tail this column is
+  almost always covr time; auto-accepted packages have
+  `assess_covr_coverage` dropped from the final pass and rarely
+  surface here (see `R/val_pkg.R` L477-482 for the drop). Slow
+  here => usually a `remote_only` candidate (skip the local covr
+  pass), but check `timings.csv` to confirm before flipping.
 - **Skip report** — the `capture_covr_skip_report()` phase. Only
   fires when a package's `covr_coverage` came in below threshold and
   the report re-runs `testthat::test_dir()` in a subprocess to
   attribute skip reasons. Slow here (relative to **Assess**) =>
   candidate for `covr_skip_report$skip_pkgs` in `inst/config.yml`.
-- **Total** — wall-clock end-to-end (`assessment_runtime_mins`).
+- **Total** — elapsed through the end of the last `pkg_assess()`
+  call (`assessment_runtime_mins`; matches the "Cumulative runtime"
+  above). Excludes `val_decision()` + report emission, which are
+  tracked separately in `timings.csv`.
 
 ```{r slowest-pkgs}
 if (length(rt) > 0L) {
-  # Older `qual_metadata.rds` files (pre-#177) won't have the phase
-  # breakdown scalars -- back-fill with NA so the transmute below is
-  # column-safe regardless of vintage. Report still degrades to the
-  # single-column "Runtime" behavior when neither field is present.
-  slow_src <- qual_metadata
-  if (!"assess_mins" %in% names(slow_src))
-    slow_src$assess_mins <- NA_real_
-  if (!"skip_report_mins" %in% names(slow_src))
-    slow_src$skip_report_mins <- NA_real_
+  # Detect vintage of the loaded `qual_metadata.rds`. Pre-#177 files
+  # have neither phase-breakdown column, in which case the report
+  # falls back to the old single-Runtime table shape (rendering "-"
+  # in the Assess/Skip report columns would be uninformative for the
+  # whole cohort). Post-#177 files always have both columns
+  # (populated even for the dep-skip / error paths in val_build.R,
+  # as NA_real_ so bind_rows() aligns), so we can key the branch on
+  # column presence.
+  has_phase_breakdown <-
+    all(c("assess_mins", "skip_report_mins") %in% names(qual_metadata))
 
-  slow_df <- slow_src |>
-    dplyr::mutate(
-      total_mins       = as.numeric(assessment_runtime_mins),
-      assess_mins_num  = suppressWarnings(as.numeric(assess_mins)),
-      skip_mins_num    = suppressWarnings(as.numeric(skip_report_mins))
-    ) |>
+  slow_df <- qual_metadata |>
+    dplyr::mutate(total_mins = as.numeric(assessment_runtime_mins)) |>
     dplyr::filter(!is.na(total_mins)) |>
     dplyr::arrange(dplyr::desc(total_mins)) |>
-    dplyr::slice_head(n = 50) |>
-    dplyr::transmute(
-      Package = pkg,
-      Version = ver,
-      `Final decision` = as.character(final_decision),
-      Assess       = vapply(assess_mins_num, format_hm, character(1)),
-      `Skip report` = vapply(skip_mins_num,   format_hm, character(1)),
-      Total        = vapply(total_mins,      format_hm, character(1)),
-      `Assess (mins)`      = round(assess_mins_num, 2),
-      `Skip report (mins)` = round(skip_mins_num, 2),
-      `Total (mins)`       = round(total_mins, 2)
-    )
+    dplyr::slice_head(n = 50)
+
+  if (has_phase_breakdown) {
+    slow_df <- slow_df |>
+      dplyr::mutate(
+        assess_mins_num = suppressWarnings(as.numeric(assess_mins)),
+        skip_mins_num   = suppressWarnings(as.numeric(skip_report_mins))
+      ) |>
+      dplyr::transmute(
+        Package = pkg,
+        Version = ver,
+        `Final decision` = as.character(final_decision),
+        Assess       = vapply(assess_mins_num, format_hm, character(1)),
+        `Skip report` = vapply(skip_mins_num,   format_hm, character(1)),
+        Total        = vapply(total_mins,      format_hm, character(1)),
+        `Assess (mins)`      = round(assess_mins_num, 2),
+        `Skip report (mins)` = round(skip_mins_num, 2),
+        `Total (mins)`       = round(total_mins, 2)
+      )
+  } else {
+    # Pre-#177 fallback: legacy single-Runtime columns. Kept so
+    # cohort reports rendered against older assessed/ directories
+    # still land a useful table (rather than a wall of "-").
+    slow_df <- slow_df |>
+      dplyr::transmute(
+        Package = pkg,
+        Version = ver,
+        `Final decision` = as.character(final_decision),
+        Runtime = vapply(total_mins, format_hm, character(1)),
+        `Runtime (mins)` = round(total_mins, 2)
+      )
+  }
   itable(slow_df, default_page_size = 10)
 } else {
   cat("_(runtime data not available)_\n")

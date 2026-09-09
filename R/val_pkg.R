@@ -965,32 +965,32 @@ val_pkg <- function(
     # per-phase timings map so the summary report's "Slowest packages"
     # table can distinguish `pkg_assess()` cost from the extra
     # `capture_covr_skip_report()` `testthat::test_dir()` replay:
-    #   * `assess_mins` — `assess_initial` + `assess_final` phases (the
-    #     two `pkg_assess()` calls; `assess_final` drives
-    #     `covr::package_coverage()`). Slow here => `remote_only`
-    #     candidate.
-    #   * `skip_report_mins` — the `skip_report` phase. Only fires when
-    #     `capture_covr_skip_report()` re-ran `testthat::test_dir()`
-    #     to attribute a below-threshold coverage. `NA_real_` when the
-    #     phase didn't run. Slow here (relative to `assess_mins`) =>
-    #     `covr_skip_report$skip_pkgs` candidate in `inst/config.yml`.
-    # `assessment_runtime$mins` above is the total wall-clock
-    # (includes download / untar / decision / report emission), so the
-    # summary template just renders these two as the breakdown and
-    # keeps `assessment_runtime_mins` as "Total". See
-    # `val_time_block()` in R/verbosity.R for the underlying
-    # accounting.
-    assess_mins = {
-      t <- get_pkg_timings()
-      secs <- sum(unlist(t[c("assess_initial", "assess_final")]),
-                  na.rm = TRUE)
-      if (isTRUE(secs > 0)) secs / 60 else NA_real_
-    },
-    skip_report_mins = {
-      t <- get_pkg_timings()
-      if (!is.null(t[["skip_report"]])) sum(t[["skip_report"]]) / 60
-      else NA_real_
-    },
+    #   * `assess_mins` -- `assess_initial` + `assess_final` phases
+    #     (the two `pkg_assess()` calls; `assess_final` drives
+    #     `covr::package_coverage()` for non-auto-accepted pkgs).
+    #     Note that auto-accepted final passes have
+    #     `assess_covr_coverage` dropped (see the `metrics_reduced`
+    #     branch above L477-482), so `assess_mins` is not universally
+    #     equivalent to covr time -- but for pkgs slow enough to
+    #     appear in the summary's "Slowest packages" tail, the covr
+    #     pass is almost always the driver.
+    #   * `skip_report_mins` -- the `skip_report` phase. Only fires
+    #     when `capture_covr_skip_report()` re-ran
+    #     `testthat::test_dir()` to attribute a below-threshold
+    #     coverage. `NA_real_` when the phase didn't run. Slow here
+    #     (relative to `assess_mins`) => `covr_skip_report$skip_pkgs`
+    #     candidate in `inst/config.yml`.
+    # `assessment_runtime$mins` above is captured at `assessed_end`
+    # (L669) which fires BEFORE `val_decision()` (L740) and the
+    # `report` phase (L895), so it is elapsed-through-assessment, NOT
+    # a whole-val_pkg wall-clock. The summary template labels it
+    # "Total" because it is the total the summary already reported
+    # pre-#177 (backwards-compatible column semantics); decision +
+    # report emission are still tracked as separate phases in
+    # `timings.csv`. See val_time_block() in R/verbosity.R for the
+    # full accounting.
+    assess_mins      = pkg_assess_mins(get_pkg_timings()),
+    skip_report_mins = pkg_skip_report_mins(get_pkg_timings()),
     # Testthat skip report scalars (issue #150). Populated when
     # `assess_covr_coverage` was included in the final pass (i.e.
     # `!auto_accepted`) and the package ships a `tests/testthat/`
