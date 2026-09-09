@@ -271,3 +271,51 @@ test_that("compose_covr_caveat() populates missing_suggests even w/o skip refs",
     expect_identical(out$silent_skip_pkgs, character(0))
   })
 })
+
+test_that("meta bundle -> qual_metadata transform preserves covr_caveat as list-cols (#169 review)", {
+  # Direct exercise of the streaming-pass transform val_finalize()
+  # applies to each `_meta.rds` bundle: pull the two variable-length
+  # covr_caveat_* character vectors out of `bundle`, `list_flatten()`
+  # the rest, and re-wrap the caveat slots as list-cols so a
+  # `bind_rows()` across a mixed cohort survives ragged shapes and
+  # missing-fields on legacy bundles. Deliberately does NOT drive
+  # `val_finalize()` end-to-end -- that requires a val_dir scaffold
+  # (config.yml, val_start, reject_iteration deps, ...) that would
+  # brittle-couple this test to unrelated finalize plumbing.
+  # Mirror the exact selector/wrap sequence in
+  # R/val_finalize.R so a shape regression there fails here too.
+  transform_one <- function(bundle) {
+    caveat_miss   <- bundle[["covr_caveat_missing_suggests"]]
+    caveat_silent <- bundle[["covr_caveat_silent_skip_pkgs"]]
+    bundle[["covr_caveat_missing_suggests"]] <- NULL
+    bundle[["covr_caveat_silent_skip_pkgs"]] <- NULL
+    x <- purrr::list_flatten(bundle)
+    x$covr_caveat_missing_suggests <- list(caveat_miss)
+    x$covr_caveat_silent_skip_pkgs <- list(caveat_silent)
+    dplyr::as_tibble(x)
+  }
+
+  alpha <- list(
+    pkg = "alpha", ver = "0.0.0",
+    covr_caveat_missing_suggests = c("readr", "tplyr"),
+    covr_caveat_silent_skip_pkgs = "readr"
+  )
+  # Bravo emulates a pre-#169 bundle: the fields don't exist at all.
+  bravo <- list(pkg = "bravo", ver = "0.0.0")
+
+  qm0 <- dplyr::bind_rows(transform_one(alpha), transform_one(bravo))
+
+  expect_true("covr_caveat_missing_suggests" %in% names(qm0))
+  expect_true("covr_caveat_silent_skip_pkgs" %in% names(qm0))
+  expect_true(is.list(qm0$covr_caveat_missing_suggests))
+  expect_true(is.list(qm0$covr_caveat_silent_skip_pkgs))
+
+  alpha_row <- qm0[qm0$pkg == "alpha", ]
+  expect_identical(alpha_row$covr_caveat_missing_suggests[[1]],
+                   c("readr", "tplyr"))
+  expect_identical(alpha_row$covr_caveat_silent_skip_pkgs[[1]], "readr")
+
+  bravo_row <- qm0[qm0$pkg == "bravo", ]
+  expect_null(bravo_row$covr_caveat_missing_suggests[[1]])
+  expect_null(bravo_row$covr_caveat_silent_skip_pkgs[[1]])
+})

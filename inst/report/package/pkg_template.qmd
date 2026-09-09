@@ -891,11 +891,15 @@ cat(
 
 if (length(.silent) > 0L) {
   cat(
-    "**Guaranteed silent skips (", length(.silent),
+    "**Likely silent skips (", length(.silent),
     "):** every package below is BOTH missing on this host AND",
     "referenced by a `skip_if_not_installed()` call under `tests/`,",
-    "so at least one `test_that()` block silently dropped from the",
-    "covr run for each:\n\n", sep = ""
+    "so at least one `test_that()` block *probably* dropped from the",
+    "covr run for each. \"Likely\" (not \"guaranteed\") because the",
+    "detector is a text grep: it also matches commented-out example",
+    "calls, string literals, and calls behind unreachable",
+    "conditionals. Treat the list as a strong signal, not proof:\n\n",
+    sep = ""
   )
   cat(paste0("- `", .silent, "`", collapse = "\n"), "\n\n", sep = "")
 }
@@ -916,7 +920,7 @@ if (length(.broad) > 0L) {
 cat(
   "Reproducing the maintainer's CI number (typically closer to their",
   "`README` badge) usually requires installing at least the",
-  "guaranteed-silent-skip set above and re-running.\n\n"
+  "likely-silent-skip set above and re-running.\n\n"
 )
 ```
 

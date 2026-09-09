@@ -278,6 +278,20 @@ val_finalize <- function(
     # `qual_metadata$assessment_gaps[[i]]`. See #124.
     gaps <- bundle[["assessment_gaps"]]
     bundle[["assessment_gaps"]] <- NULL
+    # Pull the two covr-caveat character vectors out before
+    # `list_flatten()` for the same reason as `depends`/`suggests`:
+    # they're variable-length and need to survive `bind_rows()` as
+    # list-columns, otherwise the flatten would explode each entry
+    # into its own scalar column and the ragged widths would trigger
+    # `bind_rows()` NAs plus row-alignment surprises. See #169
+    # review. Older meta bundles (pre-#169) don't have these fields;
+    # fall back to `NULL` so the list-col slot lands as
+    # `list(NULL)` and the summary template's `has_covr_caveat`
+    # gate reads it as "no data".
+    caveat_miss <- bundle[["covr_caveat_missing_suggests"]]
+    caveat_silent <- bundle[["covr_caveat_silent_skip_pkgs"]]
+    bundle[["covr_caveat_missing_suggests"]] <- NULL
+    bundle[["covr_caveat_silent_skip_pkgs"]] <- NULL
 
     x <- purrr::list_flatten(bundle)
     x$depends  <- list(x$depends)
@@ -292,6 +306,8 @@ val_finalize <- function(
     x$rev_deps <- list(x$rev_deps)
     x$sys_info <- list(x$sys_info)
     x$assessment_gaps <- list(gaps)
+    x$covr_caveat_missing_suggests <- list(caveat_miss)
+    x$covr_caveat_silent_skip_pkgs <- list(caveat_silent)
     pkgs_df0_rows[[i]] <- dplyr::as_tibble(x)
 
     if (!is.null(tmap) && length(tmap) > 0L) {
