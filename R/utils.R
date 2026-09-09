@@ -41,15 +41,29 @@ probe_writable_dir <- function(dir, create = FALSE) {
     pattern = ".val_pipeline_probe_",
     tmpdir  = dir
   )
+  # Close the connection BEFORE attempting file.remove() -- on
+  # Windows an open file handle silently blocks the removal, so an
+  # `on.exit(close(con))` (which fires after the remove) leaves a
+  # probe file behind and breaks the "probe is cleaned up" test
+  # assertion. See #175.
   res <- tryCatch(
     {
       con <- file(probe, open = "w")
-      on.exit(close(con), add = TRUE)
       cat("ok\n", file = con)
+      close(con)
       TRUE
     },
-    error   = function(e) conditionMessage(e),
-    warning = function(w) conditionMessage(w)
+    error   = function(e) {
+      # Defensive: if the write errored *after* the file() call
+      # succeeded, close the dangling connection so the file
+      # isn't held open when we try to remove it below.
+      try(close(con), silent = TRUE)
+      conditionMessage(e)
+    },
+    warning = function(w) {
+      try(close(con), silent = TRUE)
+      conditionMessage(w)
+    }
   )
   if (file.exists(probe)) {
     suppressWarnings(file.remove(probe))
