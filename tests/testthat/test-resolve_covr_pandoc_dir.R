@@ -122,3 +122,95 @@ test_that("pull_covr_env_vars() and pull_covr_path_env() compose cleanly", {
   # PATH (which would collide with the pandoc augmentation).
   expect_equal(sum(names(merged) == "PATH"), 1L)
 })
+
+test_that("resolve_covr_pandoc_dir honors covr_pandoc_dir from config.yml (#167 review)", {
+  neutralize_env()
+  fake <- make_fake_pandoc()
+
+  cfg_dir <- withr::local_tempdir()
+  cfg <- file.path(cfg_dir, "config.yml")
+  writeLines(c(
+    "default:",
+    paste0("  covr_pandoc_dir: ", shQuote(fake))
+  ), cfg)
+
+  expect_identical(resolve_covr_pandoc_dir(config_path = cfg), fake)
+
+  path_env <- pull_covr_path_env(config_path = cfg)
+  expect_named(path_env, "PATH")
+  expect_true(startsWith(path_env[["PATH"]], fake))
+})
+
+test_that("resolve_covr_pandoc_dir ignores covr_pandoc_dir pointing at a dir with no pandoc", {
+  neutralize_env()
+  bogus <- withr::local_tempdir()
+
+  cfg_dir <- withr::local_tempdir()
+  cfg <- file.path(cfg_dir, "config.yml")
+  writeLines(c(
+    "default:",
+    paste0("  covr_pandoc_dir: ", shQuote(bogus))
+  ), cfg)
+
+  # Bad config value must silently fall through to character(0),
+  # never surface a broken PATH prepend.
+  expect_identical(resolve_covr_pandoc_dir(config_path = cfg), character(0))
+})
+
+test_that("resolve_covr_pandoc_dir rejects override pointing at a *directory* named pandoc (#167 review)", {
+  neutralize_env()
+  # Emulate an override where the "pandoc" entry is itself a
+  # subdirectory rather than a file. Before the review fix,
+  # `file.exists()` returned TRUE for a dir and the override was
+  # trusted, prepending a directory whose "executable" can't be
+  # exec'd.
+  bad_dir <- withr::local_tempdir()
+  exe_name <- if (.Platform$OS.type == "windows") "pandoc.exe" else "pandoc"
+  dir.create(file.path(bad_dir, exe_name))
+
+  withr::local_envvar(c(VAL_PIPELINE_PANDOC_DIR = bad_dir))
+  expect_identical(resolve_covr_pandoc_dir(), character(0))
+})
+
+test_that("resolve_covr_pandoc_dir picks the highest-versioned Quarto under the probe glob (#167 review)", {
+  neutralize_env()
+  # Emulate a multi-version Quarto install tree under a tempdir and
+  # point the probe option at it. `<root>/<ver>/bin/tools/<arch>/pandoc`
+  # mirrors the Posit-Team `/opt/quarto/<ver>/...` layout exactly so
+  # the structural version-extraction regex applies.
+  root <- withr::local_tempdir()
+  vers <- c("1.4.550", "1.8.27", "1.5.10")
+  exe_name <- if (.Platform$OS.type == "windows") "pandoc.exe" else "pandoc"
+  for (v in vers) {
+    d <- file.path(root, v, "bin", "tools", "x86_64")
+    dir.create(d, recursive = TRUE)
+    file.create(file.path(d, exe_name))
+  }
+
+  probe <- file.path(root, "*", "bin", "tools", "*", exe_name)
+  withr::local_options(list(val.pipeline.quarto_pandoc_probe_glob = probe))
+
+  got <- resolve_covr_pandoc_dir()
+  expected <- file.path(root, "1.8.27", "bin", "tools", "x86_64")
+  expect_identical(
+    normalizePath(got, winslash = "/", mustWork = FALSE),
+    normalizePath(expected, winslash = "/", mustWork = FALSE)
+  )
+})
+
+test_that("pull_covr_path_env does not emit a trailing separator on empty PATH (#167 review)", {
+  neutralize_env()
+  fake <- make_fake_pandoc()
+  withr::local_envvar(c(
+    VAL_PIPELINE_PANDOC_DIR = fake,
+    PATH = ""
+  ))
+  got <- pull_covr_path_env()
+  expect_named(got, "PATH")
+  # No trailing `:` on POSIX / `;` on Windows -- an empty PATH
+  # component gets interpreted as CWD by some `execvp`
+  # implementations, silently letting covr's test child pick up
+  # binaries from the test working dir.
+  expect_identical(got[["PATH"]], fake)
+  expect_false(endsWith(got[["PATH"]], .Platform$path.sep))
+})

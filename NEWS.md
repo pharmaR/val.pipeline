@@ -1,3 +1,19 @@
+# val.pipeline 0.1.54
+
+- Harden the `#167` pandoc-on-PATH resolver against Copilot review
+  findings: reject overrides whose `pandoc` entry is a directory
+  rather than a file; normalize `Sys.which("quarto")` before
+  probing its sibling `tools/` dir so a symlink on PATH doesn't
+  send discovery to the wrong tree; match `pandoc.exe` in the
+  Quarto probes on Windows; skip the `PATH` separator when the
+  inherited PATH is empty so covr's test child doesn't accidentally
+  pick up executables from its working dir; and pass the
+  pandoc-augmented PATH into `capture_covr_skip_report()` so the
+  skip-count subprocess sees the same environment as the main
+  covr run. Adds tests for the config-backed override, the
+  highest-versioned Quarto selection, the directory-named-`pandoc`
+  edge case, and the empty-PATH guard. (#167)
+
 # val.pipeline 0.1.51
 
 - Prepend a discovered `pandoc` directory to `PATH` for the final

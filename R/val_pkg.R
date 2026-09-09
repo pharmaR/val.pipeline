@@ -573,7 +573,17 @@ val_pkg <- function(
         covr_skip_report <- val_time_block("skip_report",
           capture_covr_skip_report(
             pkg_source_path = file.path(sourced, pkg),
-            env_vars        = pull_covr_env_vars()
+            # Include the same pandoc-PATH augmentation the main
+            # covr run got (#167 review): capture_covr_skip_report()
+            # runs `testthat::test_dir()` in a subprocess, and any
+            # test file that renders an .Rmd or calls
+            # `logrx::axecute()` will error in setup without pandoc
+            # on PATH — muting or silently skipping the very tests
+            # that drove the caveat in the first place. Composing
+            # via `c()` puts pull_covr_path_env()'s PATH entry
+            # after the covr_env_vars block, matching the ordering
+            # `withr::with_envvar()` uses in the main call site.
+            env_vars        = c(pull_covr_env_vars(), pull_covr_path_env())
           )
         )
         if (!is.null(covr_skip_report)) {

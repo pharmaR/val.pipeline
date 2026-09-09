@@ -609,7 +609,12 @@ pull_covr_env_vars <- function(config_path = NULL) {
 #' 1. If `pandoc` is already on `PATH` — return `character(0)`
 #'    (nothing to augment; caller applies no PATH change).
 #' 2. `Sys.getenv("VAL_PIPELINE_PANDOC_DIR")` — explicit user escape
-#'    hatch. Not validated; if the caller sets it, we trust it.
+#'    hatch. Validated the same way the config value is (must
+#'    contain a `pandoc`/`pandoc.exe` regular file); an override
+#'    that points at a non-existent dir, a dir with no pandoc, or a
+#'    subdirectory happening to be named `pandoc` silently falls
+#'    through to the next probe rather than surfacing a broken PATH
+#'    later.
 #' 3. Config `default: covr_pandoc_dir:` (see `inst/config.yml`).
 #' 4. `Sys.getenv("RSTUDIO_PANDOC")` — the convention RStudio uses
 #'    to point R sessions at its bundled pandoc, honored by
@@ -647,7 +652,11 @@ resolve_covr_pandoc_dir <- function(config_path = NULL) {
   is_pandoc_dir <- function(dir) {
     if (!is.character(dir) || length(dir) != 1L || !nzchar(dir)) return(FALSE)
     exe <- file.path(dir, if (.Platform$OS.type == "windows") "pandoc.exe" else "pandoc")
-    file.exists(exe)
+    # Require a regular file, not a directory happening to be named
+    # `pandoc` -- otherwise a bogus override survives here and the
+    # caller ends up prepending a dir whose "executable" can't
+    # actually be exec'd.
+    file.exists(exe) && !dir.exists(exe)
   }
 
   # 2. Explicit env-var override.
@@ -670,10 +679,20 @@ resolve_covr_pandoc_dir <- function(config_path = NULL) {
   if (nzchar(rs) && is_pandoc_dir(rs)) return(rs)
 
   # 5a. Quarto binary sibling: `<quarto>/../tools/<arch>/pandoc`.
-  q <- Sys.which("quarto")
-  if (nzchar(q)) {
+  #     `Sys.which("quarto")` returns whatever's on PATH, which is
+  #     often a symlink into the real install root (e.g.
+  #     `/usr/local/bin/quarto` -> `/opt/quarto/1.8/bin/quarto`);
+  #     without `normalizePath()` the `tools/` glob below searches
+  #     under the symlink's directory (`/usr/local/bin/tools`)
+  #     instead of Quarto's install tree. On Windows the pandoc
+  #     binary is `pandoc.exe`, so match that too.
+  q_raw <- Sys.which("quarto")
+  if (nzchar(q_raw)) {
+    q <- tryCatch(normalizePath(q_raw, mustWork = FALSE),
+                  error = function(e) q_raw)
     q_bin <- dirname(q)
-    cand <- Sys.glob(file.path(q_bin, "tools", "*", "pandoc"))
+    p_exe <- if (.Platform$OS.type == "windows") "pandoc.exe" else "pandoc"
+    cand <- Sys.glob(file.path(q_bin, "tools", "*", p_exe))
     cand <- cand[file.exists(cand)]
     if (length(cand)) return(dirname(cand[1]))
   }
@@ -681,17 +700,23 @@ resolve_covr_pandoc_dir <- function(config_path = NULL) {
   # 5b. Posit-Team default layout: /opt/quarto/<ver>/bin/tools/<arch>/pandoc.
   #    Pick the highest-versioned match so we don't get stuck on an old
   #    installation. Probe path is exposed via an option so tests can
-  #    disable it without depending on the host filesystem.
+  #    disable it without depending on the host filesystem, or point
+  #    it at a temp-tree emulation. The version-extraction regex is
+  #    intentionally structural (pulls the segment two levels above
+  #    `pandoc`, i.e. `<ver>/bin/tools/<arch>/pandoc`) so a test can
+  #    reuse it under `tempdir()` without depending on `/opt/quarto`.
   probe_glob <- getOption(
     "val.pipeline.quarto_pandoc_probe_glob",
-    "/opt/quarto/*/bin/tools/*/pandoc"
+    if (.Platform$OS.type == "windows")
+      "/opt/quarto/*/bin/tools/*/pandoc.exe"
+    else
+      "/opt/quarto/*/bin/tools/*/pandoc"
   )
   if (is.character(probe_glob) && length(probe_glob) == 1L && nzchar(probe_glob)) {
     cand <- Sys.glob(probe_glob)
     cand <- cand[file.exists(cand)]
     if (length(cand)) {
-      # Extract the version segment for a natural sort.
-      vers <- sub("^/opt/quarto/([^/]+)/.*$", "\\1", cand)
+      vers <- sub(".*/([^/]+)/bin/tools/[^/]+/pandoc(\\.exe)?$", "\\1", cand)
       ord <- order(numeric_version(vers, strict = FALSE), decreasing = TRUE)
       return(dirname(cand[ord[1]]))
     }
@@ -734,7 +759,18 @@ resolve_covr_pandoc_dir <- function(config_path = NULL) {
 pull_covr_path_env <- function(config_path = NULL) {
   dir <- resolve_covr_pandoc_dir(config_path = config_path)
   if (length(dir) == 0L) return(character(0))
-  new_path <- paste(dir, Sys.getenv("PATH"), sep = .Platform$path.sep)
+  old_path <- Sys.getenv("PATH")
+  # Don't paste a bare separator on an empty PATH -- POSIX shells and
+  # some `execvp()` implementations interpret an empty PATH component
+  # as "the current working directory", which would silently make
+  # covr's test child pick up whatever executables live in the test
+  # cwd. This is only a real risk when the parent has an unset/empty
+  # PATH (rare in production but easy to hit in restricted test
+  # harnesses), but the guard is essentially free.
+  new_path <- if (nzchar(old_path))
+    paste(dir, old_path, sep = .Platform$path.sep)
+  else
+    dir
   stats::setNames(new_path, "PATH")
 }
 
