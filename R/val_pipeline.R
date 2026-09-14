@@ -281,9 +281,19 @@ val_pipeline <- function(
     pull_config(val = "decisions_lst", rule_type = "default")
 
   # Keep options aligned with the prep run when picking up from disk.
+  # Note: we intentionally do NOT set `pkgType = "source"` here. That
+  # was previously set unconditionally at this seam, which meant every
+  # `val_pipeline() -> val_build()` handoff entered val_build with
+  # `pkgType = "source"` already live in the parent session -- even
+  # for `ref = "remote"` runs -- and pushed the state divergence that
+  # regressed covr_coverage on some source-tier packages (see #181).
+  # `val_build()` sets `pkgType = "source"` itself, gated on
+  # `ref == "source"`, at the top of its own body. That single owner
+  # keeps the option contract consistent whether callers use
+  # `val_pipeline()` or `val_build()` directly.
   old <- options()
   on.exit(options(old), add = TRUE)
-  options(repos = prep$opt_repos, pkgType = "source", scipen = 999)
+  options(repos = prep$opt_repos, scipen = 999)
 
   #
   # ---- val_build() ----

@@ -204,6 +204,28 @@ val_build <- function(
   stopifnot(is.logical(mem_watchdog), length(mem_watchdog) == 1L,
             !is.na(mem_watchdog))
   apply_verbose(verbose)
+
+  # Establish `options(repos, pkgType)` BEFORE any helper that calls
+  # `available.packages()` runs (notably
+  # `configure_bioc_repositories_if_requested()` at the next line,
+  # which hits `available.packages()` inside its BiocManager repo
+  # probe). Sequencing this after those helpers means the bioc-repo
+  # cache lands with whatever pkgType the caller's session happened
+  # to carry -- and under `val_pipeline()`, that pre-set pkgType
+  # comes from a prior `options(pkgType = "source")` upstream, so
+  # the exact same `val_build()` invocation resolves a different
+  # bioc set depending on how it was entered. That divergence was
+  # the root cause of the covr_coverage delta between bare
+  # `val_build()` (>90% on logrx) and `val_pipeline() -> val_build()`
+  # (62%). See #181. The `on.exit(options(old), add = TRUE)` guard
+  # restores whichever slots we mutated so the caller session is
+  # left untouched -- fixes the previous
+  # `on.exit(function() options(old))` which constructed a function
+  # and threw it away, never restoring options (also lacked
+  # `add = TRUE`, silently wiping the earlier config-path on.exit).
+  old <- apply_val_build_options(ref = ref, opt_repos = opt_repos)
+  on.exit(options(old), add = TRUE)
+
   configure_bioc_repositories_if_requested(quiet = TRUE)
   configure_riskmetric_offline_if_requested(quiet = TRUE)
 
@@ -232,15 +254,6 @@ val_build <- function(
   decisions <- pull_config(val = "decisions_lst", rule_type = "default")
   remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
   # opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
-  
-  old <- options()
-  on.exit(function() options(old))
-  if(ref == 'source') {
-    options(repos = opt_repos, pkgType = "source") # , rlang_interactive = FALSE
-  } else {
-    options(repos = opt_repos) # , rlang_interactive = FALSE
-  }
-  # options("repos")
   
   #
   # ---- Which pkgs, ordered ----

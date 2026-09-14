@@ -1,3 +1,25 @@
+# val.pipeline 0.1.60
+
+- **Stop `val_pipeline()` from silently regressing covr_coverage on
+  some source-tier packages.** The outer seam in `val_pipeline()`
+  pushed `options(pkgType = "source")` into the parent session
+  before dispatching to `val_build()`, unconditionally and outside
+  the `ref` gate. That pre-set changed the state
+  `configure_bioc_repositories_if_requested()` (which
+  `val_build()` calls at entry) resolved its
+  `available.packages()` cache under, so the same
+  `val_build(pkg_names = "logrx", ref = "source", ...)` returned
+  >90% covr_coverage when called directly but ~62% when called
+  through `val_pipeline()`. Ownership of the `pkgType` slot now
+  lives in exactly one place -- `val_build()`, via the new
+  `apply_val_build_options()` helper -- gated on `ref == "source"`
+  and set BEFORE the bioc-config helper runs. Also fixes a stale
+  `on.exit(function() options(old))` in `val_build()` that
+  constructed a function value and threw it away (never restored
+  the option snapshot) AND silently wiped the earlier
+  `on.exit(options(old_cfg), add = TRUE)` because it lacked
+  `add = TRUE`. (#181)
+
 # val.pipeline 0.1.59
 
 - **Fix `<U+2014>` fallback in the summary report subtitle and a few

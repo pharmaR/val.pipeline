@@ -185,6 +185,43 @@ apply_config_path <- function(config_path) {
 }
 
 
+#' Set `repos` and (conditionally) `pkgType` for a val_build() scope
+#'
+#' Sets `options(repos = opt_repos)` and, when `ref == "source"`, also
+#' `options(pkgType = "source")`. Returns the previous values in the
+#' form returned by [base::options()] so the caller can restore them
+#' via `on.exit(options(old), add = TRUE)`.
+#'
+#' Extracted from `val_build()` so the option-management contract is
+#' testable in isolation. The `ref` gate mirrors `val_build()`'s
+#' historical intent (source installs only for source-tier assessment)
+#' -- see #181 for the covr-coverage regression that motivated
+#' extracting this and the paired unconditional-set audit in
+#' `val_pipeline()` / `val_prep_pipeline()` / `val_categorize()`.
+#'
+#' @param ref One of `"source"` or `"remote"`. `pkgType = "source"` is
+#'   set only when `ref == "source"`; `"remote"` leaves the caller's
+#'   `pkgType` untouched.
+#' @param opt_repos Named character vector of repository URLs, as
+#'   accepted by `options(repos = ...)`.
+#'
+#' @return An `options()`-shaped list holding the previous values of
+#'   the slots we mutated (always includes `repos`; includes `pkgType`
+#'   only when `ref == "source"`). Suitable for
+#'   `on.exit(options(old), add = TRUE)`.
+#'
+#' @keywords internal
+apply_val_build_options <- function(ref, opt_repos) {
+  ref <- match.arg(ref, c("source", "remote"))
+  if (identical(ref, "source")) {
+    old <- options(repos = opt_repos, pkgType = "source")
+  } else {
+    old <- options(repos = opt_repos)
+  }
+  old
+}
+
+
 
 #' 
 #' Helper function to determine which repo a package came from
