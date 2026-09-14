@@ -334,15 +334,43 @@ val_build <- function(
   # with `options(val.pipeline.log_level = "verbose")` on disk. See
   # #87.
   log_file <- file.path(val_dir, "val_pipeline.log")
+  # Record the loaded val.pipeline version + its library slot in the
+  # banner so an operator can retrospectively answer "which
+  # val.pipeline built this?" from `val_pipeline.log` alone (rather
+  # than having to open `qual_metadata.rds$val_pipeline_ver` after the
+  # fact). The library slot is expressed as "N of M" of `.libPaths()`
+  # so a stale rv/renv snapshot at position 1 -- a common source of
+  # version-mismatch surprises when a user updates val.pipeline into
+  # their user library but the workbench-job runtime resolves it from
+  # a project library first -- is visible without a second command.
+  # See #179.
+  vp_ver <- as.character(utils::packageVersion("val.pipeline"))
+  vp_lib <- tryCatch(find.package("val.pipeline"),
+                     error = function(e) NA_character_)
+  vp_libpaths <- .libPaths()
+  vp_lib_slot <- if (!is.na(vp_lib)) {
+    # `find.package()` returns the package dir; its parent is the
+    # library. Match against `.libPaths()` by normalised path.
+    lib_dir <- dirname(vp_lib)
+    idx <- which(normalizePath(vp_libpaths, mustWork = FALSE) ==
+                 normalizePath(lib_dir, mustWork = FALSE))
+    if (length(idx) == 1L) {
+      sprintf(" (`.libPaths()` slot %d of %d)", idx, length(vp_libpaths))
+    } else ""
+  } else ""
   init_val_log(
     log_file,
     header = paste0("\n=== val_build() @ ",
                     format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"),
-                    " (R ", getRversion(), ", metric_pkg=", metric_pkg,
+                    " (val.pipeline ", vp_ver,
+                    ", R ", getRversion(), ", metric_pkg=", metric_pkg,
                     ", ref=", ref, ", workers=", workers, ") ===\n")
   )
   old_log_opts <- options(val.pipeline.log_file = log_file)
   on.exit(options(old_log_opts), add = TRUE)
+  val_msg(paste0("--> val.pipeline ", vp_ver,
+                 " loaded from '", vp_lib, "'", vp_lib_slot, ".\n"),
+          min_level = "minimal")
 
   # Mirror the parent session's .libPaths() into R_LIBS_SITE so every
   # subprocess spawned by riskmetric (rcmdcheck::rcmdcheck for the
