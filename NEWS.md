@@ -1,16 +1,15 @@
 # val.pipeline 0.1.60
 
-- **Log the loaded `val.pipeline` version and its library slot at the
-  top of every `val_build()` run** so an operator can retrospectively
-  answer "which val.pipeline built this?" from `val_pipeline.log`
-  alone (rather than having to open `qual_metadata.rds$val_pipeline_ver`
-  after the fact). The banner now reads
-  `=== val_build() @ ... (val.pipeline 0.1.60, R 4.5.2, ...) ===`
-  and a follow-up `val_msg()` line records the exact directory
-  `find.package("val.pipeline")` resolved to, plus its position in
-  `.libPaths()` -- so a stale rv / renv library at slot 1 (a common
-  source of "I installed the new version but the job picked up the
-  old one" surprises) is visible without a second command. (#179)
+- **Log the loaded `val.pipeline` version, install path, and library slot at
+  the top of every `val_build()` run** so an operator can retrospectively
+  answer "which val.pipeline built this?" from `val_pipeline.log` alone
+  (rather than having to open `qual_metadata.rds$val_pipeline_ver` after the
+  fact). All three fields land in the unconditional `init_val_log()` header
+  so a `log_level = "quiet"` run still records the origin; the follow-up
+  `val_msg()` line is a console-friendly echo. The library slot is
+  expressed as "N of M" so a stale rv / renv library at slot 1 -- a common
+  source of "I installed the new version but the job picked up the old
+  one" surprises -- is visible without a second command. (#179)
 
 # val.pipeline 0.1.59
 

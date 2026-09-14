@@ -334,16 +334,22 @@ val_build <- function(
   # with `options(val.pipeline.log_level = "verbose")` on disk. See
   # #87.
   log_file <- file.path(val_dir, "val_pipeline.log")
-  # Record the loaded val.pipeline version + its library slot in the
-  # banner so an operator can retrospectively answer "which
-  # val.pipeline built this?" from `val_pipeline.log` alone (rather
-  # than having to open `qual_metadata.rds$val_pipeline_ver` after the
-  # fact). The library slot is expressed as "N of M" of `.libPaths()`
-  # so a stale rv/renv snapshot at position 1 -- a common source of
-  # version-mismatch surprises when a user updates val.pipeline into
-  # their user library but the workbench-job runtime resolves it from
-  # a project library first -- is visible without a second command.
-  # See #179.
+  # Record the loaded val.pipeline version + its install path + its
+  # library slot in the banner so an operator can retrospectively
+  # answer "which val.pipeline built this?" from `val_pipeline.log`
+  # alone (rather than having to open `qual_metadata.rds$val_pipeline_ver`
+  # after the fact). The library slot is expressed as "N of M" of
+  # `.libPaths()` so a stale rv/renv snapshot at position 1 -- a
+  # common source of version-mismatch surprises when a user updates
+  # val.pipeline into their user library but the workbench-job
+  # runtime resolves it from a project library first -- is visible
+  # without a second command. See #179.
+  #
+  # All three fields are folded into the `init_val_log()` header
+  # (which writes unconditionally, regardless of log level) so a
+  # `log_level = "quiet"` run still records the origin. The
+  # subsequent `val_msg()` echo at min_level = "minimal" is for
+  # interactive console feedback and is fine to filter under quiet.
   vp_ver <- as.character(utils::packageVersion("val.pipeline"))
   vp_lib <- tryCatch(find.package("val.pipeline"),
                      error = function(e) NA_character_)
@@ -358,11 +364,15 @@ val_build <- function(
       sprintf(" (`.libPaths()` slot %d of %d)", idx, length(vp_libpaths))
     } else ""
   } else ""
+  vp_lib_txt <- if (!is.na(vp_lib)) {
+    paste0(", lib='", vp_lib, "'", vp_lib_slot)
+  } else ""
   init_val_log(
     log_file,
     header = paste0("\n=== val_build() @ ",
                     format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"),
                     " (val.pipeline ", vp_ver,
+                    vp_lib_txt,
                     ", R ", getRversion(), ", metric_pkg=", metric_pkg,
                     ", ref=", ref, ", workers=", workers, ") ===\n")
   )

@@ -170,11 +170,18 @@ cat("\n\n============================================================\n")
 cat("INSTALLED PKGS: version mismatches or presence delta\n")
 cat("(only relevant if val_prep_pipeline touched .libPaths / installed)\n")
 cat("============================================================\n")
-ai <- before$installed[, c("Package", "Version")]
-bi <- after$installed[,  c("Package", "Version")]
-names(ai)[2] <- "Version.before"
-names(bi)[2] <- "Version.after"
-diff_pkgs <- merge(ai, bi, by = "Package", all = TRUE)
+ai <- before$installed[, c("Package", "LibPath", "Version"), drop = FALSE]
+bi <- after$installed[,  c("Package", "LibPath", "Version"), drop = FALSE]
+ai <- as.data.frame(ai, stringsAsFactors = FALSE)
+bi <- as.data.frame(bi, stringsAsFactors = FALSE)
+names(ai)[3] <- "Version.before"
+names(bi)[3] <- "Version.after"
+# Merge on (Package, LibPath) — installed.packages() has one row per
+# pkg PER library slot, so a Package-only merge Cartesian-products
+# any pkg that appears in >1 slot (e.g. `.libPaths()` position 1 and
+# 3), yielding phantom "before != after" rows that are just row
+# reordering artifacts.
+diff_pkgs <- merge(ai, bi, by = c("Package", "LibPath"), all = TRUE)
 diff_pkgs <- diff_pkgs[with(diff_pkgs,
   is.na(Version.before) | is.na(Version.after) |
     Version.before != Version.after), ]
