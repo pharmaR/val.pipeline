@@ -1,15 +1,16 @@
 # Contract for apply_val_build_options(): sets `repos` (always) and
-# `pkgType = "source"` (only when ref == "source"), and returns the
+# `pkgType = "both"` (only when ref == "source"), and returns the
 # previous slot values in an `options()`-shaped list so the caller
 # can restore via `on.exit(options(old), add = TRUE)`. Root motivation
-# is #181 -- the outer `val_pipeline()` seam used to set
-# `pkgType = "source"` unconditionally, diverging parent-session
-# state between `val_pipeline() -> val_build()` and bare `val_build()`
-# and silently regressing covr_coverage on some source-tier packages.
+# is #181 -- entering val_build under `getOption('pkgType') == 'source'`
+# regressed covr_coverage on some source-tier packages (>90% on logrx
+# became ~62%). `"both"` keeps the offline available.packages() cache
+# complete for the dependency install probe while `ref = "source"`
+# still drives val.pipeline's own source-tarball assessment path.
 
 test_that("apply_val_build_options(ref = 'source') sets repos AND pkgType", {
   withr::with_options(
-    list(repos = c(CRAN = "https://old.example/cran"), pkgType = "both"),
+    list(repos = c(CRAN = "https://old.example/cran"), pkgType = "binary"),
     {
       old <- apply_val_build_options(
         ref = "source",
@@ -21,17 +22,37 @@ test_that("apply_val_build_options(ref = 'source') sets repos AND pkgType", {
                    "https://new.example/cran")
       expect_equal(getOption("repos")[["BioC"]],
                    "https://new.example/bioc")
-      expect_equal(getOption("pkgType"), "source")
+      # #181: source-tier assessment must force pkgType = "both"
+      # (NOT "source") so the offline available.packages() cache built
+      # by configure_riskmetric_offline_if_requested() stays complete.
+      expect_equal(getOption("pkgType"), "both")
       # Returned `old` captured both slots verbatim, ready for
       # `options(old)`.
       expect_setequal(names(old), c("repos", "pkgType"))
       expect_equal(old$repos[["CRAN"]], "https://old.example/cran")
-      expect_equal(old$pkgType, "both")
+      expect_equal(old$pkgType, "binary")
       # Restoring returns state to the with_options snapshot.
       options(old)
-      expect_equal(getOption("pkgType"), "both")
+      expect_equal(getOption("pkgType"), "binary")
       expect_equal(getOption("repos")[["CRAN"]],
                    "https://old.example/cran")
+    }
+  )
+})
+
+test_that("apply_val_build_options(ref = 'source') never sets pkgType='source'", {
+  # Regression guard for #181: the intuitive-but-wrong direction was
+  # pkgType = "source" for source-tier assessment. Force any future
+  # attempt to flip this back to fail loudly here.
+  withr::with_options(
+    list(repos = NULL, pkgType = "binary"),
+    {
+      old <- apply_val_build_options(
+        ref = "source",
+        opt_repos = c(CRAN = "https://new.example/cran")
+      )
+      expect_false(identical(getOption("pkgType"), "source"))
+      options(old)
     }
   )
 })

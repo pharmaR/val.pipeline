@@ -188,18 +188,39 @@ apply_config_path <- function(config_path) {
 #' Set `repos` and (conditionally) `pkgType` for a val_build() scope
 #'
 #' Sets `options(repos = opt_repos)` and, when `ref == "source"`, also
-#' `options(pkgType = "source")`. Returns the previous values in the
+#' `options(pkgType = "both")`. Returns the previous values in the
 #' form returned by [base::options()] so the caller can restore them
 #' via `on.exit(options(old), add = TRUE)`.
 #'
-#' Extracted from `val_build()` so the option-management contract is
-#' testable in isolation. The `ref` gate mirrors `val_build()`'s
-#' historical intent (source installs only for source-tier assessment)
-#' -- see #181 for the covr-coverage regression that motivated
-#' extracting this and the paired unconditional-set audit in
-#' `val_pipeline()` / `val_prep_pipeline()` / `val_categorize()`.
+#' # Why `pkgType = "both"` for source-tier assessment (not `"source"`)
 #'
-#' @param ref One of `"source"` or `"remote"`. `pkgType = "source"` is
+#' Intuition would say "source-tier assessment => `pkgType = 'source'`",
+#' but that combination is exactly what regressed `covr_coverage` on
+#' logrx from >90% to ~62% (see #181). Reproduced empirically:
+#' entering `val_build(ref = "source", ...)` under
+#' `getOption('pkgType') == 'source'` produces the ~62% number;
+#' entering under `"both"` or `"binary"` produces >90%. The likely
+#' mechanism: `configure_riskmetric_offline_if_requested()` (which
+#' runs near the top of val_build's body) calls
+#' `utils::available.packages()`, whose default `type = getOption('pkgType')`
+#' filters the resolved cache. Under `"source"` the cache is
+#' source-only -- packages available only as binaries in a PPM-style
+#' mirror drop out of the offline cache, and downstream install
+#' probes for a source-tier package's test-time dependencies fail
+#' silently (test suite short-circuits, covr reports the resulting
+#' partial coverage). `"both"` returns the fullest cache while still
+#' allowing source installs where source is what's actually needed.
+#'
+#' `ref` still governs val.pipeline's OWN source-vs-remote assessment
+#' path (see `val_pkg()`'s tarball fetch) -- `pkgType` here only
+#' controls what `install.packages()` / `available.packages()` do
+#' for the dependency install probe, which we want as permissive
+#' as possible.
+#'
+#' Extracted from `val_build()` so the option-management contract is
+#' testable in isolation.
+#'
+#' @param ref One of `"source"` or `"remote"`. `pkgType = "both"` is
 #'   set only when `ref == "source"`; `"remote"` leaves the caller's
 #'   `pkgType` untouched.
 #' @param opt_repos Named character vector of repository URLs, as
@@ -214,7 +235,7 @@ apply_config_path <- function(config_path) {
 apply_val_build_options <- function(ref, opt_repos) {
   ref <- match.arg(ref, c("source", "remote"))
   if (identical(ref, "source")) {
-    old <- options(repos = opt_repos, pkgType = "source")
+    old <- options(repos = opt_repos, pkgType = "both")
   } else {
     old <- options(repos = opt_repos)
   }

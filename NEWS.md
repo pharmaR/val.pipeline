@@ -1,26 +1,32 @@
 # val.pipeline 0.1.60
 
 - **Stop `val_pipeline()` from silently regressing covr_coverage on
-  some source-tier packages.** The outer seam in `val_pipeline()`
-  pushed `options(pkgType = "source")` into the parent session
-  before dispatching to `val_build()`, unconditionally and outside
-  the `ref` gate. That pre-set changed the state
-  `configure_bioc_repositories_if_requested()` (which `val_build()`
-  calls at entry) resolved its `available.packages()` cache under,
-  so the same `val_build(pkg_names = "logrx", ref = "source", ...)`
-  returned >90% covr_coverage when called directly but ~62% when
-  called through `val_pipeline()`. The outer set is now removed; the
-  `pkgType` slot is owned in exactly one place -- `val_build()`,
-  via the new `apply_val_build_options()` helper, gated on
-  `ref == "source"` and set AFTER
-  `configure_bioc_repositories_if_requested()` so the bioc-config
-  step still runs under the caller's session `pkgType` (the state
-  the historical bare-`val_build()` code path resolved bioc under,
-  which produced the accurate covr numbers). Also fixes a stale
-  `on.exit(function() options(old))` in `val_build()` that
-  constructed a function value and threw it away (never restored
-  the option snapshot) AND silently wiped the earlier
-  `on.exit(options(old_cfg), add = TRUE)` because it lacked
+  some source-tier packages.** Two related fixes for #181:
+  1. The outer seam in `val_pipeline()` pushed
+     `options(pkgType = "source")` into the parent session before
+     dispatching to `val_build()`, unconditionally and outside the
+     `ref` gate. That set is now removed; `pkgType` is owned in
+     exactly one place -- `val_build()`, via the new
+     `apply_val_build_options()` helper, gated on `ref == "source"`.
+  2. For source-tier assessment, `val_build()` now sets
+     `pkgType = "both"` (NOT `"source"`). Entering `val_build()`
+     under `getOption('pkgType') == 'source'` was reproducibly
+     regressing logrx from >90% to ~62% covr_coverage. Likely
+     mechanism: `configure_riskmetric_offline_if_requested()`
+     (which `val_build()` calls near entry) uses
+     `utils::available.packages()`, whose default `type` filter
+     narrows the offline cache to source-only under
+     `pkgType == "source"` -- any dependency present only as a
+     binary in a PPM-style mirror drops out and downstream
+     test-time installs fail silently. `"both"` keeps the cache
+     complete (binary-preferred, source fallback) while
+     `ref = "source"` still drives val.pipeline's own
+     source-tarball assessment path in `val_pkg()`.
+
+  Also fixes a stale `on.exit(function() options(old))` in
+  `val_build()` that constructed a function value and threw it away
+  (never restored the option snapshot) AND silently wiped the
+  earlier `on.exit(options(old_cfg), add = TRUE)` because it lacked
   `add = TRUE`. (#181)
 
 # val.pipeline 0.1.59

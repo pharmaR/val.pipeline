@@ -233,19 +233,22 @@ val_build <- function(
   remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
   # opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
 
-  # Establish `options(repos, pkgType)` AFTER
-  # `configure_bioc_repositories_if_requested()` +
-  # `configure_riskmetric_offline_if_requested()` on purpose: the
-  # bioc helper only installs a `assignInNamespace("repositories",
-  # ...)` shim (no `available.packages()` call of its own), but the
-  # riskmetric-offline helper DOES call `available.packages()` (see
-  # `R/bioc.R`) to build its offline cache. Pre-poisoning the caller
-  # session with `pkgType = "source"` before that cache is built
-  # produces a different cache and silently regressed covr_coverage
-  # on some source-tier packages (>90% on logrx under bare
-  # `val_build()`, ~62% when the same call was reached through
-  # `val_pipeline()` because the outer seam unconditionally pushed
-  # `pkgType = "source"` into the parent session first). See #181.
+  # For `ref == "source"` runs, force `options(pkgType = "both")` --
+  # NOT `"source"`. See `apply_val_build_options()` in `R/utils.R`
+  # for the full mechanism; short version: entering val_build under
+  # `getOption('pkgType') == 'source'` regressed covr_coverage on
+  # some source-tier packages (>90% on logrx became ~62%),
+  # reproduced empirically by Aaron. The likely offender is
+  # `configure_riskmetric_offline_if_requested()` above -- it calls
+  # `available.packages()`, whose default `type` filter narrows the
+  # offline cache to source-only when `pkgType == "source"`, so any
+  # dep only present as a binary in a PPM-style mirror drops out
+  # and downstream test-time installs fail silently.
+  #
+  # `"both"` keeps the cache complete (binary-preferred, source
+  # fallback) while `ref = "source"` still governs val.pipeline's
+  # own source-tarball assessment path in `val_pkg()`. See #181.
+  #
   # The `on.exit(options(old), add = TRUE)` guard restores whichever
   # slots we mutated -- fixes the previous
   # `on.exit(function() options(old))` which constructed a function
