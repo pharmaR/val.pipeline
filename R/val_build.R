@@ -234,16 +234,20 @@ val_build <- function(
   # opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
 
   # Establish `options(repos, pkgType)` AFTER
-  # `configure_bioc_repositories_if_requested()` on purpose: the bioc
-  # helper's `available.packages()` probe must run under whatever
-  # `pkgType` the caller's session carried at entry -- pre-poisoning
-  # it with `pkgType = "source"` produces a different bioc-repo cache
-  # and silently regressed covr_coverage on some source-tier packages
-  # (>90% on logrx under bare `val_build()`, ~62% when the same call
-  # was reached through `val_pipeline()` because the outer seam
-  # unconditionally pushed `pkgType = "source"` into the parent
-  # session first). See #181. The `on.exit(options(old), add = TRUE)`
-  # guard restores whichever slots we mutated -- fixes the previous
+  # `configure_bioc_repositories_if_requested()` +
+  # `configure_riskmetric_offline_if_requested()` on purpose: the
+  # bioc helper only installs a `assignInNamespace("repositories",
+  # ...)` shim (no `available.packages()` call of its own), but the
+  # riskmetric-offline helper DOES call `available.packages()` (see
+  # `R/bioc.R`) to build its offline cache. Pre-poisoning the caller
+  # session with `pkgType = "source"` before that cache is built
+  # produces a different cache and silently regressed covr_coverage
+  # on some source-tier packages (>90% on logrx under bare
+  # `val_build()`, ~62% when the same call was reached through
+  # `val_pipeline()` because the outer seam unconditionally pushed
+  # `pkgType = "source"` into the parent session first). See #181.
+  # The `on.exit(options(old), add = TRUE)` guard restores whichever
+  # slots we mutated -- fixes the previous
   # `on.exit(function() options(old))` which constructed a function
   # value and threw it away (never restored options) and lacked
   # `add = TRUE` (silently wiped the earlier config-path on.exit).

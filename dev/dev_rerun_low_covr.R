@@ -133,14 +133,15 @@ val_date <- if (!is.null(VAL_DATE_OVERRIDE)) VAL_DATE_OVERRIDE else {
   if (exists("val_date")) get("val_date") else Sys.Date()
 }
 workers <- if (exists("workers")) get("workers") else 5L
-config_path <- if (exists("config_path")) get("config_path") else file.path(getwd(), "config.yml")
+config_path <- if (exists("config_path")) get("config_path") else NULL
 
 cat("\nRe-run settings:\n")
 cat("  val_date         : ", format(val_date), "\n")
 cat("  workers          : ", workers, "\n")
 cat("  ref              : ", ref, "\n")
 cat("  out              : ", out, "\n")
-cat("  config_path      : ", config_path, "\n\n")
+cat("  config_path      : ",
+    if (is.null(config_path)) "<val_build default>" else config_path, "\n\n")
 
 # =============================================================================
 # GO / NO-GO prompt (interactive sessions only)
