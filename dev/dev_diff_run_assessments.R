@@ -212,7 +212,6 @@ if (is.null(rd_map)) {
       unique(pieces[nzchar(pieces) & pieces != "R"])
     }
     counts <- integer(nrow(qm_src))
-    names(counts) <- qm_src$package
     all_deps <- lapply(seq_len(nrow(qm_src)),
                        function(i) coalesce_deps(qm_src[i, , drop = FALSE]))
     dep_tbl <- table(unlist(all_deps))
@@ -359,22 +358,46 @@ cat("\n")
 
 # ---- Optional decision-category shift ------------------------------
 
+# qual_metadata keys on `pkg` (not `package` like qual_assessments does).
+# Accept either; user-supplied frames from unrelated sources might use
+# `pkg_name` too. First match wins.
+.qm_key_col <- function(df) {
+  cands <- c("package", "pkg", "pkg_name")
+  hit <- intersect(cands, names(df))
+  if (length(hit) == 0L) return(NA_character_)
+  hit[[1L]]
+}
+
 dec_tab <- NULL
 if (!is.null(old_qm_df) && !is.null(new_qm_df) &&
     "final_decision" %in% names(old_qm_df) &&
     "final_decision" %in% names(new_qm_df)) {
-  om <- old_qm_df[, c("package", "final_decision"), drop = FALSE]
-  nm <- new_qm_df[, c("package", "final_decision"), drop = FALSE]
-  names(om)[2] <- "decision_old"
-  names(nm)[2] <- "decision_new"
-  dec <- merge(om, nm, by = "package", all = FALSE)
-  dec <- dec[dec$package %in% shared, , drop = FALSE]
-  cat("== Decision-category shift (old -> new) ===============\n")
-  dec_tab <- table(dec$decision_old, dec$decision_new,
-                   useNA = "ifany", dnn = c("old", "new"))
-  print(dec_tab)
-  cat("=======================================================\n\n")
-  diff_df <- merge(diff_df, dec, by = "package", all.x = TRUE)
+  old_key <- .qm_key_col(old_qm_df)
+  new_key <- .qm_key_col(new_qm_df)
+  if (is.na(old_key) || is.na(new_key)) {
+    cat("Warning: qm frames lack a recognizable key column ",
+        "(none of package/pkg/pkg_name found); skipping decision diff.\n",
+        sep = "")
+  } else {
+    om <- data.frame(
+      package       = old_qm_df[[old_key]],
+      decision_old  = old_qm_df$final_decision,
+      stringsAsFactors = FALSE
+    )
+    nm <- data.frame(
+      package       = new_qm_df[[new_key]],
+      decision_new  = new_qm_df$final_decision,
+      stringsAsFactors = FALSE
+    )
+    dec <- merge(om, nm, by = "package", all = FALSE)
+    dec <- dec[dec$package %in% shared, , drop = FALSE]
+    cat("== Decision-category shift (old -> new) ===============\n")
+    dec_tab <- table(dec$decision_old, dec$decision_new,
+                     useNA = "ifany", dnn = c("old", "new"))
+    print(dec_tab)
+    cat("=======================================================\n\n")
+    diff_df <- merge(diff_df, dec, by = "package", all.x = TRUE)
+  }
 }
 
 # ---- Persist frame -------------------------------------------------
