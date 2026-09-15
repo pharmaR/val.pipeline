@@ -17,3 +17,4 @@ dev/nfs_smb_latency_probe.txt
 # Sensitive per-run artifacts (do not commit)
 dev/low_covr.rds
 dev/low_covr_rerun_compare_*.rds
+dev/covr_diff_*.rds
