@@ -18,3 +18,4 @@ dev/nfs_smb_latency_probe.txt
 dev/low_covr.rds
 dev/low_covr_rerun_compare_*.rds
 dev/covr_diff_*.rds
+dev/covr_diff_*.html
