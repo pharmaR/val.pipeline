@@ -232,16 +232,31 @@ val_build <- function(
   decisions <- pull_config(val = "decisions_lst", rule_type = "default")
   remote_pkgs <- pull_config(val = "remote_only", rule_type = "default")
   # opt_repos <- pull_config(val = "opt_repos", rule_type = "default") |> unlist()
-  
-  old <- options()
-  on.exit(function() options(old))
-  if(ref == 'source') {
-    options(repos = opt_repos, pkgType = "source") # , rlang_interactive = FALSE
-  } else {
-    options(repos = opt_repos) # , rlang_interactive = FALSE
-  }
-  # options("repos")
-  
+
+  # For `ref == "source"` runs, force `options(pkgType = "both")` --
+  # NOT `"source"`. See `apply_val_build_options()` in `R/utils.R`
+  # for the full mechanism; short version: entering val_build under
+  # `getOption('pkgType') == 'source'` regressed covr_coverage on
+  # some source-tier packages (>90% on logrx became ~62%),
+  # reproduced empirically by Aaron. The likely offender is
+  # `configure_riskmetric_offline_if_requested()` above -- it calls
+  # `available.packages()`, whose default `type` filter narrows the
+  # offline cache to source-only when `pkgType == "source"`, so any
+  # dep only present as a binary in a PPM-style mirror drops out
+  # and downstream test-time installs fail silently.
+  #
+  # `"both"` keeps the cache complete (binary-preferred, source
+  # fallback) while `ref = "source"` still governs val.pipeline's
+  # own source-tarball assessment path in `val_pkg()`. See #181.
+  #
+  # The `on.exit(options(old), add = TRUE)` guard restores whichever
+  # slots we mutated -- fixes the previous
+  # `on.exit(function() options(old))` which constructed a function
+  # value and threw it away (never restored options) and lacked
+  # `add = TRUE` (silently wiped the earlier config-path on.exit).
+  old <- apply_val_build_options(ref = ref, opt_repos = opt_repos)
+  on.exit(options(old), add = TRUE)
+
   #
   # ---- Which pkgs, ordered ----
   #

@@ -13,3 +13,9 @@ dev/nfs_smb_latency_probe.txt
 # run under devtools::test(). Ignore any *-tests/ dir so a stray test
 # run doesn't accidentally commit hundreds of files.
 *-tests/
+
+# Sensitive per-run artifacts (do not commit)
+dev/low_covr.rds
+dev/low_covr_rerun_compare_*.rds
+dev/covr_diff_*.rds
+dev/covr_diff_*.html
