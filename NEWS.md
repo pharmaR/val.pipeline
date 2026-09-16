@@ -1,4 +1,4 @@
-# val.pipeline 0.1.60
+# val.pipeline 0.2.1
 
 - **Log the loaded `val.pipeline` version, install path, and library slot at
   the top of every `val_build()` run** so an operator can retrospectively
@@ -10,6 +10,33 @@
   expressed as "N of M" so a stale rv / renv library at slot 1 -- a common
   source of "I installed the new version but the job picked up the old
   one" surprises -- is visible without a second command. (#179)
+  
+# val.pipeline 0.2.0
+
+- **Breaking, but almost certainly what you want**:
+  `write_qualified_pkg_lists()` now expands the `blocklist-BioC.txt`
+  file against the full [`available.packages()`] universe by default
+  (`use_full_universe = TRUE`). The pre-0.2.0 behaviour was to
+  blocklist only the *assessed* BioC set, so any BioC package
+  dropped at `remote_reduce` (or otherwise never seen by the
+  pipeline) was absent from both the allowlist and the blocklist --
+  PPM would silently serve it. Smoke test on the 2026-07-30 prod run
+  showed 2,150 BioC packages leaking past the old blocklist. Pass
+  `use_full_universe = FALSE` to restore the pre-0.2.0 behaviour
+  (useful on offline / network-restricted runners). If the network
+  call fails at runtime, the function falls back to the
+  assessed-only blocklist with a warning instead of aborting.
+- **New**: exported `build_bioc_blocklist()` returns the BioC
+  blocklist as a data frame with `package`, `version`, `matched_repo`,
+  and `reason` (`not_assessed` vs `assessed_<risk>`) columns. Useful
+  for auditing or building custom provisioning reports.
+- **New**: exported `is_bioc_repo()` helper detects BioC entries in a
+  named `repos` vector via case-insensitive substring `"bioc"` match
+  on **both** the alias name and the URL. Covers non-OSS forks that
+  consolidate the four BioC sub-repos into a single entry, plus
+  URL-only aliases (e.g. an internal mirror named `sci` whose URL is
+  a Bioconductor path). (#183)
+
 
 # val.pipeline 0.1.59
 

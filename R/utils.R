@@ -2962,6 +2962,25 @@ format_runtime_seconds <- function(secs) {
 #'   `qualified-<source>.txt`. Defaults to the value of
 #'   `blocklist_sources` in `inst/config.yml` (currently `c("BioC")`).
 #'   Pass `character()` to force allow-list output for every source.
+#' @param use_full_universe Logical(1). When `TRUE` (the default),
+#'   any BioC-detected source in `blocklist_sources` has its blocklist
+#'   expanded against the full [utils::available.packages()] universe
+#'   for the effective BioC repo(s), via [build_bioc_blocklist()].
+#'   Without this, packages dropped at `remote_reduce` (or otherwise
+#'   never assessed) leak past both the allowlist and the blocklist,
+#'   and PPM would silently serve them. Set to `FALSE` to preserve
+#'   the pre-0.2.0 behaviour (assessed-only inverse) — useful on
+#'   offline / network-restricted runners where
+#'   `available.packages()` can't reach the BioC repo. If the network
+#'   call fails at runtime, this function falls back to the
+#'   assessed-only blocklist with a warning rather than aborting the
+#'   whole write.
+#' @param opt_repos Named list/character of `alias -> URL`, forwarded
+#'   to [build_bioc_blocklist()] when `use_full_universe = TRUE`.
+#'   `NULL` (default) means read from the effective config.
+#' @param config_path Optional `config.yml` path, forwarded to
+#'   [build_bioc_blocklist()] when `use_full_universe = TRUE` and
+#'   `opt_repos` is `NULL`.
 #'
 #' @return Invisibly, a named character vector: names are the source
 #'   labels (e.g. `"CRAN"`, `"BioC"`), values are the absolute paths of
@@ -2974,12 +2993,16 @@ write_qualified_pkg_lists <- function(
     qualified_decision = pull_config(val = "decisions_lst",
                                      rule_type = "default")[1],
     blocklist_sources = pull_config(val = "blocklist_sources",
-                                    rule_type = "default")
+                                    rule_type = "default"),
+    use_full_universe = TRUE,
+    opt_repos = NULL,
+    config_path = NULL
 ) {
   stopifnot(
     is.data.frame(qual_metadata),
     is.character(out_dir), length(out_dir) == 1L, nzchar(out_dir),
-    is.character(qualified_decision), length(qualified_decision) == 1L
+    is.character(qualified_decision), length(qualified_decision) == 1L,
+    is.logical(use_full_universe), length(use_full_universe) == 1L
   )
   if (is.null(blocklist_sources)) blocklist_sources <- character()
   stopifnot(is.character(blocklist_sources))
@@ -3073,12 +3096,71 @@ write_qualified_pkg_lists <- function(
   #
   # Unknown-source rows never produce a blocklist file — the "NA"
   # bucket is allow-list-only.
+  #
+  # Resolve the effective repo map once so BioC gating below can
+  # classify a source by BOTH its alias AND its URL. Pre-empts the
+  # URL-only-alias case: blocklist_sources = "sci" with
+  # opt_repos = list(sci = ".../bioconductor/...") should still fire
+  # the expansion even though "sci" doesn't contain "bioc".
+  effective_repos <- if (isTRUE(use_full_universe)) {
+    tryCatch(
+      as.list(.resolve_opt_repos(opt_repos = opt_repos,
+                                 config_path = config_path)),
+      error = function(e) list()  # no config -> skip URL classification
+    )
+  } else {
+    list()
+  }
   all_sources <- sort(unique(qual_metadata$repo_name))
   written <- character(0)
   for (src in all_sources) {
     src_rows <- qual_metadata$repo_name == src
     if (src %in% blocklist_sources && src != "NA") {
       pkgs <- sort(unique(qual_metadata$pkg[src_rows & !is_qualified]))
+      # For BioC-detected sources with use_full_universe = TRUE,
+      # expand the blocklist against the full available.packages()
+      # universe. This closes the leak where BioC pkgs dropped at
+      # remote_reduce (or otherwise never assessed) are missing from
+      # both the allowlist and the blocklist — PPM would serve them.
+      # Network failures are non-fatal here: fall back to the
+      # assessed-only inverse with a warning so the surrounding
+      # allowlist writes still succeed.
+      #
+      # Classify src by both its alias AND the URL mapped from the
+      # effective repo map, so URL-only-alias configs still trigger.
+      src_url <- if (src %in% names(effective_repos)) {
+        as.character(effective_repos[[src]])
+      } else {
+        ""
+      }
+      if (isTRUE(use_full_universe) &&
+          any(is_bioc_repo(stats::setNames(src_url, src)))) {
+        expanded <- tryCatch(
+          build_bioc_blocklist(
+            qual_metadata      = qual_metadata,
+            opt_repos          = opt_repos,
+            config_path        = config_path,
+            qualified_decision = qualified_decision
+          ),
+          error = function(e) {
+            warning(
+              "build_bioc_blocklist() failed for source '", src,
+              "'; falling back to assessed-only blocklist. Reason: ",
+              conditionMessage(e),
+              call. = FALSE
+            )
+            NULL
+          }
+        )
+        # Only NULL (== error caught) preserves the assessed-only
+        # `pkgs`. A zero-row data frame is a deliberate result (every
+        # universe pkg is on the allowlist) and must replace `pkgs`
+        # so we don't silently blocklist an assessed_High pkg that's
+        # absent from the current universe.
+        if (!is.null(expanded)) {
+          pkgs <- sort(unique(expanded$package))
+        }
+      }
       out_file <- file.path(out_dir, paste0("blocklist-", src, ".txt"))
       label <- "blocklisted"
     } else {
