@@ -248,7 +248,8 @@ test_that("write_qualified_pkg_lists() emits blocklist-<src>.txt for blocklist_s
   out_dir <- withr::local_tempdir()
   paths <- write_qualified_pkg_lists(qm, out_dir,
                                      qualified_decision = "Low",
-                                     blocklist_sources = "BioC")
+                                     blocklist_sources = "BioC",
+                                     use_full_universe = FALSE)
 
   expect_named(paths, c("BioC", "CRAN"))
   # BioC file is a blocklist of non-qualified pkgs; qualified 'limma' excluded.
@@ -275,7 +276,8 @@ test_that("write_qualified_pkg_lists() supports multiple blocklist sources", {
   out_dir <- withr::local_tempdir()
   paths <- write_qualified_pkg_lists(qm, out_dir,
                                      qualified_decision = "Low",
-                                     blocklist_sources = c("BioC", "github"))
+                                     blocklist_sources = c("BioC", "github"),
+                                     use_full_universe = FALSE)
 
   expect_setequal(names(paths), c("BioC", "CRAN", "github"))
   expect_equal(basename(paths[["BioC"]]),   "blocklist-BioC.txt")
@@ -302,7 +304,8 @@ test_that("write_qualified_pkg_lists() writes an EMPTY blocklist file when every
   out_dir <- withr::local_tempdir()
   paths <- write_qualified_pkg_lists(qm, out_dir,
                                      qualified_decision = "Low",
-                                     blocklist_sources = "BioC")
+                                     blocklist_sources = "BioC",
+                                     use_full_universe = FALSE)
 
   expect_true(file.exists(file.path(out_dir, "blocklist-BioC.txt")))
   # File exists, but contains zero package names.
@@ -325,7 +328,8 @@ test_that("write_qualified_pkg_lists() ignores blocklist_sources = 'NA' (unknown
   suppressMessages(
     paths <- write_qualified_pkg_lists(qm, out_dir,
                                        qualified_decision = "Low",
-                                       blocklist_sources = c("BioC", "NA"))
+                                       blocklist_sources = c("BioC", "NA"),
+                                       use_full_universe = FALSE)
   )
   expect_true(file.exists(file.path(out_dir, "qualified-NA.txt")))
   expect_false(file.exists(file.path(out_dir, "blocklist-NA.txt")))
@@ -344,9 +348,96 @@ test_that("write_qualified_pkg_lists() blocklist_sources default comes from conf
   out_dir <- withr::local_tempdir()
   # No blocklist_sources argument -> pull_config() default should kick
   # in and route BioC into blocklist-BioC.txt.
-  paths <- write_qualified_pkg_lists(qm, out_dir, qualified_decision = "Low")
+  paths <- write_qualified_pkg_lists(qm, out_dir, qualified_decision = "Low",
+                                     use_full_universe = FALSE)
 
   expect_true(file.exists(file.path(out_dir, "blocklist-BioC.txt")))
   expect_false(file.exists(file.path(out_dir, "qualified-BioC.txt")))
   expect_equal(readLines(file.path(out_dir, "blocklist-BioC.txt")), "edgeR")
+})
+
+
+test_that("write_qualified_pkg_lists(use_full_universe = TRUE) expands BioC blocklist against available.packages()", {
+  # This is the 0.2.0 default behaviour. build_bioc_blocklist() is
+  # invoked when the source is BioC-detected and in blocklist_sources.
+  qm <- data.frame(
+    pkg            = c("dplyr", "affy",  "limma", "AnnotationDbi"),
+    repo_name      = c("CRAN",  "BioC",  "BioC",  "BioC"),
+    final_decision = c("Low",   "Low",   "Low",   "High"),
+    stringsAsFactors = FALSE
+  )
+  # Fake universe must exceed min_universe (default 100) so the
+  # guardrail doesn't fall back to the assessed-only inverse.
+  fake_pkgs <- c("affy", "limma", "AnnotationDbi",
+                 "GenomeInfoDb", "SummarizedExperiment",
+                 sprintf("filler%03d", seq_len(120)))
+  ap_fake <- cbind(
+    Package    = fake_pkgs,
+    Version    = "1.0.0",
+    Repository = "https://bioconductor.org/packages/3.22/bioc/src/contrib"
+  )
+  testthat::local_mocked_bindings(
+    available.packages = function(...) ap_fake,
+    .package = "utils"
+  )
+
+  out_dir <- withr::local_tempdir()
+  paths <- write_qualified_pkg_lists(
+    qm, out_dir,
+    qualified_decision = "Low",
+    blocklist_sources  = "BioC",
+    use_full_universe  = TRUE,
+    opt_repos = list(BioC = "https://bioconductor.org/packages/3.22/bioc",
+                     CRAN = "https://cran.rstudio.com")
+  )
+
+  bl <- readLines(file.path(out_dir, "blocklist-BioC.txt"))
+  # Expanded blocklist:
+  #   assessed_High: AnnotationDbi
+  #   not_assessed: GenomeInfoDb, SummarizedExperiment, filler001..filler120
+  # Excludes assessed_Low: affy, limma.
+  expect_true("AnnotationDbi" %in% bl)
+  expect_true("GenomeInfoDb" %in% bl)
+  expect_true("SummarizedExperiment" %in% bl)
+  expect_false("affy" %in% bl)
+  expect_false("limma" %in% bl)
+  # And every one of the 120 filler pkgs (never-seen-by-pipeline) is on
+  # the blocklist — that's exactly the leak this feature closes.
+  expect_true(all(sprintf("filler%03d", seq_len(120)) %in% bl))
+  expect_equal(length(bl), 123L)
+  # CRAN allowlist is untouched by the BioC expansion.
+  expect_equal(readLines(file.path(out_dir, "qualified-CRAN.txt")), "dplyr")
+})
+
+
+test_that("write_qualified_pkg_lists() falls back to assessed-only if build_bioc_blocklist() fails", {
+  # available.packages() throwing should not abort the whole write —
+  # the surrounding qualified-CRAN.txt still needs to be produced.
+  qm <- data.frame(
+    pkg            = c("dplyr", "limma", "edgeR"),
+    repo_name      = c("CRAN",  "BioC",  "BioC"),
+    final_decision = c("Low",   "Low",   "High"),
+    stringsAsFactors = FALSE
+  )
+  testthat::local_mocked_bindings(
+    available.packages = function(...) stop("network down"),
+    .package = "utils"
+  )
+
+  out_dir <- withr::local_tempdir()
+  expect_warning(
+    paths <- write_qualified_pkg_lists(
+      qm, out_dir,
+      qualified_decision = "Low",
+      blocklist_sources  = "BioC",
+      use_full_universe  = TRUE,
+      opt_repos = list(BioC = "https://bioconductor.org/packages/3.22/bioc",
+                       CRAN = "https://cran.rstudio.com")
+    ),
+    regexp = "falling back to assessed-only"
+  )
+  # Fell back to the assessed-only inverse: just edgeR (limma is Low).
+  expect_equal(readLines(file.path(out_dir, "blocklist-BioC.txt")), "edgeR")
+  # And the CRAN allowlist still writes correctly.
+  expect_equal(readLines(file.path(out_dir, "qualified-CRAN.txt")), "dplyr")
 })
