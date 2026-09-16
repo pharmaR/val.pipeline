@@ -128,6 +128,19 @@ build_bioc_blocklist <- function(
     stop("qual_metadata is missing 'final_decision'.", call. = FALSE)
   }
 
+  # Prefer the run's snapshotted config.yml when val_dir is provided
+  # and the caller didn't pin one explicitly. Historical runs pin BioC
+  # to a specific release; resolving opt_repos from the session/installed
+  # config would compare an old run's decisions against a newer BioC
+  # universe (config drift). Same convention val_finalize() uses.
+  if (is.null(opt_repos) && is.null(config_path) && !is.null(val_dir)) {
+    snapshot <- file.path(val_dir, "config.yml")
+    if (file.exists(snapshot)) {
+      message("---- Using snapshotted config: ", snapshot)
+      config_path <- snapshot
+    }
+  }
+
   repos_lst <- .resolve_opt_repos(opt_repos = opt_repos,
                                   config_path = config_path)
 
@@ -174,11 +187,20 @@ build_bioc_blocklist <- function(
   # Trim to unique packages, keeping the first repo we saw them in.
   universe <- universe[!duplicated(universe$package), , drop = FALSE]
 
-  # Identify BioC rows in qm.
+  # Identify BioC rows in qm. Two paths need to agree:
+  #  (a) repo_name matches an alias in bioc_repos (catches URL-only
+  #      matches like alias="sci" -> bioc URL — the substring-on-name
+  #      check would miss those).
+  #  (b) repo_name contains "bioc" case-insensitively (catches
+  #      riskmetric-derived labels like "BioCsoft" that don't
+  #      literally equal the config alias).
+  # Union covers both.
   qm_pkg <- qm[[key_col]]
   if ("repo_name" %in% names(qm)) {
-    qm_bioc_mask <- grepl("bioc", qm$repo_name, ignore.case = TRUE) &
-      !is.na(qm$repo_name)
+    qm_bioc_mask <- (
+      (!is.na(qm$repo_name) & qm$repo_name %in% names(bioc_repos)) |
+      (!is.na(qm$repo_name) & grepl("bioc", qm$repo_name, ignore.case = TRUE))
+    )
   } else {
     # No repo_name -> assume every assessed pkg that also appears in
     # the BioC universe belongs to BioC. Coarse, but safe: we only use

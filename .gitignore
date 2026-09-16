@@ -7,6 +7,11 @@ dev/riskassessments/*
 dev/riskmetric-bioc-available-shim.txt
 dev/air-gapped-bioc-mirror-config.txt
 dev/nfs_smb_latency_probe.txt
+dev/low_covr.rds
+dev/low_covr_rerun_compare_*.rds
+dev/covr_diff_*.rds
+dev/covr_diff_*.html
+dev/blocklist-BioC-full-*.csv
 
 # testthat scratch directories: some upstream packages' test suites
 # copy themselves into <pkg>-tests/ dirs at the repo root when they

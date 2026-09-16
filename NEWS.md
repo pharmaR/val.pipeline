@@ -11,9 +11,15 @@
   `reason` column (`not_assessed` vs `assessed_<risk>`). Repo
   detection is a case-insensitive substring match on `"bioc"` against
   both the alias name and URL, so non-OSS forks that consolidate the
-  four sub-repos into one entry are covered. Smoke test on the
-  2026-07-30 prod run surfaced 2,150 BioC packages that would leak
-  through the existing blocklist (#183).
+  four sub-repos into one entry are covered. When `val_dir` is
+  provided, defaults `config_path` to `<val_dir>/config.yml` if
+  present so historical runs pin against the same BioC universe they
+  originally assessed. The qm-side BioC mask unions the config-alias
+  match with a substring fallback so both URL-only aliases (e.g.
+  alias `sci` -> bioc URL) and riskmetric-derived labels (e.g.
+  `BioCsoft` vs config alias `BioC`) are recognized. Smoke test on
+  the 2026-07-30 prod run surfaced 2,150 BioC packages that would
+  leak through the existing blocklist (#183).
 
 # val.pipeline 0.1.59
 
