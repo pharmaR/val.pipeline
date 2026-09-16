@@ -441,3 +441,103 @@ test_that("write_qualified_pkg_lists() falls back to assessed-only if build_bioc
   # And the CRAN allowlist still writes correctly.
   expect_equal(readLines(file.path(out_dir, "qualified-CRAN.txt")), "dplyr")
 })
+
+
+test_that("write_qualified_pkg_lists(use_full_universe = TRUE) triggers expansion for URL-only-alias BioC repos", {
+  # blocklist_sources = "sci" alone has no "bioc" substring, but its
+  # URL in opt_repos points at Bioconductor. The wire-up must classify
+  # by BOTH alias AND URL from the effective repo map, otherwise a
+  # URL-only-alias config silently writes the pre-0.2.0 assessed-only
+  # blocklist.
+  qm <- data.frame(
+    pkg            = c("affy", "AnnotationDbi"),
+    repo_name      = c("sci",  "sci"),
+    final_decision = c("Low",  "High"),
+    stringsAsFactors = FALSE
+  )
+  # Universe must exceed min_universe (100).
+  fake_pkgs <- c("affy", "AnnotationDbi", "GenomeInfoDb",
+                 sprintf("filler%03d", seq_len(120)))
+  ap_fake <- cbind(
+    Package    = fake_pkgs,
+    Version    = "1.0.0",
+    Repository = "https://bioconductor.org/packages/3.22/bioc/src/contrib"
+  )
+  testthat::local_mocked_bindings(
+    available.packages = function(...) ap_fake,
+    .package = "utils"
+  )
+
+  out_dir <- withr::local_tempdir()
+  paths <- write_qualified_pkg_lists(
+    qm, out_dir,
+    qualified_decision = "Low",
+    blocklist_sources  = "sci",
+    use_full_universe  = TRUE,
+    opt_repos = list(sci = "https://bioconductor.org/packages/3.22/bioc")
+  )
+
+  bl <- readLines(file.path(out_dir, "blocklist-sci.txt"))
+  # affy (Low, assessed) must NOT be blocklisted.
+  expect_false("affy" %in% bl)
+  # AnnotationDbi (assessed_High) and every not_assessed pkg must be.
+  expect_true("AnnotationDbi" %in% bl)
+  expect_true("GenomeInfoDb" %in% bl)
+  # All 120 fillers on the blocklist proves the expansion triggered.
+  expect_true(all(sprintf("filler%03d", seq_len(120)) %in% bl))
+})
+
+
+test_that("write_qualified_pkg_lists(use_full_universe = TRUE) uses expansion result even when it is empty", {
+  # If build_bioc_blocklist() legitimately returns 0 rows (every
+  # universe pkg is on the allowlist), the wire-up must adopt that
+  # empty set — NOT silently keep the assessed-only inverse. Otherwise
+  # a previously-assessed_High pkg that's absent from the current
+  # universe would stay blocklisted, which contradicts the caller's
+  # explicit request to expand against the universe.
+  qm <- data.frame(
+    pkg            = c("affy", "GhostHighPkg"),
+    repo_name      = c("BioC", "BioC"),
+    final_decision = c("Low",  "High"),  # GhostHighPkg would be blocked pre-expansion
+    stringsAsFactors = FALSE
+  )
+  # Universe contains ONLY affy (Low-risk), enough pkgs to clear the
+  # min_universe floor. GhostHighPkg is absent from the current
+  # universe — the expansion result must be empty.
+  fake_pkgs <- c("affy", sprintf("filler%03d", seq_len(120)))
+  ap_fake <- cbind(
+    Package    = fake_pkgs,
+    Version    = "1.0.0",
+    Repository = "https://bioconductor.org/packages/3.22/bioc/src/contrib"
+  )
+  # Also add every filler to the allowlist so the expansion returns 0.
+  qm <- rbind(qm, data.frame(
+    pkg = sprintf("filler%03d", seq_len(120)),
+    repo_name = "BioC",
+    final_decision = "Low",
+    stringsAsFactors = FALSE
+  ))
+
+  testthat::local_mocked_bindings(
+    available.packages = function(...) ap_fake,
+    .package = "utils"
+  )
+
+  out_dir <- withr::local_tempdir()
+  suppressWarnings(  # empty-blocklist warning from build_bioc_blocklist()
+    paths <- write_qualified_pkg_lists(
+      qm, out_dir,
+      qualified_decision = "Low",
+      blocklist_sources  = "BioC",
+      use_full_universe  = TRUE,
+      opt_repos = list(BioC = "https://bioconductor.org/packages/3.22/bioc")
+    )
+  )
+
+  # The expansion said "empty"; the assessed-only inverse would have
+  # written GhostHighPkg. If the expansion result is honoured, the
+  # blocklist file is empty.
+  bl <- readLines(file.path(out_dir, "blocklist-BioC.txt"))
+  expect_length(bl, 0L)
+  expect_false("GhostHighPkg" %in% bl)
+})

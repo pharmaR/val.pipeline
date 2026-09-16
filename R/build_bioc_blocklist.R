@@ -68,15 +68,25 @@ build_bioc_blocklist <- function(
     qual_metadata,
     opt_repos          = NULL,
     config_path        = NULL,
-    qualified_decision = pull_config(val = "decisions_lst",
-                                     rule_type = "default")[1],
+    qualified_decision = NULL,
     min_universe       = 100L
 ) {
   stopifnot(
     is.data.frame(qual_metadata),
-    is.character(qualified_decision), length(qualified_decision) == 1L,
     is.numeric(min_universe), length(min_universe) == 1L, min_universe >= 0L
   )
+
+  # Resolve qualified_decision inside the body so it honours the
+  # caller's config_path. Evaluating in the signature default would
+  # read the session/installed config regardless — silently wrong if
+  # a historical/custom config uses a different first decision.
+  if (is.null(qualified_decision)) {
+    qualified_decision <- pull_config(val = "decisions_lst",
+                                      rule_type = "default",
+                                      config_path = config_path)[1]
+  }
+  stopifnot(is.character(qualified_decision),
+            length(qualified_decision) == 1L)
 
   key_col <- if ("pkg" %in% names(qual_metadata)) "pkg"
              else if ("package" %in% names(qual_metadata)) "package"

@@ -3096,6 +3096,21 @@ write_qualified_pkg_lists <- function(
   #
   # Unknown-source rows never produce a blocklist file — the "NA"
   # bucket is allow-list-only.
+  #
+  # Resolve the effective repo map once so BioC gating below can
+  # classify a source by BOTH its alias AND its URL. Pre-empts the
+  # URL-only-alias case: blocklist_sources = "sci" with
+  # opt_repos = list(sci = ".../bioconductor/...") should still fire
+  # the expansion even though "sci" doesn't contain "bioc".
+  effective_repos <- if (isTRUE(use_full_universe)) {
+    tryCatch(
+      as.list(.resolve_opt_repos(opt_repos = opt_repos,
+                                 config_path = config_path)),
+      error = function(e) list()  # no config -> skip URL classification
+    )
+  } else {
+    list()
+  }
   all_sources <- sort(unique(qual_metadata$repo_name))
   written <- character(0)
   for (src in all_sources) {
@@ -3110,7 +3125,16 @@ write_qualified_pkg_lists <- function(
       # Network failures are non-fatal here: fall back to the
       # assessed-only inverse with a warning so the surrounding
       # allowlist writes still succeed.
-      if (isTRUE(use_full_universe) && any(is_bioc_repo(stats::setNames("", src)))) {
+      #
+      # Classify src by both its alias AND the URL mapped from the
+      # effective repo map, so URL-only-alias configs still trigger.
+      src_url <- if (src %in% names(effective_repos)) {
+        as.character(effective_repos[[src]])
+      } else {
+        ""
+      }
+      if (isTRUE(use_full_universe) &&
+          any(is_bioc_repo(stats::setNames(src_url, src)))) {
         expanded <- tryCatch(
           build_bioc_blocklist(
             qual_metadata      = qual_metadata,
@@ -3128,7 +3152,12 @@ write_qualified_pkg_lists <- function(
             NULL
           }
         )
-        if (!is.null(expanded) && nrow(expanded) > 0L) {
+        # Only NULL (== error caught) preserves the assessed-only
+        # `pkgs`. A zero-row data frame is a deliberate result (every
+        # universe pkg is on the allowlist) and must replace `pkgs`
+        # so we don't silently blocklist an assessed_High pkg that's
+        # absent from the current universe.
+        if (!is.null(expanded)) {
           pkgs <- sort(unique(expanded$package))
         }
       }

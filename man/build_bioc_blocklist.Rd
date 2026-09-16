@@ -8,7 +8,7 @@ build_bioc_blocklist(
   qual_metadata,
   opt_repos = NULL,
   config_path = NULL,
-  qualified_decision = pull_config(val = "decisions_lst", rule_type = "default")[1],
+  qualified_decision = NULL,
   min_universe = 100L
 )
 }
