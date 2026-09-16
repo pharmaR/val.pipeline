@@ -1,3 +1,20 @@
+# val.pipeline 0.1.60
+
+- **Add `dev/dev_build_bioc_blocklist.R` for provisioning-time BioC
+  blocklist generation.** The pipeline's own `blocklist-BioC.txt` is
+  the inverse of the *assessed* BioC set, so any BioC package dropped
+  at `remote_reduce` (or otherwise never seen by the pipeline) is
+  absent from both the allowlist and the blocklist -- PPM would serve
+  it. The new helper pulls the full BioC universe via
+  `available.packages()` against the config's BioC repos, then emits
+  `blocklist = universe − Low-risk allowlist` as a CSV with a
+  `reason` column (`not_assessed` vs `assessed_<risk>`). Repo
+  detection is a case-insensitive substring match on `"bioc"` against
+  both the alias name and URL, so non-OSS forks that consolidate the
+  four sub-repos into one entry are covered. Smoke test on the
+  2026-07-30 prod run surfaced 2,150 BioC packages that would leak
+  through the existing blocklist (#183).
+
 # val.pipeline 0.1.59
 
 - **Fix `<U+2014>` fallback in the summary report subtitle and a few
