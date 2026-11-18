@@ -198,6 +198,16 @@ default:
   # to `~` (YAML null) or an empty list to fall back to allow-list
   # output for every source.
   blocklist_sources: [BioC]
+  # Output format(s) for the per-package reports rendered in `val_pkg()`
+  # (passed to `riskreports::package_report(output_format = )`). Options:
+  #   "typst" — PDF via Typst (default).
+  #   "html"  — the styled, self-contained HTML defined in pkg_template.qmd
+  #             (embed-resources + r-val-hub theme + foldable code).
+  #   "gfm"   — plain GitHub-flavoured markdown (no styling).
+  #   "all"   — render all three.
+  # A list such as [html, typst] renders several. Like the other scalar
+  # defaults, this must stay above `decisions_lst`.
+  pkg_report_format: typst
   # Whitelist of `riskmetric` assessment names to run when the initial
   # BioC assessment uses `pkg_bioc_remote` (i.e. `bioc_initial_ref:
   # remote`). Most `pkg_bioc_remote` metrics scrape bioconductor.org
