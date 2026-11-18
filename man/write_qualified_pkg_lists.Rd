@@ -8,7 +8,10 @@ write_qualified_pkg_lists(
   qual_metadata,
   out_dir,
   qualified_decision = pull_config(val = "decisions_lst", rule_type = "default")[1],
-  blocklist_sources = pull_config(val = "blocklist_sources", rule_type = "default")
+  blocklist_sources = pull_config(val = "blocklist_sources", rule_type = "default"),
+  use_full_universe = TRUE,
+  opt_repos = NULL,
+  config_path = NULL
 )
 }
 \arguments{
@@ -31,6 +34,28 @@ values in the \code{repo_name} column) that should be emitted as
 \verb{qualified-<source>.txt}. Defaults to the value of
 \code{blocklist_sources} in \code{inst/config.yml} (currently \code{c("BioC")}).
 Pass \code{character()} to force allow-list output for every source.}
+
+\item{use_full_universe}{Logical(1). When \code{TRUE} (the default),
+any BioC-detected source in \code{blocklist_sources} has its blocklist
+expanded against the full \code{\link[utils:available.packages]{utils::available.packages()}} universe
+for the effective BioC repo(s), via \code{\link[=build_bioc_blocklist]{build_bioc_blocklist()}}.
+Without this, packages dropped at \code{remote_reduce} (or otherwise
+never assessed) leak past both the allowlist and the blocklist,
+and PPM would silently serve them. Set to \code{FALSE} to preserve
+the pre-0.2.0 behaviour (assessed-only inverse) — useful on
+offline / network-restricted runners where
+\code{available.packages()} can't reach the BioC repo. If the network
+call fails at runtime, this function falls back to the
+assessed-only blocklist with a warning rather than aborting the
+whole write.}
+
+\item{opt_repos}{Named list/character of \code{alias -> URL}, forwarded
+to \code{\link[=build_bioc_blocklist]{build_bioc_blocklist()}} when \code{use_full_universe = TRUE}.
+\code{NULL} (default) means read from the effective config.}
+
+\item{config_path}{Optional \code{config.yml} path, forwarded to
+\code{\link[=build_bioc_blocklist]{build_bioc_blocklist()}} when \code{use_full_universe = TRUE} and
+\code{opt_repos} is \code{NULL}.}
 }
 \value{
 Invisibly, a named character vector: names are the source
