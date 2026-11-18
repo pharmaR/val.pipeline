@@ -897,7 +897,9 @@ val_pkg <- function(
       package_name = pkg,
       package_version = ver,
       template_path = system.file("report/package", package = "val.pipeline"),
-      output_format = "typst", # Options include html, gfm, and typst. Supplying 'all' does all 3
+      # Configurable via `pkg_report_format` in config.yml (html, gfm,
+      # typst, or 'all'); see pkg_report_format() below.
+      output_format = pkg_report_format(),
       # params list: https://github.com/pharmaR/riskreports/blob/main/inst/report/package/pkg_template.qmd
       params = list(
         assessment_path = assessment_file,
@@ -1072,3 +1074,29 @@ val_pkg <- function(
 }
 
 
+#' Output format(s) for the per-package report
+#'
+#' Reads `pkg_report_format` from the config, falling back to `"typst"` when
+#' it is unset, and checks it against the formats `pkg_template.qmd`
+#' supports.
+#'
+#' @return A character vector of Quarto output formats.
+#' @noRd
+pkg_report_format <- function() {
+  allowed <- c("html", "gfm", "typst", "all")
+  fmt <- tryCatch(
+    pull_config(val = "pkg_report_format", rule_type = "default"),
+    error = function(e) NULL
+  )
+  fmt <- as.character(unlist(fmt))
+  if (length(fmt) == 0L || !all(nzchar(fmt))) return("typst")
+  bad <- setdiff(fmt, allowed)
+  if (length(bad) > 0L) {
+    stop(
+      "Invalid `pkg_report_format` in config: ", toString(bad),
+      ". Use one or more of: ", toString(allowed), ".",
+      call. = FALSE
+    )
+  }
+  if ("all" %in% fmt) "all" else unique(fmt)
+}
